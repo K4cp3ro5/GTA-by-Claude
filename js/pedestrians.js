@@ -110,6 +110,7 @@ Pedestrians.hit = function(n, force, gentle){
   n.state = 'down';
   n.stateT = gentle ? 3.5 : 5.5;
   n.group.rotation.x = (rnd() < 0.5 ? 1 : -1) * Math.PI/2;
+  n.body.position.set(n.pos.x, -50, n.pos.y);   // leżący pieszy nie zostawia niewidzialnej kolizji w miejscu, gdzie stał
   Sound.hurt();
 };
 Pedestrians.hitMesh = function(mesh, dmg){

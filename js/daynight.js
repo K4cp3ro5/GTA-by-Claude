@@ -3,15 +3,18 @@
    --------------------------------------------------------------- */
 let timeOfDay = 0.375;        // 09:00
 const sunDir = new THREE.Vector3();
+/* kierunek światła kierunkowego: słońce w dzień, nocą księżyc (to samo azymutalnie, odbite nad horyzont) */
+const lightDir = new THREE.Vector3();
 let dayF = 1, nightF = 0, duskF = 0;
 
 const C_DAY    = new THREE.Color(0x8cb9e6);
 const C_NIGHT  = new THREE.Color(0x0a1026);
 const C_DUSK   = new THREE.Color(0xff8a3c);
 const C_HEMI_D = new THREE.Color(0xbfd8ff);
-const C_HEMI_N = new THREE.Color(0x2a3352);
+const C_HEMI_N = new THREE.Color(0x4a5784);
 const C_SUN_D  = new THREE.Color(0xfff6e2);
 const C_SUN_K  = new THREE.Color(0xff7a2a);
+const C_MOON   = new THREE.Color(0x8ea4d8);
 const skyCol   = new THREE.Color();
 const fogCol   = new THREE.Color();
 
@@ -19,6 +22,7 @@ function updateSky(dt){
   if (!timeFrozen) timeOfDay = (timeOfDay + dt / DAY_LENGTH * (down('daytime') ? 30 : 1)) % 1;
   const th = (timeOfDay - 0.25) * TAU;
   sunDir.set(Math.cos(th) * 0.55, Math.sin(th), Math.cos(th) * 0.83).normalize();
+  lightDir.set(sunDir.x, Math.max(Math.abs(sunDir.y), 0.12), sunDir.z).normalize();
 
   const up = sunDir.y;
   dayF   = smoothstep(-0.07, 0.20, up);
@@ -31,11 +35,11 @@ function updateSky(dt){
   scene.fog.color.copy(fogCol);
   scene.fog.density = lerp(0.0090, 0.0055, dayF);
 
-  sun.intensity = dayF * 1.25;
-  sun.color.copy(C_SUN_D).lerp(C_SUN_K, duskF * 0.85);
-  hemi.intensity = 0.20 + dayF * 0.52;
+  sun.intensity = dayF * 1.25 + nightF * 0.34;                 // nocą: słaba, chłodna poświata księżyca
+  sun.color.copy(C_SUN_D).lerp(C_SUN_K, duskF * 0.85).lerp(C_MOON, nightF);
+  hemi.intensity = 0.50 + dayF * 0.22;
   hemi.color.copy(C_HEMI_N).lerp(C_HEMI_D, dayF);
-  hemi.groundColor.setHex(nightF > 0.5 ? 0x14161f : 0x3a3630);
+  hemi.groundColor.setHex(nightF > 0.5 ? 0x262833 : 0x3a3630);
 
   /* świecące okna */
   const glow = smoothstep(0.12, 0.72, nightF);
@@ -43,7 +47,7 @@ function updateSky(dt){
 
   /* latarnie */
   matLampGlass.color.setRGB(lerp(0.22, 1.0, glow), lerp(0.22, 0.72, glow), lerp(0.22, 0.28, glow));
-  matGlow.opacity = glow * 0.40;
+  matGlow.opacity = glow * 0.55;
   lampGlows.visible = glow > 0.02;
 
   /* reflektory auta + tylne światła */

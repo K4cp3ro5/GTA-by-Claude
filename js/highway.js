@@ -169,6 +169,31 @@ function embankSide(buf, xe, zA, yA, zB, yB, outX){
   });
 })();
 
+/* wnętrze tuneli: ciemna "głębia" przy murze (zamiast muru z niebem nad nim) i świecące
+   oprawy pod stropem nad każdym pasem — tunel wygląda na ciągnący się dalej, także nocą */
+const tunnelLightBuf = new GeoBuf(), tunnelVoidBuf = new GeoBuf();
+(function buildTunnelInterior(){
+  const xl = HWY_A_OUT - 0.5, xr = HWY_B_OUT + 0.5;
+  [[HWY_Z0, 1], [HWY_Z1, -1]].forEach(t => {
+    const zw = t[0] + t[1] * 0.05;                                     // tuż przed licem muru
+    quadOut(tunnelVoidBuf, [xl,0,zw], [xr,0,zw], [xr,5.4,zw], [xl,5.4,zw], [0,0,t[1]]);
+    [hwyLaneX('A',0), hwyLaneX('A',1), hwyLaneX('B',0), hwyLaneX('B',1)].forEach(lx => {
+      for (let k = 1; k < HWY_TUN_L; k += 3){
+        const z = t[0] + t[1] * k;
+        quadOut(tunnelLightBuf, [lx-0.15,5.38,z-0.6], [lx+0.15,5.38,z-0.6], [lx+0.15,5.38,z+0.6], [lx-0.15,5.38,z+0.6], [0,-1,0]);
+      }
+    });
+  });
+})();
+
+/* latarnie wzdłuż zewnętrznych krawędzi obu jezdni (tylko na odcinkach na poziomie terenu,
+   poza łącznicami, estakadą i tunelami); wysięgnik nad pobocze */
+for (let z = -216; z <= 216; z += 48){
+  if (Math.abs(z - HWY_BR.zc) < HWY_BR.half + HWY_BR.ramp + 8) continue;
+  if (Math.abs(z - HWY_IC_Z) > 80) lampSpots.push({ x: HWY_A_OUT - 0.5, z: z, rot:  Math.PI/2, y: 0 });
+  lampSpots.push({ x: HWY_B_OUT + 0.5, z: z, rot: -Math.PI/2, y: 0 });
+}
+
 /* --- łącznica: krzywa Beziera między autostradą a istniejącym skrzyżowaniem
    miejskim (WALL_X-ROAD_H-ish, HWY_IC_Z) — zwęża się do zera na końcu
    zjazdowym (gore), stała szerokość na reszcie długości --- */
@@ -418,3 +443,5 @@ const shedMesh      = addMerged(shedBuf,      new THREE.MeshLambertMaterial({ co
 const shedRoofMesh  = addMerged(shedRoofBuf,  new THREE.MeshLambertMaterial({ color: 0x4b525a }), true, true);
 const treeTrunkMesh = addMerged(treeTrunkBuf, new THREE.MeshLambertMaterial({ color: 0x584434 }), true, true);
 const treeCrownMesh = addMerged(treeCrownBuf, new THREE.MeshLambertMaterial({ color: 0x4a7a3a }), true, true);
+addMerged(tunnelLightBuf, new THREE.MeshBasicMaterial({ color: 0xffdca8 }), false, false);
+addMerged(tunnelVoidBuf,  new THREE.MeshBasicMaterial({ color: 0x050607 }), false, false);

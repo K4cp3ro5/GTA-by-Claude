@@ -210,6 +210,7 @@ function toggleDebugMenu(){
     wasLockedBeforeDebug = pointerLocked;
     if (pointerLocked) document.exitPointerLock();
     dbg.time.value = String(Math.round(timeOfDay * 1440) % 1440);
+    dbg.timeLbl.textContent = timeLabel(parseInt(dbg.time.value, 10));
     dbg.freeze.checked = timeFrozen;
     dbg.god.checked = godMode;
     dbg.speed.value = String(carSpeedMult);

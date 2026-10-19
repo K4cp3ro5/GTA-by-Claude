@@ -32,28 +32,20 @@ function updateNpcs(dt){
     if (checkPoint(chassisBody.position.x, chassisBody.position.z, 1.0)) block = true;
     if (!block && mode === 'foot' &&
         checkPoint(player.body.position.x, player.body.position.z, 0.5)) block = true;
-    /* auta NPC: przy ruchu prostopadłym obowiązuje reguła prawej ręki — ustępuje
-       ten, kto ma drugie auto po swojej PRAWEJ (inaczej dwa auta na skrzyżowaniu
-       widzą się nawzajem "przed sobą" i czekają w nieskończoność). Bezpiecznik:
-       po 9 s stania z powodu aut ignorujemy je na 2.5 s (cykl z 4 aut). */
+    if (!block && mainCarPlaceholder &&
+        checkPoint(mainCarPlaceholder.body.position.x, mainCarPlaceholder.body.position.z, 1.0)) block = true;   // zaparkowane główne auto
+    /* auta NPC (npcConflict): jazda za autem w tym samym kierunku (cap), a przy ruchu poprzecznym
+       punkt kolizji torów — auto, które już jest w strefie konfliktu, ma pierwszeństwo; gdy oba
+       dopiero dojeżdżają, ustępuje to, które ma drugie po PRAWEJ (reguła prawej ręki). Bezpiecznik:
+       po 9 s stania z powodu aut przez 2.5 s liczy się tylko auto tuż przed maską. */
     let blockedByNpc = false, cap = Infinity;     // cap = prędkość auta jadącego przed nami w tym samym kierunku
-    if (!block && !(n.ignoreNpcT > 0)){
+    if (!block){
+      const ignoring = n.ignoreNpcT > 0;
       for (let k = 0; k < npcs.length; k++){
         if (k === i) continue;
-        const m = npcs[k];
-        const rx = m.pos.x - n.pos.x, rz = m.pos.y - n.pos.y;
-        /* wąski stożek z przodu LUB bardzo bliskie auto przed nosem (zakręty — stożek bywa obrócony) */
-        const veryClose = Math.hypot(rx, rz) < 3.0 && (rx*dx + rz*dz) > 0;
-        if (!checkPoint(m.pos.x, m.pos.y, 1.0) && !veryClose) continue;
-        const mdx = Math.sin(m.heading), mdz = Math.cos(m.heading);
-        if (dx*mdx + dz*mdz > 0.8 && (rx*dx + rz*dz) > 5.5){   // to samo kierunek, wystarczający odstęp: dostosuj prędkość
-          cap = Math.min(cap, m.speed); continue;
-        }
-        if (Math.abs(dx*mdx + dz*mdz) < 0.5){
-          const rightness = (m.pos.x - n.pos.x) * -dz + (m.pos.y - n.pos.y) * dx;
-          if (rightness <= 0) continue;       // drugie auto z lewej — mam pierwszeństwo
-        }
-        block = true; blockedByNpc = true; break;
+        const r = npcConflict(n, npcs[k], dx, dz, ignoring);
+        if (r === true){ block = true; blockedByNpc = true; break; }
+        if (r < cap) cap = r;
       }
     }
     if (n.ignoreNpcT > 0) n.ignoreNpcT -= dt;
@@ -68,8 +60,41 @@ function updateNpcs(dt){
     n.speed = damp(n.speed, want, (block || want < n.speed - 1) ? 5.5 : 1.7, dt);
     n.heading = angleDamp(n.heading, Math.atan2(dx, dz), 5.5, dt);
 
+    n.dirX = dx; n.dirZ = dz;
     n.body.velocity.set(dx * n.speed, 0, dz * n.speed);
     n.body.angularVelocity.set(0, 0, 0);
     n.body.quaternion.setFromAxisAngle(_npAxis, n.heading);
   }
+}
+
+/* Relacja auta n (kierunek jazdy dx,dz) z autem m: true = stój, liczba = maks. prędkość
+   (jazda za m), Infinity = brak wpływu. Kierunek m to jego faktyczny kierunek jazdy (dirX/dirZ),
+   nie wygładzony heading — w zakręcie heading spóźnia się za ruchem. */
+function npcConflict(n, m, dx, dz, onlyClose){
+  const rx = m.pos.x - n.pos.x, rz = m.pos.y - n.pos.y, dist = Math.hypot(rx, rz);
+  if (dist > 16) return Infinity;
+  const ahead = rx*dx + rz*dz, lat = Math.abs(rx*-dz + rz*dx);
+  if (dist < 3.2 && ahead > 0) return true;                        // tuż przed maską — zawsze stop
+  if (onlyClose) return Infinity;
+  const mdx = m.dirX !== undefined ? m.dirX : Math.sin(m.heading), mdz = m.dirZ !== undefined ? m.dirZ : Math.cos(m.heading);
+  const dot = dx*mdx + dz*mdz;
+  if (dot > 0.8){                                                  // ten sam kierunek: kolejka
+    if (ahead < 0.5 || ahead > 13 || lat > 2.6) return Infinity;
+    if (ahead < 5.5) return true;
+    return ahead < 8 ? m.speed * 0.7 : m.speed;
+  }
+  if (dot < -0.8){                                                 // z naprzeciwka: tylko gdy na moim pasie
+    return (ahead > 0.5 && ahead < 10 && lat < 2.2) ? true : Infinity;
+  }
+  /* ruch poprzeczny: punkt przecięcia torów; t = moja droga do niego, s = droga m (ujemna = minął) */
+  const cr = dx*mdz - dz*mdx;
+  const t = (rx*mdz - rz*mdx) / cr, s = (rx*dz - rz*dx) / cr;
+  if (t < -2.6 || t > 13 || s < -2.6 || s > 13) return Infinity;   // któreś już minęło punkt (tył auta też) albo jest daleko
+  const mIn = s < 3.2, nIn = t < 3.2;                              // w strefie konfliktu (lub tuż przed nią)
+  if (nIn && !mIn) return Infinity;                                // jestem już w środku — jadę dalej
+  if (mIn && !nIn) return true;                                    // ono jest w środku — czekam
+  if (mIn && nIn) return t > s ? true : Infinity;                  // oba w środku: dalsze od punktu ustępuje
+  if (m.speed < 0.5) return Infinity;                              // m stoi przed skrzyżowaniem (światło, STOP, ustępuje) — nie czekam na nie
+  const rightness = rx*-dz + rz*dx;                                // > 0: m po mojej prawej
+  return (rightness > 0 && t < 12) ? true : Infinity;
 }

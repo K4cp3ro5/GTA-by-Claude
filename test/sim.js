@@ -110,18 +110,33 @@ function __static(){
   out.world = { x0: -WALL_X, x1: WORLD_X1, hwyZ: [HWY_Z0, HWY_Z1], hwy: [HWY_A_OUT, HWY_B_OUT], bridgeZ: HWY_BR.zc, ic: HWY_IC_Z };
   return out;
 }
+/* prawdziwe nakładanie nadwozi: test osi rozdzielającej (SAT) dla prostokątów 1.86 x 4.1 m
+   obróconych wg kierunku jazdy (pomniejszone o 0.1 m — styk zderzaków to jeszcze nie kolizja) */
+function __obb(a, b){
+  const ha = [0.88, 2.0], ax = [[Math.cos(a.h), -Math.sin(a.h)], [Math.sin(a.h), Math.cos(a.h)]];
+  const bx = [[Math.cos(b.h), -Math.sin(b.h)], [Math.sin(b.h), Math.cos(b.h)]];
+  const d = [b.x - a.x, b.z - a.z];
+  for (const axis of ax.concat(bx)){
+    const ra = ha[0]*Math.abs(ax[0][0]*axis[0] + ax[0][1]*axis[1]) + ha[1]*Math.abs(ax[1][0]*axis[0] + ax[1][1]*axis[1]);
+    const rb = ha[0]*Math.abs(bx[0][0]*axis[0] + bx[0][1]*axis[1]) + ha[1]*Math.abs(bx[1][0]*axis[0] + bx[1][1]*axis[1]);
+    if (Math.abs(d[0]*axis[0] + d[1]*axis[1]) > ra + rb) return false;
+  }
+  return true;
+}
 function __sim(seconds){
   const dt = 0.05, steps = Math.floor(seconds/dt);
   chassisBody.position.set(9999, 0.6, 9999);       // auto gracza poza trasami
   player.body.position.set(-9999, 1, -9999);
-  const cnt = { red:0, stop:0, yield:0, rbNear:0 };
+  const cnt = { red:0, stop:0, yield:0, rbNear:0, red2:0, stop2:0 };
   const _r = redLightAhead, _s = stopSignAhead, _y = roundaboutYield;
-  redLightAhead = (...a) => { const v = _r(...a); if (v) cnt.red++; return v; };
-  stopSignAhead = (...a) => { const v = _s(...a); if (v) cnt.stop++; return v; };
+  let late = false;   // druga połowa symulacji — reguły muszą działać przez cały czas, nie tylko na starcie
+  redLightAhead = (...a) => { const v = _r(...a); if (v){ cnt.red++; if (late) cnt.red2++; } return v; };
+  stopSignAhead = (...a) => { const v = _s(...a); if (v){ cnt.stop++; if (late) cnt.stop2++; } return v; };
   roundaboutYield = (...a) => { const v = _y(...a); if (v) cnt.yield++; return v; };
   const hw = { steps:0, vMin:1e9, vMax:0, vSum:0, vN:0, lanes:0, overlaps:0, minGap:1e9, prevT:new Map(), wrongSide:0, laneCrossBad:0 };
   const stuck = new Map(), report = { stuckMax:0, stuckIds:[], overlaps:0, overlapPairs:new Set(), minSpeedSamples:0 };
   for (let s = 0; s < steps; s++){
+    late = s > steps / 2;
     updateTrafficLights(dt); updateNpcs(dt); updateRoundaboutTraffic(dt); updateHighwayTraffic(dt);
     for (let i = 0; i < hwyTraffic.length; i++){
       const c = hwyTraffic[i];
@@ -151,7 +166,7 @@ function __sim(seconds){
       }
       for (let k = i+1; k < npcs.length; k++){
         const m = npcs[k];
-        if (Math.hypot(n.pos.x-m.pos.x, n.pos.y-m.pos.y) < 1.3){ report.overlaps++; report.overlapPairs.add(i+'-'+k); (report.locs = report.locs || []).push([+n.pos.x.toFixed(0), +n.pos.y.toFixed(0), +n.heading.toFixed(1), +m.heading.toFixed(1)]); }
+        if (Math.hypot(n.pos.x-m.pos.x, n.pos.y-m.pos.y) < 4.6 && __obb({x:n.pos.x, z:n.pos.y, h:n.heading}, {x:m.pos.x, z:m.pos.y, h:m.heading})){ report.overlaps++; report.overlapPairs.add(i+'-'+k); (report.locs = report.locs || []).push([+n.pos.x.toFixed(0), +n.pos.y.toFixed(0), +n.heading.toFixed(1), +m.heading.toFixed(1)]); }
       }
     }
   }
@@ -182,10 +197,10 @@ console.log('Świat:', JSON.stringify(st.world));
 const r = base.__sim(secs);
 console.log('Symulacja', secs, 's gry,', r.npcCount, 'aut NPC miejskich');
 console.log('Najdłuższy postój jednego auta (v<0.3):', r.stuckMax.toFixed(1), 's', r.stuckAt ? '(auto #'+r.stuckId+' przy '+r.stuckAt+')' : '');
-console.log('Zdarzenia nakładania się aut (<1.3 u):', r.overlaps, r.overlapPairs.slice(0,8));
+console.log('Klatki z nakładaniem się nadwozi aut miejskich (test SAT):', r.overlaps, r.overlapPairs.slice(0,8));
 if (r.dump) console.log('ZAKLESZCZENIE — auta w pobliżu:', JSON.stringify(r.dump));
 if (r.locs) console.log('miejsca nakładania (x,z,h1,h2):', JSON.stringify(r.locs.slice(0,14)));
-console.log('Aktywacje reguł (klatki z hamowaniem): światła', r.cnt.red, '| STOP', r.cnt.stop, '| ustępowanie na rondach', r.cnt.yield);
+console.log('Aktywacje reguł (klatki z hamowaniem): światła', r.cnt.red, '| STOP', r.cnt.stop, '| ustępowanie na rondach', r.cnt.yield, '| w 2. połowie: światła', r.cnt.red2, 'STOP', r.cnt.stop2);
 console.log('Auta miejskie blisko aut krążących na rondach (<1.6 u):', r.cnt.rbNear);
 console.log('Postawionych znaków/sygnalizatorów:', r.signs, '| stojących w budynku:', r.signsInBuildings.length, r.signsInBuildings.slice(0,6));
 console.log('Autostrada — kierunki zgodne z pasem:', r.hwyDirsOk);

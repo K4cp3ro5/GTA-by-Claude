@@ -112,7 +112,7 @@ for (let i = 0; i <= GRID; i++){
 }
 
 /* --- podesty chodników + budynki + detale --- */
-const lampSpots = [];   // {x,z,rot}
+const lampSpots = [];   // {x,z,rot, y?: podłoże (domyślnie chodnik), street?: latarnia przy krawężniku}
 const treeSpots = [];   // {x,z,type,scale}
 const binSpots  = [];
 const hydSpots  = [];
@@ -140,6 +140,7 @@ function addBuilding(cx, cz, w, d, h, pool, yBase){
 /* --- przystanki autobusowe i parkingi (doc pkt 2) --- */
 const busBuf = new GeoBuf();        // wiata (kolor stalowy)
 const busSignBuf = new GeoBuf();    // żółta tabliczka przystankowa
+const busStopSpots = [];            // środki wiat (latarnie omijają to miejsce)
 function buildBusStop(cx, cz, side){
   /* side: 0=E, 1=W, 2=N, 3=S względem środka kwartału; wiata przy krawędzi chodnika */
   const e = LOT/2 - 0.7, y = WALK_H;
@@ -155,6 +156,7 @@ function buildBusStop(cx, cz, side){
   busBuf.box(px, y + 0.5, pz, alongX ? L1*0.7 : 0.35, 0.1, alongX ? 0.35 : L1*0.7, 2, true);   // ławka
   busSignBuf.box(px + (alongX ? L1/2 + 0.5 : 0), y + 2.5, pz + (alongX ? 0 : L1/2 + 0.5), 0.5, 0.5, 0.06, 1, true);
   staticBox(px, y + 1.2, pz, w, 2.4, d);
+  busStopSpots.push({ x: px, z: pz });
 }
 function buildParkingBlock(cx, cz){
   const y = WALK_H;
@@ -305,11 +307,13 @@ for (let bi = 0; bi < GRID; bi++){
 
     /* detale na obrzeżu kwartału */
     const edge = LOT/2 - 1.3;
-    lampSpots.push({ x: cx + edge, z: cz + rand(-edge*0.55, edge*0.55), rot: -Math.PI/2 });
-    lampSpots.push({ x: cx + rand(-edge*0.55, edge*0.55), z: cz - edge, rot: 0 });
-    if ((bi + bj) % 2 === 0){
-      lampSpots.push({ x: cx - edge, z: cz + rand(-edge*0.5, edge*0.5), rot: Math.PI/2 });
-    }
+    /* latarnie 0.6 m od krawężnika, wysięgnik (lokalne +Z, kierunek (sin rot, cos rot)) nad jezdnię;
+       pomijane, gdy w tym miejscu stoi wiata przystanku */
+    const edgeL = LOT/2 - 0.6;
+    const lamp = (x, z, rot) => { if (!busStopSpots.some(b => Math.hypot(b.x - x, b.z - z) < 3)) lampSpots.push({ x: x, z: z, rot: rot, street: true }); };
+    lamp(cx + edgeL, cz + rand(-edge*0.55, edge*0.55), Math.PI/2);
+    lamp(cx + rand(-edge*0.55, edge*0.55), cz - edgeL, Math.PI);
+    if ((bi + bj) % 2 === 0) lamp(cx - edgeL, cz + rand(-edge*0.5, edge*0.5), -Math.PI/2);
     for (let t = 0; t < 3; t++){
       const side = randInt(0,3);
       const p = rand(-edge*0.8, edge*0.8);

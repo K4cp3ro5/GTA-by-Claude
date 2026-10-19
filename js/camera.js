@@ -69,5 +69,5 @@ function updateCamera(dt, kmh){
 
   /* cień podąża za akcją */
   sun.target.position.set(camTarget.x, 0, camTarget.z);
-  sun.position.set(camTarget.x + sunDir.x * 95, sunDir.y * 95 + 2, camTarget.z + sunDir.z * 95);
+  sun.position.set(camTarget.x + lightDir.x * 95, lightDir.y * 95 + 2, camTarget.z + lightDir.z * 95);
 }

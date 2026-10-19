@@ -56,13 +56,15 @@ function buildNpcModel(color){
   return g;
 }
 
-function spawnNpcCar(path, colorHex, startIdx){
+/* frac = położenie na odcinku idx -> idx+1 (0 = w narożniku pętli) */
+function spawnNpcCar(path, colorHex, startIdx, frac){
   const idx = (startIdx !== undefined) ? startIdx : randInt(0, path.length - 1);
+  const p0 = path[idx], p1 = path[(idx + 1) % path.length], f = frac || 0;
   const n = {
     path: path,
     wp: (idx + 1) % path.length,
-    pos: new THREE.Vector2(path[idx].x, path[idx].z),
-    heading: 0,
+    pos: new THREE.Vector2(lerp(p0.x, p1.x, f), lerp(p0.z, p1.z, f)),
+    heading: Math.atan2(p1.x - p0.x, p1.z - p0.z),
     speed: 0,
     /* prędkość zależna od strefy (centrum wolniej, obrzeża szybciej) i od "charakteru" kierowcy 0.7–1.35x */
     target: clamp(clamp(6.5 + Math.hypot(path[idx].x, path[idx].z) / 26, 6.5, 14) * rand(0.7, 1.35), 5, 18),
@@ -82,9 +84,20 @@ function spawnNpcCar(path, colorHex, startIdx){
   npcs.push(n);
   return n;
 }
+/* nowe auto (kradzież, menu debug): w losowym miejscu którejś pętli, ale poza zasięgiem
+   wzroku gracza (> 60 m) i nie na innym aucie (> 12 m od każdego NPC) */
 function spawnRandomNpcCar(){
-  const path = LOOPS[randInt(0, LOOPS.length - 1)];
-  return spawnNpcCar(path, NPC_COLORS[randInt(0, NPC_COLORS.length - 1)]);
+  const p = mode === 'car' ? chassisBody.position : player.body.position;
+  let path, idx, frac;
+  for (let tries = 0; tries < 40; tries++){
+    path = LOOPS[randInt(0, LOOPS.length - 1)]; idx = randInt(0, path.length - 1); frac = rand(0.25, 0.75);
+    const a = path[idx], b = path[(idx + 1) % path.length];
+    const x = lerp(a.x, b.x, frac), z = lerp(a.z, b.z, frac);
+    if (Math.hypot(x - p.x, z - p.z) < 60) continue;
+    if (npcs.some(m => Math.hypot(m.pos.x - x, m.pos.y - z) < 12)) continue;
+    break;
+  }
+  return spawnNpcCar(path, NPC_COLORS[randInt(0, NPC_COLORS.length - 1)], idx, frac);
 }
 function removeNpcCar(n){
   delBody(n.body);

@@ -77,7 +77,7 @@ function redLightAhead(px, pz, dx, dz){
     const ahead = ox*dx + oz*dz;
     if (ahead < 2 || ahead > 9.5) continue;
     const lat = Math.abs(ox*-dz + oz*dx);
-    if (lat > 3.5) continue;
+    if (lat > 5.2) continue;          // pas jazdy = 3.5 m od osi (±1.75); próg dokładnie 3.5 odrzucał auta po minimalnym dryfie numerycznym
     const st = Math.abs(dz) >= Math.abs(dx) ? tl.ns : tl.ew;
     if (st === 'G') continue;
     if (st === 'Y' && ahead < 9) continue;
@@ -121,7 +121,7 @@ function stopSignAhead(n, dx, dz, dt){
     const ahead = ox*dx + oz*dz;
     if (ahead < 1.5 || ahead > 9) continue;
     const lat = Math.abs(ox*-dz + oz*dx);
-    if (lat > 3.5) continue;
+    if (lat > 5.2) continue;          // pas jazdy = 3.5 m od osi (±1.75); próg dokładnie 3.5 odrzucał auta po minimalnym dryfie numerycznym
     inZone = true;
     if (n.stopPass) return false;
     if (n.speed < 0.6){          // postój gdziekolwiek w strefie dojazdu liczy się do odczekania
