@@ -1,7 +1,16 @@
 /* ---------------------------------------------------------------
    17. AKTUALIZACJA POJAZDU
    --------------------------------------------------------------- */
-let steer = 0, engineRpm = 0, handbrakeOn = false, gearTxt = 'N';
+let steer = 0, steerRaw = 0, engineRpm = 0, handbrakeOn = false, gearTxt = 'N';
+/* opór powietrza i stabilizacja odchylenia — co KROK fizyki (preStep), nie co klatkę:
+   siła dodana w klatce bez kroku sumowała się z następną i prędkość "pulsowała" */
+world.addEventListener('preStep', () => {
+  const v = chassisBody.velocity, spd = Math.hypot(v.x, v.z), drag = 1.15;
+  chassisBody.force.x -= v.x * spd * drag;
+  chassisBody.force.z -= v.z * spd * drag;
+  /* tłumienie obrotu wokół osi pionowej bez skrętu (mniej "pływania" tyłu po puszczeniu kierownicy), nie przy ręcznym */
+  if (!handbrakeOn && Math.abs(steer) < 0.05) chassisBody.angularVelocity.y *= 0.985;
+});
 const MAX_STEER = 0.52, MAX_FORCE = 5200, BRAKE_F = 62, HAND_F = 190;
 
 const _fwdWorld = new CANNON.Vec3();
@@ -14,23 +23,24 @@ function updateCar(dt){
   const spd = Math.hypot(vel.x, vel.z);
   const kmh = spd * 3.6;
 
-  /* opór powietrza — ogranicza prędkość maksymalną */
-  const drag = 1.15;
-  chassisBody.force.x -= vel.x * spd * drag;
-  chassisBody.force.z -= vel.z * spd * drag;
-
   if (driving){
     const throttle = (down('forward') || keys['ArrowUp']) ? 1 : 0;
     const reverse  = (down('back')    || keys['ArrowDown']) ? 1 : 0;
     handbrakeOn = down('jump');
 
-    /* skręt z powrotem kół do centrum i mniejszym kątem przy prędkości */
+    /* skręt: klawisz ustawia CEL, a koła dochodzą do niego płynnie (najpierw liniowo, potem
+       wygładzenie wykładnicze — bez szarpnięcia na starcie i końcu ruchu kierownicy).
+       Maksymalny kąt maleje z prędkością (0.52 rad w miejscu, ~0.2 rad przy 120 km/h),
+       a kierownica wolniej skręca, szybciej wraca do środka i szybko zmienia stronę. */
     let want = 0;
     if (down('left')  || keys['ArrowLeft'])  want += 1;
     if (down('right') || keys['ArrowRight']) want -= 1;
-    const speedFactor = 1 - clamp(kmh / 165, 0, 0.62);
-    const rate = want !== 0 ? 4.4 : 7.5;
-    steer = approach(steer, want * MAX_STEER * speedFactor, rate * dt);
+    const lock = MAX_STEER / (1 + spd / 20);
+    const target = want * lock;
+    const reversing = want !== 0 && Math.sign(target) !== Math.sign(steerRaw) && Math.abs(steerRaw) > 0.02;
+    const rate = want === 0 ? 3.2 : (reversing ? 4.0 : 2.2 / (1 + spd / 30));
+    steerRaw = approach(steerRaw, target, rate * dt);
+    steer = damp(steer, steerRaw, 16, dt);
     vehicle.setSteeringValue(steer, 0);
     vehicle.setSteeringValue(steer, 1);
 
@@ -96,13 +106,26 @@ function updateCar(dt){
   return { kmh: kmh, spd: spd, fwd: fwdWorld };
 }
 
-function syncCar(){
-  carModel.root.position.copy(chassisBody.position);
-  carModel.root.quaternion.copy(chassisBody.quaternion);
+/* model auta = poza interpolowana między dwoma krokami fizyki (alpha z main-loop.js); koła liczone
+   względem nadwozia z fizyki i przeniesione na nadwozie interpolowane, żeby nie "pływały" */
+const _scPos = new THREE.Vector3(), _scQ0 = new THREE.Quaternion(), _scQ1 = new THREE.Quaternion();
+const _scCur = new THREE.Matrix4(), _scInv = new THREE.Matrix4(), _scRen = new THREE.Matrix4(), _scW = new THREE.Matrix4();
+const _scV = new THREE.Vector3(), _scQ = new THREE.Quaternion(), _scS = new THREE.Vector3(1, 1, 1);
+function syncCar(alpha){
+  const b = chassisBody, a = alpha === undefined ? 1 : alpha, p0 = b._hasPrev === true ? b._p0 : b.position, q0 = b._hasPrev === true ? b._q0 : b.quaternion;
+  _scPos.set(lerp(p0.x, b.position.x, a), lerp(p0.y, b.position.y, a), lerp(p0.z, b.position.z, a));
+  _scQ0.set(q0.x, q0.y, q0.z, q0.w); _scQ1.set(b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w);
+  _scQ0.slerp(_scQ1, a);
+  carModel.root.position.copy(_scPos);
+  carModel.root.quaternion.copy(_scQ0);
+  _scV.set(b.position.x, b.position.y, b.position.z);
+  _scCur.compose(_scV, _scQ1, _scS); _scInv.copy(_scCur).invert();
+  _scRen.compose(_scPos, _scQ0, _scS);
   for (let i = 0; i < 4; i++){
     vehicle.updateWheelTransform(i);
     const t = vehicle.wheelInfos[i].worldTransform;
-    carModel.wheels[i].position.copy(t.position);
-    carModel.wheels[i].quaternion.copy(t.quaternion);
+    _scV.set(t.position.x, t.position.y, t.position.z); _scQ.set(t.quaternion.x, t.quaternion.y, t.quaternion.z, t.quaternion.w);
+    _scW.compose(_scV, _scQ, _scS).premultiply(_scInv).premultiply(_scRen);
+    _scW.decompose(carModel.wheels[i].position, carModel.wheels[i].quaternion, _scV);
   }
 }
