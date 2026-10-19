@@ -12,6 +12,16 @@ function updateNpcs(dt){
     n.mesh.rotation.y = n.heading;
 
     const tgt = n.path[n.wp];
+    /* rondo: 'approach' = cel to punkt trasy ronda, auto jeszcze przed pasem okrężnym; 'ring' = wlot, rondo, wylot */
+    if (tgt.rb !== undefined){
+      const rp = ROUNDABOUT_PTS[tgt.rb], rcx = L(rp[0]), rcz = L(rp[1]);
+      n.rb = tgt.rb; n.rbDist = Math.hypot(n.pos.x - rcx, n.pos.y - rcz);
+      n.rbPhase = (tgt.k === 'in' && n.rbDist > RB.outer + 0.6) ? 'approach' : 'ring';
+      if (n.rbPhase === 'approach'){
+        const ax = n.pos.x - rcx, az = n.pos.y - rcz;
+        n.rbArm = Math.abs(ax) > Math.abs(az) ? { x: Math.sign(ax), z: 0 } : { x: 0, z: Math.sign(az) };
+      }
+    } else { n.rb = -1; n.rbPhase = null; }
     let dx = tgt.x - n.pos.x, dz = tgt.z - n.pos.y;
     let d = Math.hypot(dx, dz);
     if (d < 2.2){
@@ -53,12 +63,14 @@ function updateNpcs(dt){
     if (n.waitT > 9){ n.ignoreNpcT = 2.5; n.waitT = 0; }
     if (!block && redLightAhead(n.pos.x, n.pos.y, dx, dz)) block = true;
     if (!block && stopSignAhead(n, dx, dz, dt)) block = true;
-    if (!block && roundaboutYield(n.pos.x, n.pos.y, dx, dz)) block = true;
+    if (!block && roundaboutYield(n)) block = true;
     n.blocked = block;
+    /* rondo: ~23 km/h na pasie okrężnym, płynne zwalnianie od ~24 m przed środkiem */
+    if (n.rb >= 0 && n.rbDist < 24) cap = Math.min(cap, 6.5 + Math.max(0, n.rbDist - 13) * 0.7);
 
     const want = block ? 0 : Math.min(n.target, cap);
     n.speed = damp(n.speed, want, (block || want < n.speed - 1) ? 5.5 : 1.7, dt);
-    n.heading = angleDamp(n.heading, Math.atan2(dx, dz), 5.5, dt);
+    n.heading = angleDamp(n.heading, Math.atan2(dx, dz), n.rbPhase === 'ring' ? 8 : 5.5, dt);
 
     n.dirX = dx; n.dirZ = dz;
     n.body.velocity.set(dx * n.speed, 0, dz * n.speed);
@@ -78,6 +90,22 @@ function npcConflict(n, m, dx, dz, onlyClose){
   if (onlyClose) return Infinity;
   const mdx = m.dirX !== undefined ? m.dirX : Math.sin(m.heading), mdz = m.dirZ !== undefined ? m.dirZ : Math.cos(m.heading);
   const dot = dx*mdx + dz*mdz;
+  /* to samo rondo: na pasie okrężnym kolejka liczona po torze; jadący po rondzie nie ustępują
+     wjeżdżającym (to oni czekają — roundaboutYield), a dojeżdżający różnymi wlotami nie wpływają
+     na siebie (tory przecinają się dopiero na rondzie) */
+  if (n.rb >= 0 && m.rb === n.rb){
+    if (n.rbPhase === 'ring' && m.rbPhase === 'ring'){
+      const p = ROUNDABOUT_PTS[n.rb], cx = L(p[0]), cz = L(p[1]);
+      const an = Math.atan2(n.pos.x - cx, n.pos.y - cz), am = Math.atan2(m.pos.x - cx, m.pos.y - cz);
+      const gap = ((am - an) % TAU + TAU) % TAU * RB.ringR - 4.4;  // m przed nami po torze (zderzak–zderzak)
+      if (gap < 1.8) return true;
+      if (gap < 10) return gap < 5 ? m.speed * 0.6 : m.speed;
+      return Infinity;
+    }
+    if (n.rbPhase === 'ring') return Infinity;
+    if (dot > 0.8 && ahead > 0.5 && ahead < 13 && lat < 2.6) return ahead < 5.5 ? true : (ahead < 8 ? m.speed * 0.7 : m.speed);
+    return Infinity;
+  }
   if (dot > 0.8){                                                  // ten sam kierunek: kolejka
     if (ahead < 0.5 || ahead > 13 || lat > 2.6) return Infinity;
     if (ahead < 5.5) return true;

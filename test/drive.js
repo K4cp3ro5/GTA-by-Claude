@@ -24,7 +24,6 @@ code += `
 function __run(x0, z0, heading, secs, stopFn, maxKmh){
   npcs.slice().forEach(removeNpcCar);
   hwyTraffic.forEach(c => delBody(c.body)); hwyTraffic.length = 0;
-  roundaboutCars.forEach(c => delBody(c.body)); roundaboutCars.length = 0;
   Pedestrians.list.slice().forEach(removePed);
   delBody(player.body);
   chassisBody.position.set(x0, 0.9, z0);
@@ -48,10 +47,10 @@ function __run(x0, z0, heading, secs, stopFn, maxKmh){
   return out;
 }
 /* autopilot "pure pursuit" po łamanej wps (szuka punktu w odległości lookahead przed autem) */
-function __follow(x0, z0, heading, wps, secs, kmhMax, doneFn){
+function __follow(x0, z0, heading, wps, secs, kmhMax, doneFn, look){
+  look = look || [6, 0.35];                              // punkt celowania: look[0] + look[1]*v metrów przed autem
   npcs.slice().forEach(removeNpcCar);
   hwyTraffic.forEach(c => delBody(c.body)); hwyTraffic.length = 0;
-  roundaboutCars.forEach(c => delBody(c.body)); roundaboutCars.length = 0;
   Pedestrians.list.slice().forEach(removePed);
   delBody(player.body);
   chassisBody.position.set(x0, 0.9, z0);
@@ -67,7 +66,7 @@ function __follow(x0, z0, heading, wps, secs, kmhMax, doneFn){
   };
   for (let t = 0; t < secs*60; t++){
     const p = chassisBody.position, v = chassisBody.velocity, sp = Math.hypot(v.x, v.z), kmh = sp*3.6;
-    while (idx < wps.length - 1 && Math.hypot(wps[idx][0]-p.x, wps[idx][1]-p.z) < 6 + sp*0.35) idx++;
+    while (idx < wps.length - 1 && Math.hypot(wps[idx][0]-p.x, wps[idx][1]-p.z) < look[0] + sp*look[1]) idx++;
     const tg = wps[idx];
     const fw = new CANNON.Vec3(); chassisBody.quaternion.vmult(new CANNON.Vec3(0,0,-1), fw);
     const tx = tg[0]-p.x, tz = tg[1]-p.z, tl = Math.hypot(tx, tz) || 1;
@@ -87,11 +86,13 @@ function __follow(x0, z0, heading, wps, secs, kmhMax, doneFn){
   const p = chassisBody.position; out.end = [+p.x.toFixed(1), +p.y.toFixed(2), +p.z.toFixed(1)];
   return out;
 }
+function __rbCenter(i){ return [L(ROUNDABOUT_PTS[i][0]), L(ROUNDABOUT_PTS[i][1])]; }
+function __rbRoute(i, a, b){ return roundaboutRoute(i, a, b).map(p => [p.x, p.z]); }
 function __bez(R, n){ const a = []; for (let k = 0; k <= n; k++){ const q = bezPt(R, k/n); a.push([q.x, q.z]); } return a; }
 function __consts(){ return { laneA0: hwyLaneX('A',0), laneA1: hwyLaneX('A',1), laneB0: hwyLaneX('B',0), laneB1: hwyLaneX('B',1),
   tree: (() => { const s = treeSpots.find(q => Math.abs(q.x - L(5) - ROAD_H - 3) < 12 && q.z > -200 && q.z < 200); return s ? [s.x, s.z] : null; })(),
   sign: (() => { const g = signGeomLog.find(q => q.poleTop < 3.6 && Math.abs(q.z) < 200); return g ? [g.x, g.z] : null; })(),
-  zc: HWY_BR.zc, h: HWY_BR.h, z0: HWY_Z0, z1: HWY_Z1, ic: HWY_IC_Z, x2: HWY2_Z, yard: YARD_X, offs: __bez(HWY_OFF_RAMP, 20), ons: __bez(HWY_ON_RAMP, 20), wall: WALL_X, a0: HWY_A_OUT }; }
+  zc: HWY_BR.zc, h: HWY_BR.h, z0: HWY_Z0, z1: HWY_Z1, ic: HWY_IC_Z, x2: HWY2_Z, yard: YARD_X, offs: __bez(HWY_OFF_RAMP, 20), ons: __bez(HWY_ON_RAMP, 20), wall: WALL_X, a0: HWY_A_OUT, rbApron: RB.apron }; }
 `;
 const ctx = vm.createContext(base);
 new vm.Script(code,{filename:'game-drive.js'}).runInContext(ctx);
@@ -127,3 +128,14 @@ const hit = (name, tx, tz, fromDx, fromDz, kmh) => {
 if (K.tree) hit('drzewo', K.tree[0], K.tree[1], 0, 16, 40);
 if (K.sign) hit('słupek znaku', K.sign[0], K.sign[1], 16, 0, 40);
 hit('mur północny', 3.5, -K.wall, 0, 160, 150);
+console.log('=== 7) RONDO (4,4): auto gracza wjeżdża z południa, objeżdża i zjeżdża — na wprost, w lewo, zawrotka po 3/4 ===');
+[['na wprost (płn.)', {x:0,z:-1}], ['w lewo (zach.)', {x:-1,z:0}], ['w prawo (wsch.)', {x:1,z:0}]].forEach(([nm, uOut]) => {
+  const c = base.__rbCenter(0), route = base.__rbRoute(0, {x:0,z:1}, uOut);
+  const last = route[route.length - 1], tail = [[last[0] + uOut.x*25, last[1] + uOut.z*25], [last[0] + uOut.x*45, last[1] + uOut.z*45]];
+  let minD = 1e9;
+  const r = base.__follow(c[0] + 3.5, c[1] + 45, Math.PI, route.concat(tail), 40, 25, p => {
+    minD = Math.min(minD, Math.hypot(p.x - c[0], p.z - c[1]));
+    return Math.hypot(p.x - tail[1][0], p.z - tail[1][1]) < 4;
+  }, [3.2, 0.15]);
+  rep(' ' + nm + ':', r, '| maks. odchylenie od toru: ' + r.maxDev.toFixed(2) + ' m | najbliżej środka: ' + minD.toFixed(2) + ' m (wyspa+opaska ' + K.rbApron + ', + pół auta 0.96)');
+});

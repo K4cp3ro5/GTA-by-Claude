@@ -27,6 +27,18 @@ function texC12(){
   }
   return toTex(c);
 }
+/* C-9 "nakaz jazdy z prawej strony znaku": strzałka skośna w dół w prawo */
+function texC9(){
+  const S = 128, c = mkCanvas(S,S), g = c.getContext('2d');
+  g.fillStyle = '#1659b0'; g.beginPath(); g.arc(S/2,S/2,S/2-1,0,TAU); g.fill();
+  g.strokeStyle = '#fff'; g.lineWidth = 4; g.beginPath(); g.arc(S/2,S/2,S/2-6,0,TAU); g.stroke();
+  g.save(); g.translate(S/2, S/2); g.rotate(-Math.PI/4);          // strzałka w dół obrócona o -45° (canvas: y w dół) => w dół w prawo
+  g.fillStyle = '#fff';
+  g.fillRect(-7, -34, 14, 46);
+  g.beginPath(); g.moveTo(-22, 8); g.lineTo(22, 8); g.lineTo(0, 34); g.closePath(); g.fill();
+  g.restore();
+  return toTex(c);
+}
 /* trójkąt odwrócony (A-7): wierzchołki (0,0),(S,0),(S/2,S) = UV (0,1),(1,1),(0.5,0) — patrz shapeTriDown */
 function texA7(){
   const S = 128, c = mkCanvas(S,S), g = c.getContext('2d');
@@ -177,7 +189,7 @@ function placeSign(x, z, rotY, faces, opt){
 
 /* --- gotowe tarcze --- */
 const SIGN_TEX = {
-  C12: texC12(), A7: texA7(), STOP: texStop()
+  C12: texC12(), A7: texA7(), STOP: texStop(), C9: texC9()
 };
 const _speedTex = {};
 function speedTex(n){ return _speedTex[n] || (_speedTex[n] = texSpeed(n)); }
@@ -185,6 +197,7 @@ const FACE = {
   C12:  () => signFace('C-12', SIGN_TEX.C12, shapeCircle(0.35)),
   A7:   () => signFace('A-7', SIGN_TEX.A7, shapeTriDown(0.8, 0.7)),
   STOP: () => signFace('STOP', SIGN_TEX.STOP, shapeOct(0.38)),
+  C9:   () => signFace('C-9', SIGN_TEX.C9, shapeCircle(0.3)),
   B33:  n  => signFace('B-33', speedTex(n), shapeCircle(0.35))
 };
 

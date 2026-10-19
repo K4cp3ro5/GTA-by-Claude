@@ -4,6 +4,8 @@
 const NPC_COLORS = [0x2e4d8f, 0xd9d4c8, 0x2f6f4e, 0x8a8f96, 0xe0a52c, 0x6b3a8f];
 const npcs = [];
 
+/* pętla po prostokącie siatki, prawy pas (3.5 m od osi): wschód -> południe -> zachód -> północ,
+   na narożnikach skręty w prawo */
 function npcLoop(i0, j0, i1, j1){
   const o = 3.5;
   return [
@@ -12,6 +14,41 @@ function npcLoop(i0, j0, i1, j1){
     { x: L(i1) - o, z: L(j1) - o },
     { x: L(i0) + o, z: L(j1) - o }
   ];
+}
+/* ten sam prostokąt w drugą stronę (południe -> wschód -> północ -> zachód): skręty w lewo */
+function npcLoopRev(i0, j0, i1, j1){
+  const o = 3.5;
+  return [
+    { x: L(i0) - o, z: L(j0) - o },
+    { x: L(i0) - o, z: L(j1) + o },
+    { x: L(i1) + o, z: L(j1) + o },
+    { x: L(i1) + o, z: L(j0) - o }
+  ];
+}
+/* Przejazd przez ronda: odcinki pętli przechodzące przez rondo (prosto lub ze skrętem
+   w narożniku na rondzie) zastępowane są trasą roundaboutRoute (wlot -> pas okrężny -> wylot). */
+function routeThroughRoundabouts(path){
+  const ZONE = 12.5, dense = [];
+  for (let i = 0; i < path.length; i++){
+    const a = path[i], b = path[(i + 1) % path.length], len = Math.hypot(b.x - a.x, b.z - a.z);
+    for (let s = 0; s < len; s += 0.5) dense.push({ x: a.x + (b.x - a.x)*s/len, z: a.z + (b.z - a.z)*s/len, corner: s === 0 ? a : null });
+  }
+  const zoneOf = p => ROUNDABOUT_PTS.findIndex(q => Math.hypot(p.x - L(q[0]), p.z - L(q[1])) < ZONE);
+  let start = dense.findIndex(p => zoneOf(p) < 0);
+  const out = [], N = dense.length;
+  const axis = (c, p) => { const dx = p.x - c.x, dz = p.z - c.z; return Math.abs(dx) > Math.abs(dz) ? { x: Math.sign(dx), z: 0 } : { x: 0, z: Math.sign(dz) }; };
+  for (let k = 0; k < N; k++){
+    const p = dense[(start + k) % N], zi = zoneOf(p);
+    if (zi < 0){ if (p.corner) out.push({ x: p.corner.x, z: p.corner.z }); continue; }
+    /* cały przejazd przez strefę ronda */
+    const before = dense[(start + k - 1 + N) % N];
+    let e = k; while (e + 1 < N && zoneOf(dense[(start + e + 1) % N]) === zi) e++;
+    const after = dense[(start + e + 1) % N];
+    const c = { x: L(ROUNDABOUT_PTS[zi][0]), z: L(ROUNDABOUT_PTS[zi][1]) };
+    roundaboutRoute(zi, axis(c, before), axis(c, after)).forEach(q => out.push(q));
+    k = e;
+  }
+  return out;
 }
 const LOOPS = [
   npcLoop(1, 1, 6, 6),
@@ -22,8 +59,28 @@ const LOOPS = [
   npcLoop(3, 9, 10, 10),
   npcLoop(0, 4, 5, 9),
   npcLoop(5, 3, 12, 7),
-  npcLoop(2, 7, 7, 12)
-];
+  npcLoop(2, 7, 7, 12),
+  /* ronda (4,4) (8,4) (4,8) (8,8): skręty w prawo, w lewo i jazda na wprost przez każde z nich */
+  npcLoop(4, 4, 8, 8),
+  npcLoopRev(4, 4, 8, 8),
+  npcLoop(2, 4, 10, 8),
+  npcLoop(4, 2, 8, 10)
+].map(routeThroughRoundabouts);
+/* indeks i ułamek odcinka w miejscu f (0..1) długości pętli — na odcinku poza rondem */
+function pathSpot(path, f, tries){
+  const segs = path.map((a, i) => { const b = path[(i + 1) % path.length]; return Math.hypot(b.x - a.x, b.z - a.z); });
+  const total = segs.reduce((s, v) => s + v, 0);
+  let d = ((f % 1) + 1) % 1 * total;
+  for (let i = 0; i < path.length; i++){
+    if (d <= segs[i]){
+      const p = path[i], q = path[(i + 1) % path.length];
+      if (p.rb !== undefined && q.rb === p.rb && !q.first && (tries || 0) < 40) return pathSpot(path, f + 0.03, (tries || 0) + 1);   // odcinek wewnątrz trasy ronda
+      return { idx: i, frac: segs[i] ? d / segs[i] : 0 };
+    }
+    d -= segs[i];
+  }
+  return { idx: 0, frac: 0 };
+}
 
 /* model auta NPC: 3 siatki (karoseria+koła z kolorami wierzchołków, szyby, światła) zamiast 13;
    geometria wspólna dla wszystkich aut danego koloru (cache) */
@@ -94,7 +151,8 @@ function spawnRandomNpcCar(){
   const p = mode === 'car' ? chassisBody.position : player.body.position;
   let path, idx, frac;
   for (let tries = 0; tries < 40; tries++){
-    path = LOOPS[randInt(0, LOOPS.length - 1)]; idx = randInt(0, path.length - 1); frac = rand(0.25, 0.75);
+    path = LOOPS[randInt(0, LOOPS.length - 1)];
+    const sp = pathSpot(path, rnd()); idx = sp.idx; frac = sp.frac;
     const a = path[idx], b = path[(idx + 1) % path.length];
     const x = lerp(a.x, b.x, frac), z = lerp(a.z, b.z, frac);
     if (Math.hypot(x - p.x, z - p.z) < 60) continue;
@@ -110,14 +168,12 @@ function removeNpcCar(n){
   if (idx >= 0) npcs.splice(idx, 1);
 }
 
-/* dwa auta na każdej pętli, na przeciwległych narożnikach — gęstszy ruch */
+/* dwa auta na każdej pętli, w przeciwległych miejscach (poza rondami) — gęstszy ruch */
 for (let i = 0; i < LOOPS.length; i++){
-  const st = randInt(0, 3);
-  spawnNpcCar(LOOPS[i], NPC_COLORS[i % NPC_COLORS.length], st);
-  spawnNpcCar(LOOPS[i], NPC_COLORS[(i + 3) % NPC_COLORS.length], (st + 2) % 4);
+  const f0 = rnd();
+  [f0, f0 + 0.5].forEach((f, k) => { const sp = pathSpot(LOOPS[i], f); spawnNpcCar(LOOPS[i], NPC_COLORS[(i + 3*k) % NPC_COLORS.length], sp.idx, sp.frac); });
 }
 
 /* ruch na autostradzie: dedykowany system, patrz highway.js (buduje się
    po tym pliku — potrzebuje buildNpcModel i G_CAR stąd) */
 initHighwayTraffic();
-initRoundaboutTraffic();

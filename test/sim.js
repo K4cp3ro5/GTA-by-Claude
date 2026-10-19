@@ -90,14 +90,29 @@ function __static(){
     if (g.poleFront >= g.backZ) bad.push('słupek przebija rewers @' + g.x.toFixed(0) + ',' + g.z.toFixed(0));
   });
   out.signProblems = bad;
-  /* ronda: kierunek okrążania (matematyczny kąt z mapy: wschód=+x, północ=-z) musi rosnąć = przeciwnie do wskazówek */
-  const rb = roundaboutCars[0], a0 = rb.a;
-  const pos = a => [rb.cx + Math.sin(a)*rb.r, rb.cz + Math.cos(a)*rb.r];
-  const th = a => Math.atan2(-(pos(a)[1] - rb.cz), pos(a)[0] - rb.cx);
-  let dth = th(a0 + 0.01) - th(a0); if (dth > Math.PI) dth -= TAU; if (dth < -Math.PI) dth += TAU;
-  const p1 = pos(a0), p2 = pos(a0 + 0.01), hd = rb.a + Math.PI/2;
-  const dot = ((p2[0]-p1[0])*Math.sin(hd) + (p2[1]-p1[1])*Math.cos(hd)) / Math.hypot(p2[0]-p1[0], p2[1]-p1[1]);
-  out.roundabout = { ccwFromAbove: dth > 0, headingAlongMotion: +dot.toFixed(3) };
+  /* ronda: trasy NPC przez każde rondo — przeciwnie do wskazówek zegara (kąt rośnie), tor auta
+     (± pół szerokości nadwozia 0.95) poza opaską wyspy, wewnątrz krawędzi i z dala od wysepek rozdzielających */
+  const rbs = ROUNDABOUT_PTS.map(() => ({ routes: 0, turns: {} })), rbBad = [];
+  LOOPS.forEach(path => {
+    for (let i = 0; i < path.length; i++){
+      const p = path[i], q = path[(i + 1) % path.length];
+      if (p.rb === undefined) continue;
+      const c = { x: L(ROUNDABOUT_PTS[p.rb][0]), z: L(ROUNDABOUT_PTS[p.rb][1]) };
+      const d = Math.hypot(p.x - c.x, p.z - c.z);
+      if (p.first){ rbs[p.rb].routes++; }
+      if (d < RB.apron + 0.95) rbBad.push('tor przy wyspie ' + d.toFixed(2) + ' @rondo ' + p.rb);
+      if (p.k === 'ring' && q.k === 'ring' && q.rb === p.rb){
+        const da = wrapAngle(Math.atan2(q.x - c.x, q.z - c.z) - Math.atan2(p.x - c.x, p.z - c.z));
+        if (d > RB.ringR - 0.1 && Math.hypot(q.x - c.x, q.z - c.z) > RB.ringR - 0.1 && da <= 0) rbBad.push('ruch zgodny z zegarem @rondo ' + p.rb);
+        if (d > RB.outer - 0.95) rbBad.push('tor przy krawędzi ' + d.toFixed(2));
+      }
+      RB_ARMS.forEach(u => {
+        const al = (p.x - c.x)*u.x + (p.z - c.z)*u.z, lat = Math.abs((p.x - c.x)*u.z - (p.z - c.z)*u.x);
+        if (al > RB.splitFrom - 0.5 && al < RB.splitTo + 0.5 && lat < RB.splitW0 + 0.95) rbBad.push('tor na wysepce @rondo ' + p.rb);
+      });
+    }
+  });
+  out.roundabout = { routesPerRb: rbs.map(r => r.routes), problems: rbBad.slice(0, 6), nProblems: rbBad.length };
   /* wszystko wewnątrz jednego muru */
   const outside = [];
   mapExtras.forEach(e => {
@@ -127,7 +142,7 @@ function __sim(seconds){
   const dt = 0.05, steps = Math.floor(seconds/dt);
   chassisBody.position.set(9999, 0.6, 9999);       // auto gracza poza trasami
   player.body.position.set(-9999, 1, -9999);
-  const cnt = { red:0, stop:0, yield:0, rbNear:0, red2:0, stop2:0 };
+  const cnt = { red:0, stop:0, yield:0, rbNear:0, rbWrong:0, red2:0, stop2:0, rbPass:0 };
   const _r = redLightAhead, _s = stopSignAhead, _y = roundaboutYield;
   let late = false;   // druga połowa symulacji — reguły muszą działać przez cały czas, nie tylko na starcie
   redLightAhead = (...a) => { const v = _r(...a); if (v){ cnt.red++; if (late) cnt.red2++; } return v; };
@@ -137,7 +152,7 @@ function __sim(seconds){
   const stuck = new Map(), report = { stuckMax:0, stuckIds:[], overlaps:0, overlapPairs:new Set(), minSpeedSamples:0 };
   for (let s = 0; s < steps; s++){
     late = s > steps / 2;
-    updateTrafficLights(dt); updateNpcs(dt); updateRoundaboutTraffic(dt); updateHighwayTraffic(dt);
+    updateTrafficLights(dt); updateNpcs(dt); updateHighwayTraffic(dt);
     for (let i = 0; i < hwyTraffic.length; i++){
       const c = hwyTraffic[i];
       hw.vMin = Math.min(hw.vMin, c.v); hw.vMax = Math.max(hw.vMax, c.v); hw.vSum += c.v; hw.vN++;
@@ -157,12 +172,19 @@ function __sim(seconds){
     for (let i = 0; i < npcs.length; i++){
       const n = npcs[i];
       const sp = Math.hypot(n.body.velocity.x, n.body.velocity.z);
+      if (n.__rbPrev === 'ring' && n.rbPhase !== 'ring') cnt.rbPass++;
+      n.__rbPrev = n.rbPhase;
       const st = (stuck.get(i)||0);
       stuck.set(i, sp < 0.3 ? st + dt : 0);
       if (stuck.get(i) > report.stuckMax){ report.stuckMax = stuck.get(i); report.stuckId = i; report.stuckAt = [n.pos.x.toFixed(0), n.pos.y.toFixed(0)]; }
-      for (const c of roundaboutCars){
-        const wx = c.cx + Math.sin(c.a)*c.r, wz = c.cz + Math.cos(c.a)*c.r;
-        if (Math.hypot(n.pos.x-wx, n.pos.y-wz) < 1.6) cnt.rbNear++;
+      /* rondo: nadwozie na wyspie (opasce) albo jazda po pasie okrężnym zgodnie z ruchem wskazówek */
+      for (const q of ROUNDABOUT_PTS){
+        const cx = L(q[0]), cz = L(q[1]), d = Math.hypot(n.pos.x - cx, n.pos.y - cz);
+        if (d < RB.apron + 0.85) cnt.rbNear++;
+        if (d > RB.apron + 1 && d < RB.outer - 0.5 && n.speed > 1 && n.rbPhase === 'ring'){
+          const tx = (n.pos.y - cz) / d, tz = -(n.pos.x - cx) / d;          // styczna przeciwnie do wskazówek: (cos a, -sin a)
+          if ((n.dirX || 0)*tx + (n.dirZ || 0)*tz < -0.3) cnt.rbWrong++;
+        }
       }
       for (let k = i+1; k < npcs.length; k++){
         const m = npcs[k];
@@ -191,7 +213,7 @@ const st = base.__static();
 console.log('--- kontrole statyczne ---');
 console.log('Normalne (poziome ściany patrzące w górę/w dół):', JSON.stringify(st.normals));
 console.log('Problemy ze znakami (poza jezdnią, przodem, po prawej):', st.signProblems.length, st.signProblems.slice(0,8));
-console.log('Rondo:', JSON.stringify(st.roundabout));
+console.log('Ronda (trasy NPC):', JSON.stringify(st.roundabout));
 console.log('Elementy poza murem:', st.outsideWall.length, st.outsideWall.slice(0,5));
 console.log('Świat:', JSON.stringify(st.world));
 const r = base.__sim(secs);
@@ -201,7 +223,7 @@ console.log('Klatki z nakładaniem się nadwozi aut miejskich (test SAT):', r.ov
 if (r.dump) console.log('ZAKLESZCZENIE — auta w pobliżu:', JSON.stringify(r.dump));
 if (r.locs) console.log('miejsca nakładania (x,z,h1,h2):', JSON.stringify(r.locs.slice(0,14)));
 console.log('Aktywacje reguł (klatki z hamowaniem): światła', r.cnt.red, '| STOP', r.cnt.stop, '| ustępowanie na rondach', r.cnt.yield, '| w 2. połowie: światła', r.cnt.red2, 'STOP', r.cnt.stop2);
-console.log('Auta miejskie blisko aut krążących na rondach (<1.6 u):', r.cnt.rbNear);
+console.log('Ronda: klatki z nadwoziem na wyspie:', r.cnt.rbNear, '| jazda pod prąd po pasie okrężnym:', r.cnt.rbWrong, '| przejazdy przez ronda:', r.cnt.rbPass);
 console.log('Postawionych znaków/sygnalizatorów:', r.signs, '| stojących w budynku:', r.signsInBuildings.length, r.signsInBuildings.slice(0,6));
 console.log('Autostrada — kierunki zgodne z pasem:', r.hwyDirsOk);
 const h = r.hw;
