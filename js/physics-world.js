@@ -28,33 +28,38 @@ groundBody.collisionFilterGroup = G_WORLD;
 groundBody.collisionFilterMask  = -1;   // cannon.js domyślnie daje mask:1 — bez tego świat nie kolidowałby z graczem/autem
 addBody(groundBody);
 
-function staticBox(cx, cy, cz, w, h, d){
-  const b = new CANNON.Body({ mass:0, material:matGround });
-  b.addShape(new CANNON.Box(new CANNON.Vec3(w/2, h/2, d/2)));
-  b.position.set(cx, cy, cz);
-  b.collisionFilterGroup = G_WORLD;
-  b.collisionFilterMask  = -1;          // to samo dotyczy każdego statycznego obiektu (budynki, krawężniki, latarnie, bariera...)
-  addBody(b);
+/* Statyczna kolizja świata: małe bryły (budynki, krawężniki, słupki, latarnie, drzewa…) nie są
+   osobnymi ciałami, tylko kształtami w złożonych ciałach — po jednym na kwadrat STATIC_CELL × STATIC_CELL m.
+   Przy ~2600 osobnych ciałach broadphase cannon.js przeglądał je wszystkie w każdym kroku
+   (krok fizyki 30–80 ms); teraz to kilkaset ciał. Bryły większe od komórki (mur, długie ściany)
+   dostają własne ciało. */
+const STATIC_CELL = 48;
+const staticCells = new Map();
+const _cellQ = new CANNON.Quaternion(), _axisY = new CANNON.Vec3(0, 1, 0), _axisX = new CANNON.Vec3(1, 0, 0);
+function staticShape(shape, x, y, z, quat, big){
+  const key = big ? null : Math.floor(x / STATIC_CELL) + ',' + Math.floor(z / STATIC_CELL);
+  let b = key && staticCells.get(key), fresh = false;
+  if (!b){
+    b = new CANNON.Body({ mass:0, material:matGround });
+    if (key){ const p = key.split(',').map(Number); b.position.set((p[0] + 0.5) * STATIC_CELL, 0, (p[1] + 0.5) * STATIC_CELL); staticCells.set(key, b); }
+    else b.position.set(x, 0, z);
+    b.collisionFilterGroup = G_WORLD;
+    b.collisionFilterMask  = -1;          // to samo dotyczy każdego statycznego obiektu (budynki, krawężniki, latarnie, bariera...)
+    fresh = true;
+  }
+  b.addShape(shape, new CANNON.Vec3(x - b.position.x, y, z - b.position.z), quat);
+  if (fresh) addBody(b);
+  else b.aabbNeedsUpdate = true;
   return b;
+}
+function staticBox(cx, cy, cz, w, h, d){
+  return staticShape(new CANNON.Box(new CANNON.Vec3(w/2, h/2, d/2)), cx, cy, cz, undefined, Math.max(w, d) > STATIC_CELL);
 }
 function staticBoxRot(cx, cy, cz, w, h, d, rotY){
-  const b = new CANNON.Body({ mass:0, material:matGround });
-  b.addShape(new CANNON.Box(new CANNON.Vec3(w/2, h/2, d/2)));
-  b.position.set(cx, cy, cz);
-  b.quaternion.setFromAxisAngle(new CANNON.Vec3(0,1,0), rotY);
-  b.collisionFilterGroup = G_WORLD;
-  b.collisionFilterMask  = -1;
-  addBody(b);
-  return b;
+  const q = new CANNON.Quaternion(); q.setFromAxisAngle(_axisY, rotY);
+  return staticShape(new CANNON.Box(new CANNON.Vec3(w/2, h/2, d/2)), cx, cy, cz, q, Math.max(w, d) > STATIC_CELL);
 }
 function staticCylinder(cx, cy, cz, radius, h){
-  const b = new CANNON.Body({ mass:0, material:matGround });
-  const cyl = new CANNON.Cylinder(radius, radius, h, 14);
-  b.addShape(cyl);
-  b.position.set(cx, cy, cz);
-  b.quaternion.setFromAxisAngle(new CANNON.Vec3(1,0,0), -Math.PI/2);  // cylinder cannon.js ma oś lokalną Z — stawiamy pionowo (sprawdzone numerycznie)
-  b.collisionFilterGroup = G_WORLD;
-  b.collisionFilterMask  = -1;
-  addBody(b);
-  return b;
+  const q = new CANNON.Quaternion(); q.setFromAxisAngle(_axisX, -Math.PI/2);   // cylinder cannon.js ma oś lokalną Z — stawiamy pionowo (sprawdzone numerycznie)
+  return staticShape(new CANNON.Cylinder(radius, radius, h, 14), cx, cy, cz, q, radius * 2 > STATIC_CELL);
 }

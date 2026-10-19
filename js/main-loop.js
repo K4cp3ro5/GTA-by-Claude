@@ -18,13 +18,15 @@ function noLerp(b){ if (b._hasPrev === true && Math.hypot(b._p0.x - b.position.x
 function physicsStep(dt){
   physAcc += dt;
   let steps = 0;
-  while (physAcc >= FIXED && steps < 4){
+  const t0 = performance.now();
+  while (physAcc >= FIXED && steps < 2){
     savePrev(chassisBody); savePrev(player.body);
     for (const n of npcs) savePrev(n.body);
     world.step(FIXED);
     physAcc -= FIXED; steps++;
+    if (performance.now() - t0 > FIXED * 1000) break;   // krok wolniejszy niż czas rzeczywisty: nie nadrabiamy (spirala spowolnienia)
   }
-  if (steps === 4) physAcc = 0;                  // za wolny komputer: nie nadrabiamy w nieskończoność
+  if (physAcc > FIXED) physAcc = FIXED * 0.99;     // zaległość odrzucona — gra zwalnia zamiast się zacinać
   if (chassisBody._hasPrev !== true){ savePrev(chassisBody); savePrev(player.body); }
   noLerp(chassisBody); noLerp(player.body);
   for (const n of npcs) if (n.body._hasPrev === true) noLerp(n.body);
