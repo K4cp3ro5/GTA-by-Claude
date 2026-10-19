@@ -99,3 +99,27 @@ function quadOut(buf, a, b, c, d, out){
   if (nx*out[0] + ny*out[1] + nz*out[2] < 0) buf.quad(a, d, c, b, [0,0],[0,1],[1,1],[1,0]);
   else buf.quad(a, b, c, d, [0,0],[1,0],[1,1],[0,1]);
 }
+/* scalenie kilku prostych brył Three.js (BoxGeometry, CylinderGeometry…) w jedną geometrię
+   z kolorami wierzchołków — jedna siatka = jedno wywołanie rysowania zamiast kilkunastu.
+   parts: [{ geo, color, x, y, z, rx? }] (geo nie jest modyfikowane) */
+const _mcM = new THREE.Matrix4(), _mcE = new THREE.Euler(), _mcC = new THREE.Color();
+function mergeColored(parts){
+  const P = [], N = [], C = [];
+  for (const pt of parts){
+    const g = (pt.geo.index ? pt.geo.toNonIndexed() : pt.geo.clone());
+    _mcE.set(pt.rx || 0, 0, 0);
+    _mcM.makeRotationFromEuler(_mcE).setPosition(pt.x || 0, pt.y || 0, pt.z || 0);
+    g.applyMatrix4(_mcM);
+    _mcC.setHex(pt.color);
+    const p = g.attributes.position.array, n = g.attributes.normal.array;
+    for (let i = 0; i < p.length; i++){ P.push(p[i]); N.push(n[i]); }
+    for (let i = 0; i < p.length / 3; i++) C.push(_mcC.r, _mcC.g, _mcC.b);
+    g.dispose();
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+  out.setAttribute('normal',   new THREE.Float32BufferAttribute(N, 3));
+  out.setAttribute('color',    new THREE.Float32BufferAttribute(C, 3));
+  out.computeBoundingSphere();
+  return out;
+}

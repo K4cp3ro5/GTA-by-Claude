@@ -10,46 +10,50 @@ const player = {
   health: 100, stamina: 100, dead: false, prevVy: 0, hurtFlash: 0
 };
 
-/* niskopolisowy humanoid — współdzielony przez gracza i pieszych NPC */
+/* niskopolisowy humanoid — współdzielony przez gracza i pieszych NPC.
+   5 siatek (tułów z głową + 4 kończyny na przegubach) z kolorami wierzchołków zamiast 12;
+   geometrie wspólne dla tej samej palety */
+const _humMat = new THREE.MeshLambertMaterial({ vertexColors: true });
+const _humCache = new Map();
+function humanoidGeometries(pal){
+  const key = [pal.skin, pal.shirt, pal.pants, pal.hair].join(',');
+  if (_humCache.has(key)) return _humCache.get(key);
+  const B = (w,h,d) => new THREE.BoxGeometry(w,h,d), SHOES = 0x17181c;
+  const torso = mergeColored([
+    { geo: B(0.52, 0.62, 0.30), color: pal.shirt, y: 1.19 },          // tors
+    { geo: B(0.46, 0.22, 0.28), color: pal.pants, y: 0.83 },          // biodra
+    { geo: B(0.27, 0.30, 0.26), color: pal.skin,  y: 1.66, z: 0.01 }, // głowa
+    { geo: B(0.29, 0.10, 0.28), color: pal.hair,  y: 1.79, z: 0.01 },
+    { geo: B(0.06, 0.06, 0.03), color: pal.hair,  y: 1.66, z: 0.14 }  // nos — kierunek patrzenia
+  ]);
+  /* kończyny liczone od przegubu (y=0) w dół */
+  const arm = mergeColored([
+    { geo: B(0.14, 0.56, 0.16), color: pal.shirt, y: -0.28 },
+    { geo: B(0.13, 0.13, 0.15), color: pal.skin,  y: -0.62 }
+  ]);
+  const leg = mergeColored([
+    { geo: B(0.19, 0.72, 0.20), color: pal.pants, y: -0.36 },
+    { geo: B(0.19*1.05, 0.11, 0.20*1.7), color: SHOES, y: -0.72 - 0.05, z: 0.05 }
+  ]);
+  const r = { torso: torso, arm: arm, leg: leg };
+  _humCache.set(key, r);
+  return r;
+}
 function buildHumanoid(pal){
-  const g = new THREE.Group();
-  const skin  = new THREE.MeshLambertMaterial({ color: pal.skin });
-  const shirt = new THREE.MeshLambertMaterial({ color: pal.shirt });
-  const pants = new THREE.MeshLambertMaterial({ color: pal.pants });
-  const shoes = new THREE.MeshLambertMaterial({ color: 0x17181c });
-  const hair  = new THREE.MeshLambertMaterial({ color: pal.hair });
-
-  function box(w,h,d,mat,x,y,z){
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
-    m.position.set(x,y,z); m.castShadow = true; m.receiveShadow = true;
-    return m;
-  }
-  g.add(box(0.52, 0.62, 0.30, shirt, 0, 1.19, 0));   // tors
-  g.add(box(0.46, 0.22, 0.28, pants, 0, 0.83, 0));   // biodra
-  const head = box(0.27, 0.30, 0.26, skin, 0, 1.66, 0.01);
-  g.add(head);
-  g.add(box(0.29, 0.10, 0.28, hair, 0, 1.79, 0.01));
-  g.add(box(0.06, 0.06, 0.03, hair, 0, 1.66, 0.14)); // nos — kierunek patrzenia
-
-  function limb(px, py, pz, w, h, d, mat, footMat){
+  const g = new THREE.Group(), G = humanoidGeometries(pal);
+  const mesh = geo => { const m = new THREE.Mesh(geo, _humMat); m.castShadow = true; m.receiveShadow = true; return m; };
+  g.add(mesh(G.torso));
+  function limb(px, py, geo){
     const pivot = new THREE.Group();
-    pivot.position.set(px, py, pz);
-    const seg = box(w, h, d, mat, 0, -h/2, 0);
-    pivot.add(seg);
-    if (footMat){
-      const f = box(w*1.05, 0.11, d*1.7, footMat, 0, -h - 0.05, 0.05);
-      pivot.add(f);
-    }
+    pivot.position.set(px, py, 0);
+    pivot.add(mesh(geo));
     g.add(pivot);
     return pivot;
   }
-  const armL = limb( 0.355, 1.44, 0, 0.14, 0.56, 0.16, shirt, null);
-  const armR = limb(-0.355, 1.44, 0, 0.14, 0.56, 0.16, shirt, null);
-  armL.add(box(0.13, 0.13, 0.15, skin, 0, -0.62, 0));
-  armR.add(box(0.13, 0.13, 0.15, skin, 0, -0.62, 0));
-  const legL = limb( 0.135, 0.80, 0, 0.19, 0.72, 0.20, pants, shoes);
-  const legR = limb(-0.135, 0.80, 0, 0.19, 0.72, 0.20, pants, shoes);
-
+  const armL = limb( 0.355, 1.44, G.arm);
+  const armR = limb(-0.355, 1.44, G.arm);
+  const legL = limb( 0.135, 0.80, G.leg);
+  const legR = limb(-0.135, 0.80, G.leg);
   return { group: g, armL: armL, armR: armR, legL: legL, legR: legR };
 }
 const PLAYER_PALETTE = { skin:0xd9a882, shirt:0x28405e, pants:0x2c2f36, hair:0x2a1f19 };
