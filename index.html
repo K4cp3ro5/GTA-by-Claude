@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GTA by Claude</title>
+
+<!-- Biblioteki: klasyczne buildy UMD (działają z file:// po dwukliku) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
+
+<style>
+  :root{
+    --asphalt:#14161b;
+    --asphalt-2:#1d2027;
+    --sodium:#ffb03a;
+    --sodium-dim:#8a6224;
+    --concrete:#c8c6bf;
+    --paint:#f2f0ea;
+    --brake:#ff4a3d;
+    --line:rgba(200,198,191,.18);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden;background:#05060a}
+  body{
+    font-family:"Helvetica Neue",Helvetica,"Segoe UI",Arial,sans-serif;
+    color:var(--paint);
+    -webkit-font-smoothing:antialiased;
+    cursor:default;
+  }
+  canvas{display:block}
+
+  #hud{position:fixed;inset:0;pointer-events:none;z-index:10}
+
+  .panel{
+    position:absolute;
+    background:rgba(20,22,27,.72);
+    border:1px solid var(--line);
+    border-radius:3px;
+    padding:12px 14px;
+    backdrop-filter:blur(7px);
+    -webkit-backdrop-filter:blur(7px);
+  }
+
+  /* ---- sterowanie ---- */
+  #help{top:16px;left:16px;width:232px;font-size:12px;line-height:1.7}
+  #help h2{
+    font-size:11px;font-weight:600;letter-spacing:.14em;
+    color:var(--sodium);margin-bottom:8px;
+  }
+  #help .row{display:flex;justify-content:space-between;gap:10px;color:#a9a7a1}
+  #help .row b{color:var(--paint);font-weight:500}
+  kbd{
+    display:inline-block;min-width:19px;text-align:center;
+    background:#2a2e37;border:1px solid #3c414c;border-bottom-width:2px;
+    border-radius:3px;padding:1px 5px;font:500 11px/1.4 inherit;color:var(--paint);
+  }
+  #help .sep{height:1px;background:var(--line);margin:9px 0}
+
+  /* ---- status / zegar ---- */
+  #status{top:16px;right:16px;text-align:right;min-width:170px}
+  #mode{
+    font-size:15px;font-weight:600;letter-spacing:.03em;
+    display:flex;align-items:center;justify-content:flex-end;gap:8px;
+  }
+  #mode .dot{width:7px;height:7px;border-radius:50%;background:var(--sodium);box-shadow:0 0 9px var(--sodium)}
+  #clock{
+    font-size:30px;font-weight:200;letter-spacing:.02em;margin-top:2px;
+    font-variant-numeric:tabular-nums;line-height:1.05;
+  }
+  #phase{font-size:11px;color:#8d8b86;letter-spacing:.05em}
+
+  /* ---- minimapa ---- */
+  #map{bottom:16px;left:16px;padding:9px}
+  #map canvas{border-radius:2px;display:block;background:#0d0f13}
+  #mapfoot{
+    display:flex;justify-content:space-between;
+    font-size:10px;color:#807e79;margin-top:7px;letter-spacing:.05em;
+  }
+  #mapfoot i{font-style:normal;color:var(--sodium)}
+
+  /* ---- prędkościomierz ---- */
+  #speedo{
+    bottom:16px;right:16px;text-align:right;min-width:190px;
+    opacity:0;transform:translateY(8px);
+    transition:opacity .25s ease,transform .25s ease;
+  }
+  #speedo.on{opacity:1;transform:none}
+  #kmh{
+    font-size:58px;font-weight:200;line-height:.92;letter-spacing:-.02em;
+    font-variant-numeric:tabular-nums;
+  }
+  #kmh span{font-size:14px;font-weight:500;letter-spacing:.14em;color:#8d8b86;margin-left:7px}
+  #bar{height:3px;background:#2a2e37;border-radius:2px;overflow:hidden;margin-top:10px}
+  #bar i{display:block;height:100%;width:0%;background:var(--sodium);transition:width .08s linear}
+  #gear{
+    display:flex;justify-content:flex-end;gap:14px;
+    font-size:11px;color:#6d6b67;margin-top:9px;letter-spacing:.1em;
+  }
+  #gear b{color:var(--paint);font-weight:500}
+  #gear .hot{color:var(--brake)}
+
+  /* ---- podpowiedź interakcji ---- */
+  #prompt{
+    position:absolute;left:50%;bottom:120px;transform:translateX(-50%) translateY(6px);
+    background:rgba(20,22,27,.86);border:1px solid rgba(255,176,58,.45);
+    border-radius:3px;padding:9px 16px;font-size:13px;letter-spacing:.02em;
+    opacity:0;transition:opacity .16s ease,transform .16s ease;white-space:nowrap;
+  }
+  #prompt.on{opacity:1;transform:translateX(-50%)}
+
+  #fps{
+    position:absolute;bottom:16px;left:50%;transform:translateX(-50%);
+    font-size:10px;color:#4e4c49;letter-spacing:.08em;font-variant-numeric:tabular-nums;
+  }
+
+  #hurtFlash{
+    position:fixed;inset:0;z-index:20;pointer-events:none;opacity:0;
+    background:radial-gradient(circle at 50% 50%,transparent 40%,rgba(200,20,10,.55) 100%);
+  }
+  #deadScreen{
+    position:fixed;inset:0;z-index:35;display:flex;align-items:center;justify-content:center;
+    background:rgba(10,4,4,0);pointer-events:none;opacity:0;transition:opacity .3s ease,background .3s ease;
+  }
+  #deadScreen.on{opacity:1;background:rgba(10,4,4,.72)}
+  #deadScreen span{font-size:34px;font-weight:200;letter-spacing:.1em;color:var(--brake)}
+
+  /* ---- ekran startowy ---- */
+  #gate{
+    position:fixed;inset:0;z-index:40;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:26px;text-align:center;
+    background:
+      radial-gradient(1100px 620px at 50% 30%,rgba(255,176,58,.10),transparent 68%),
+      linear-gradient(#0a0c11,#05060a);
+    transition:opacity .45s ease;
+  }
+  #gate.hidden{opacity:0;pointer-events:none}
+  #gate h1{
+    font-size:clamp(44px,9vw,104px);font-weight:200;letter-spacing:-.035em;line-height:.88;
+  }
+  #gate h1 em{
+    display:block;font-style:normal;font-weight:600;
+    color:var(--sodium);text-shadow:0 0 44px rgba(255,176,58,.42);
+  }
+  #gate p{max-width:430px;color:#8d8b86;font-size:14px;line-height:1.65;padding:0 24px}
+  #go{
+    pointer-events:auto;cursor:pointer;
+    background:var(--sodium);color:#14161b;border:0;border-radius:3px;
+    padding:14px 34px;font:600 13px/1 inherit;letter-spacing:.12em;
+    transition:transform .14s ease,box-shadow .14s ease;
+  }
+  #go:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(255,176,58,.28)}
+  #go:focus-visible{outline:2px solid var(--paint);outline-offset:3px}
+  #go[disabled]{background:#3a3d45;color:#8d8b86;cursor:progress;transform:none;box-shadow:none}
+  #gatefoot{font-size:11px;color:#56544f;letter-spacing:.08em}
+  #err{color:var(--brake);font-size:13px;max-width:520px;line-height:1.6;padding:0 24px}
+
+  /* ---- zdrowie / stamina ---- */
+  #vitals{top:16px;left:16px;width:190px}
+  .vbar{margin-bottom:10px}
+  .vbar:last-child{margin-bottom:0}
+  .vbar .vlabel{display:flex;justify-content:space-between;font-size:10px;letter-spacing:.1em;color:#a9a7a1;margin-bottom:4px}
+  .vbar .vlabel b{color:var(--paint);font-weight:500}
+  .vtrack{height:7px;background:#23262c;border-radius:4px;overflow:hidden}
+  .vtrack i{display:block;height:100%;border-radius:4px;transition:width .15s ease}
+  #healthfill{background:linear-gradient(90deg,#c73a2f,#ff5a46);width:100%}
+  #staminafill{background:linear-gradient(90deg,#2f7a6f,#4fc7ad);width:100%}
+  .vtrack.low #healthfill{animation:pulse 1s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+
+  /* ---- broń ---- */
+  #weaponhud{
+    bottom:16px;left:50%;transform:translateX(-50%);
+    display:flex;align-items:center;gap:12px;opacity:0;transition:opacity .2s ease;
+    padding:8px 16px;
+  }
+  #weaponhud.on{opacity:1}
+  #weaponhud .wname{font-size:12px;letter-spacing:.1em;color:var(--paint)}
+  #weaponhud .wammo{font-size:15px;font-weight:600;color:var(--sodium);font-variant-numeric:tabular-nums}
+  #crosshair{
+    position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    width:6px;height:6px;border-radius:50%;background:rgba(242,240,234,.85);
+    box-shadow:0 0 0 1px rgba(0,0,0,.5);opacity:0;transition:opacity .15s ease;
+  }
+  #crosshair.on{opacity:1}
+
+  /* ---- koło broni ---- */
+  #wheelWrap{
+    position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+    background:rgba(5,6,10,.35);opacity:0;pointer-events:none;transition:opacity .12s ease;z-index:30;
+  }
+  #wheelWrap.on{opacity:1}
+  #wheelCanvas{filter:drop-shadow(0 8px 28px rgba(0,0,0,.5))}
+
+  /* ---- ekran ustawień ---- */
+  #settingsBtn{
+    pointer-events:auto;cursor:pointer;background:transparent;color:#8d8b86;
+    border:1px solid var(--line);border-radius:3px;padding:9px 20px;
+    font:500 11px/1 inherit;letter-spacing:.1em;margin-top:14px;transition:color .14s,border-color .14s;
+  }
+  #settingsBtn:hover{color:var(--paint);border-color:#565b64}
+  #settings{
+    position:fixed;inset:0;z-index:45;display:none;align-items:center;justify-content:center;
+    background:rgba(5,6,10,.72);backdrop-filter:blur(4px);
+  }
+  #settings.on{display:flex}
+  #settingsPanel{
+    width:min(480px,88vw);max-height:82vh;overflow-y:auto;
+    background:#14161bdd;border:1px solid var(--line);border-radius:5px;padding:26px 26px 20px;
+  }
+  #settingsPanel h2{font-size:13px;letter-spacing:.16em;color:var(--sodium);margin-bottom:4px}
+  #settingsPanel .sub{font-size:11px;color:#68665f;margin-bottom:18px}
+  .bind-row{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:9px 0;border-bottom:1px solid var(--line);font-size:13px;color:#c8c6bf;
+  }
+  .bind-row:last-of-type{border-bottom:0}
+  .keybtn{
+    min-width:64px;text-align:center;background:#2a2e37;border:1px solid #3c414c;border-bottom-width:2px;
+    border-radius:3px;padding:5px 10px;font:500 12px/1.3 inherit;color:var(--paint);
+    cursor:pointer;pointer-events:auto;transition:border-color .12s,background .12s;
+  }
+  .keybtn:hover{border-color:var(--sodium)}
+  .keybtn.waiting{background:var(--sodium);color:#14161b;border-color:var(--sodium)}
+  #settingsFoot{display:flex;justify-content:space-between;gap:10px;margin-top:18px}
+  #settingsFoot button{
+    pointer-events:auto;cursor:pointer;flex:1;border-radius:3px;padding:11px;font:600 11px/1 inherit;letter-spacing:.1em;
+  }
+  #resetBinds{background:transparent;color:#8d8b86;border:1px solid var(--line)}
+  #resetBinds:hover{color:var(--paint)}
+  #closeSettings{background:var(--sodium);color:#14161b;border:0}
+
+  /* ---- debug menu ---- */
+  #debugMenu{
+    position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;
+    background:rgba(5,6,10,.82);backdrop-filter:blur(5px);
+  }
+  #debugMenu.on{display:flex}
+  #debugPanel{
+    width:min(440px,88vw);max-height:86vh;overflow-y:auto;
+    background:#14161bdd;border:1px solid #4a3320;border-radius:5px;padding:22px 24px 18px;
+  }
+  #debugPanel h2{font-size:13px;letter-spacing:.16em;color:#ff9a3a;margin-bottom:2px}
+  #debugPanel .sub{font-size:11px;color:#68665f;margin-bottom:16px}
+  .dsec{margin-bottom:16px}
+  .dsec h3{font-size:10px;letter-spacing:.14em;color:#8d8b86;text-transform:uppercase;margin-bottom:8px}
+  .drow{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:7px;font-size:12.5px;color:#c8c6bf}
+  .drow span.dval{color:var(--paint);font-variant-numeric:tabular-nums}
+  .dbtnrow{display:flex;gap:5px;flex-shrink:0}
+  .dbtn{
+    pointer-events:auto;cursor:pointer;background:#2a2e37;border:1px solid #3c414c;border-bottom-width:2px;
+    border-radius:3px;padding:6px 10px;font:500 11px/1 inherit;color:var(--paint);white-space:nowrap;
+    transition:border-color .12s;
+  }
+  .dbtn:hover{border-color:#ff9a3a}
+  .drow input[type=range]{flex:1;accent-color:#ff9a3a}
+  .drow input[type=checkbox]{width:15px;height:15px;accent-color:#ff9a3a;pointer-events:auto}
+  #debugInfo{font-size:11px;color:#68665f;line-height:1.7;border-top:1px solid var(--line);padding-top:10px;margin-top:4px}
+  #debugFoot{display:flex;justify-content:flex-end;margin-top:14px}
+  #closeDebug{
+    pointer-events:auto;cursor:pointer;background:#ff9a3a;color:#14161b;border:0;border-radius:3px;
+    padding:10px 20px;font:600 11px/1 inherit;letter-spacing:.1em;
+  }
+
+  @media (max-width:900px){
+    #kmh{font-size:42px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    #go,#speedo,#prompt,#gate{transition:none}
+  }
+</style>
+</head>
+<body>
+
+<div id="hud">
+  <section class="panel" id="vitals">
+    <div class="vbar"><div class="vlabel"><span>Zdrowie</span><b id="healthval">100</b></div>
+      <div class="vtrack" id="healthtrack"><i id="healthfill"></i></div></div>
+    <div class="vbar"><div class="vlabel"><span>Kondycja</span><b id="staminaval">100</b></div>
+      <div class="vtrack"><i id="staminafill"></i></div></div>
+  </section>
+
+  <section class="panel" id="status">
+    <div id="mode"><span class="dot"></span><span id="modetxt">Pieszo</span></div>
+    <div id="clock">09:00</div>
+    <div id="phase">poranek</div>
+  </section>
+
+  <section class="panel" id="map">
+    <canvas id="minimap" width="180" height="180"></canvas>
+    <div id="mapfoot"><span>GTA by Claude</span><i id="coords">0, 0</i></div>
+  </section>
+
+  <section class="panel" id="speedo">
+    <div id="kmh">0<span>KM/H</span></div>
+    <div id="bar"><i id="barfill"></i></div>
+    <div id="gear">
+      <span id="ghand">RĘCZNY</span>
+      <span>BIEG <b id="gval">N</b></span>
+    </div>
+  </section>
+
+  <div id="prompt">Naciśnij <kbd>F</kbd> lub <kbd>E</kbd>, aby wsiąść</div>
+  <section class="panel" id="weaponhud"><span class="wname" id="wname">Pięści</span><span class="wammo" id="wammo"></span></section>
+  <div id="crosshair"></div>
+  <div id="fps">— fps</div>
+</div>
+
+<div id="hurtFlash"></div>
+<div id="deadScreen"><span>ROZBITY</span></div>
+
+<div id="wheelWrap"><canvas id="wheelCanvas" width="360" height="360"></canvas></div>
+
+<div id="gate">
+  <h1>GTA by <em>Claude</em></h1>
+  <p id="gatetxt">Dwanaście na dwanaście kwartałów, ekwipunek, mieszkańcy na chodnikach i pełna doba do dyspozycji. Wszystko — asfalt, okna, silnik — generowane w locie.</p>
+  <button id="go" disabled>BUDUJĘ MIASTO…</button>
+  <button id="settingsBtn">STEROWANIE</button>
+  <div id="gatefoot">Kliknięcie przejmuje kursor myszy. Esc go zwalnia i otwiera to menu.</div>
+  <div id="err"></div>
+</div>
+
+<div id="settings">
+  <div id="settingsPanel">
+    <h2>Sterowanie</h2>
+    <div class="sub">Kliknij klawisz i naciśnij nowy, aby go przebindować.</div>
+    <div id="bindList"></div>
+    <div id="settingsFoot">
+      <button id="resetBinds">Przywróć domyślne</button>
+      <button id="closeSettings">Zamknij</button>
+    </div>
+  </div>
+</div>
+
+<div id="debugMenu">
+  <div id="debugPanel">
+    <h2>DEBUG</h2>
+    <div class="sub">Klawisz <kbd>`</kbd> otwiera i zamyka to menu.</div>
+
+    <div class="dsec">
+      <h3>Ruch drogowy</h3>
+      <div class="drow"><span>Auta NPC: <b class="dval" id="dbgCarCount">0</b></span>
+        <span class="dbtnrow"><button class="dbtn" id="dbgAddCars">+5</button><button class="dbtn" id="dbgSubCars">-5</button><button class="dbtn" id="dbgClearCars">Wyczyść</button></span></div>
+      <div class="drow"><span>Piesi: <b class="dval" id="dbgPedCount">0</b></span>
+        <span class="dbtnrow"><button class="dbtn" id="dbgAddPeds">+10</button><button class="dbtn" id="dbgSubPeds">-10</button><button class="dbtn" id="dbgClearPeds">Wyczyść</button></span></div>
+    </div>
+
+    <div class="dsec">
+      <h3>Pora dnia</h3>
+      <div class="drow"><span id="dbgTimeLabel">12:00</span><input type="range" id="dbgTime" min="0" max="1439" value="720"></div>
+      <div class="drow"><span>Zatrzymaj czas</span><input type="checkbox" id="dbgFreeze"></div>
+    </div>
+
+    <div class="dsec">
+      <h3>Gracz</h3>
+      <div class="drow"><span>Zdrowie i kondycja</span><button class="dbtn" id="dbgHeal">Pełne</button></div>
+      <div class="drow"><span>Amunicja pistoletu</span><button class="dbtn" id="dbgAmmo">+200</button></div>
+      <div class="drow"><span>Nieśmiertelność</span><input type="checkbox" id="dbgGod"></div>
+      <div class="drow"><span>Pozycja</span><button class="dbtn" id="dbgTeleport">Teleportuj do startu</button></div>
+      <div class="drow"><span>Mnożnik prędkości auta: <b class="dval" id="dbgSpeedVal">1.0×</b></span><input type="range" id="dbgSpeed" min="0.2" max="3" step="0.1" value="1"></div>
+    </div>
+
+    <div id="debugInfo">
+      <div>Ciała fizyczne: <span id="dbgBodies">—</span></div>
+      <div>NPC / piesi / pociski: <span id="dbgCounts">—</span></div>
+      <div>FPS: <span id="dbgFps">—</span></div>
+    </div>
+
+    <div id="debugFoot">
+      <button id="closeDebug">Zamknij</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/core.js"></script>
+<script src="js/textures.js"></script>
+<script src="js/geobuf.js"></script>
+<script src="js/physics-world.js"></script>
+<script src="js/city-generation.js"></script>
+<script src="js/highway.js"></script>
+<script src="js/traffic-lights.js"></script>
+<script src="js/city-props.js"></script>
+<script src="js/player.js"></script>
+<script src="js/vehicle.js"></script>
+<script src="js/traffic-npc.js"></script>
+<script src="js/pedestrians.js"></script>
+<script src="js/weapons.js"></script>
+<script src="js/controls.js"></script>
+<script src="js/sound.js"></script>
+<script src="js/vehicle-entry.js"></script>
+<script src="js/daynight.js"></script>
+<script src="js/update-player.js"></script>
+<script src="js/update-vehicle.js"></script>
+<script src="js/update-npc.js"></script>
+<script src="js/camera.js"></script>
+<script src="js/hud.js"></script>
+<script src="js/main-loop.js"></script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+{
+  "name": "gta-by-claude",
+  "version": "1.0.0",
+  "private": true,
+  "description": "GTA by Claude — przeglądarkowe mini-GTA 3D (Three.js r128 + cannon.js 0.6.2)",
+  "scripts": {
+    "test": "node test/harness.js && node test/sim.js 300",
+    "test:drive": "node test/drive.js",
+    "bundle": "node test/bundle.js gta-by-claude-single.html"
+  },
+  "devDependencies": { "cannon": "0.6.2" }
+}
