@@ -1,5 +1,9 @@
 /* ---------------------------------------------------------------
    11b. PIESI (NPC)
+   Spacerują po chodniku dookoła kwartału; przy narożniku mogą skręcić na przejście
+   dla pieszych (crosswalks z city-generation.js) do sąsiedniego kwartału:
+   walk -> toCurb (do krawężnika) -> wait (luka w ruchu / zielone) -> cross -> walk (nowy kwartał).
+   Auta NPC ustępują pieszym na jezdni (update-npc.js).
    --------------------------------------------------------------- */
 const PED_PALETTES = [
   { skin:0xd9a882, shirt:0x8a3b3b, pants:0x2c2f36, hair:0x2a1f19 },
@@ -24,8 +28,13 @@ function pedLoopFor(bi, bj){
 function isCornerBlock(bi, bj){
   return !!specialCornerAt(bi, bj);
 }
+const pedBlockSet = new Set(pedBlockCandidates.map(b => b.bi + ',' + b.bj));
+/* przejścia, z których korzystają piesi: oba końce na kwartałach z pętlą spacerową */
+const pedCrosswalks = crosswalks.filter(c => c.blocks.every(b => pedBlockSet.has(b[0] + ',' + b[1])));
+pedCrosswalks.forEach(c => { c.tl = trafficLights.find(t => Math.abs(t.x - L(c.i)) < 1 && Math.abs(t.z - L(c.j)) < 1) || null; });
 
 const Pedestrians = { list: [] };
+const PED_WALK = 1.15, PED_CROSS = 1.55;
 
 function spawnPed(bi, bj){
   const path = pedLoopFor(bi, bj);
@@ -35,12 +44,12 @@ function spawnPed(bi, bj){
   h.group.userData.pedRef = null;   // uzupełnione niżej po utworzeniu n
   scene.add(h.group);
   const n = {
-    path: path, wp: (idx + 1) % 4,
-    pos: new THREE.Vector2(path[idx].x, path[idx].z),
+    path: path, wp: (idx + 1) % 4, block: [bi, bj],
+    pos: new THREE.Vector2(path[idx].x, path[idx].z), y: WALK_H,
     heading: 0, walkPhase: rand(0, TAU),
-    speed: 1.15 + rand(-0.18, 0.22),
+    speed: PED_WALK + rand(-0.18, 0.22),
     group: h.group, armL: h.armL, armR: h.armR, legL: h.legL, legR: h.legR,
-    body: null, state: 'walk', stateT: 0
+    body: null, state: 'walk', stateT: 0, cw: null, cwTo: null, waitT: 0
   };
   h.group.userData.pedRef = n;
   const b = new CANNON.Body({ mass: 0, type: CANNON.Body.KINEMATIC });
@@ -59,7 +68,7 @@ function spawnPed(bi, bj){
 
 (function spawnAllPeds(){
   const pool = pedBlockCandidates.slice();
-  const count = Math.min(20, pool.length);
+  const count = Math.min(30, pool.length);
   for (let k = 0; k < count; k++){
     const idx = randInt(0, pool.length - 1);
     const bpos = pool.splice(idx, 1)[0];
@@ -67,15 +76,49 @@ function spawnPed(bi, bj){
   }
 })();
 
+/* Czy można wejść na przejście c: na skrzyżowaniu ze światłami — gdy auta na przekraczanej
+   jezdni mają czerwone, a poprzeczne dopiero dostały zielone (piesi mają ~11 s); zawsze —
+   gdy żaden jadący pojazd nie zbliża się do przejścia na mniej niż ~22 m i nikt na nim nie stoi. */
+function pedCrossSafe(c){
+  if (c.tl){
+    const tCross = c.road === 'ns' ? c.tl.t : (c.tl.t + TL_HALF) % TL_FULL;      // faza aut na przekraczanej jezdni
+    const tOther = (tCross + TL_HALF) % TL_FULL;
+    if (tlState(tCross) !== 'R') return false;
+    const st = tlState(tOther);
+    if (!(st === 'RY' || (st === 'G' && tOther - TL_RY < 4))) return false;
+  }
+  const near = (x, z, vx, vz) => {
+    const ox = c.x - x, oz = c.z - z, d = Math.hypot(ox, oz);
+    if (Math.abs(x - c.x) < c.hw + 1.2 && Math.abs(z - c.z) < c.hd + 1.2) return true;   // pojazd na przejściu
+    if (d > 22) return false;
+    const sp = Math.hypot(vx, vz);
+    return sp > 0.8 && (ox*vx + oz*vz) / (d || 1) > 0.3 * sp;                            // jedzie w stronę przejścia
+  };
+  for (const m of npcs) if (near(m.pos.x, m.pos.y, (m.dirX || 0) * m.speed, (m.dirZ || 0) * m.speed)) return false;
+  const v = chassisBody.velocity;
+  if (near(chassisBody.position.x, chassisBody.position.z, v.x, v.z)) return false;
+  return true;
+}
+/* pieszy na jezdni (przechodzi albo leży) — auta NPC muszą się przed nim zatrzymać */
+function pedOnRoad(n){ return n.y < WALK_H - 0.05; }
+
+function pedStepTo(n, tx, tz, spd, dt){
+  const dx = tx - n.pos.x, dz = tz - n.pos.y, dist = Math.hypot(dx, dz);
+  if (dist < 0.25) return true;
+  const st = Math.min(dist, spd * dt);
+  n.pos.x += dx / dist * st; n.pos.y += dz / dist * st;
+  n.heading = angleDamp(n.heading, Math.atan2(dx, dz), 6, dt);
+  return false;
+}
 function updatePedestrians(dt){
   for (const n of Pedestrians.list){
     if (n.state === 'down'){
       n.stateT -= dt;
       if (n.stateT <= 0){
         let bi, bj;
-        do { bi = randInt(0, GRID - 1); bj = randInt(0, GRID - 1); } while (isCornerBlock(bi, bj));
-        n.path = pedLoopFor(bi, bj);
-        n.wp = 0;
+        do { bi = randInt(0, GRID - 1); bj = randInt(0, GRID - 1); } while (isCornerBlock(bi, bj) || !pedBlockSet.has(bi + ',' + bj));
+        n.path = pedLoopFor(bi, bj); n.block = [bi, bj];
+        n.wp = 0; n.y = WALK_H;
         n.pos.set(n.path[0].x, n.path[0].z);
         n.group.rotation.x = 0;
         n.state = 'walk';
@@ -83,25 +126,62 @@ function updatePedestrians(dt){
       continue;
     }
 
-    const tgt = n.path[n.wp];
-    const dx = tgt.x - n.pos.x, dz = tgt.z - n.pos.y;
-    const dist = Math.hypot(dx, dz);
-    if (dist < 0.6){
-      n.wp = (n.wp + 1) % 4;
-    } else {
-      const nx = dx / dist, nz = dz / dist;
-      n.pos.x += nx * n.speed * dt;
-      n.pos.y += nz * n.speed * dt;
-      n.heading = angleDamp(n.heading, Math.atan2(nx, nz), 6, dt);
+    let moving = true;
+    if (n.state === 'walk'){
+      const tgt = n.path[n.wp];
+      if (pedStepTo(n, tgt.x, tgt.z, n.speed, dt)){
+        /* narożnik: czasem przejście na sąsiedni kwartał */
+        const near = pedCrosswalks.filter(c => Math.hypot(c.a.x - tgt.x, c.a.z - tgt.z) < 4 || Math.hypot(c.b.x - tgt.x, c.b.z - tgt.z) < 4);
+        const c = (near.length && rnd() < 0.45) ? pick(near) : null;
+        if (c){
+          const fromA = Math.hypot(c.a.x - tgt.x, c.a.z - tgt.z) < 4;
+          n.cw = c; n.cwFrom = fromA ? c.a : c.b; n.cwTo = fromA ? c.b : c.a;
+          n.cwBlock = c.blocks[fromA ? 1 : 0];
+          n.state = 'toCurb';
+        } else n.wp = (n.wp + 1) % 4;
+      }
+    } else if (n.state === 'toCurb'){
+      if (pedStepTo(n, n.cwFrom.x, n.cwFrom.z, n.speed, dt)){ n.state = 'wait'; n.waitT = 0; }
+    } else if (n.state === 'wait'){
+      moving = false;
+      n.waitT += dt;
+      n.heading = angleDamp(n.heading, Math.atan2(n.cwTo.x - n.pos.x, n.cwTo.z - n.pos.y), 6, dt);
+      if (pedCrossSafe(n.cw)) n.state = 'cross';
+      else if (n.waitT > 30){ n.state = 'walk'; n.cw = null; n.wp = (n.wp + 1) % 4; }   // rezygnacja — idzie dalej swoim kwartałem
+    } else if (n.state === 'cross'){
+      /* auto tuż przed pieszym na jego drodze (np. wjechało na pasy) — pieszy przystaje, nie przechodzi przez nie */
+      const wx = n.cwTo.x - n.pos.x, wz = n.cwTo.z - n.pos.y, wl = Math.hypot(wx, wz) || 1;
+      const blockedBy = (x, z) => { const ox = x - n.pos.x, oz = z - n.pos.y, a = (ox*wx + oz*wz)/wl; return a > 0 && a < 3.2 && Math.abs(ox*wz - oz*wx)/wl < 2.3; };
+      if (npcs.some(m => blockedBy(m.pos.x, m.pos.y)) || blockedBy(chassisBody.position.x, chassisBody.position.z)) moving = false;
+      else if (pedStepTo(n, n.cwTo.x, n.cwTo.z, PED_CROSS, dt)){
+        /* po drugiej stronie: pętla nowego kwartału od najbliższego narożnika */
+        n.block = n.cwBlock;
+        n.path = pedLoopFor(n.block[0], n.block[1]);
+        let best = 0, bd = 1e9;
+        n.path.forEach((p, k) => { const d = Math.hypot(p.x - n.pos.x, p.z - n.pos.y); if (d < bd){ bd = d; best = k; } });
+        n.wp = best; n.state = 'walk'; n.cw = null;
+        Pedestrians.crossings = (Pedestrians.crossings || 0) + 1;
+      }
     }
-    n.body.position.set(n.pos.x, WALK_H + 0.85, n.pos.y);
-    n.group.position.set(n.pos.x, WALK_H, n.pos.y);
+    /* wysokość: zejście z krawężnika na jezdnię tylko między krawężnikami przejścia */
+    let yT = WALK_H;
+    if (n.state === 'cross'){
+      const c = n.cw, across = c.road === 'ns' ? Math.abs(n.pos.x - L(c.i)) : Math.abs(n.pos.y - L(c.j));
+      if (across < ROAD_H) yT = 0;
+    }
+    n.y = yT < n.y ? Math.max(yT, n.y - dt * 1.5) : Math.min(yT, n.y + dt * 1.5);
+    n.body.position.set(n.pos.x, n.y + 0.85, n.pos.y);
+    n.group.position.set(n.pos.x, n.y, n.pos.y);
     n.group.rotation.y = n.heading;
 
-    n.walkPhase += dt * (3.0 + n.speed * 1.1);
-    const s = Math.sin(n.walkPhase), c = Math.sin(n.walkPhase + Math.PI);
-    n.legL.rotation.x = s * 0.5; n.legR.rotation.x = c * 0.5;
-    n.armL.rotation.x = c * 0.42; n.armR.rotation.x = s * 0.42;
+    if (moving){
+      n.walkPhase += dt * (3.0 + (n.state === 'cross' ? PED_CROSS : n.speed) * 1.1);
+      const s = Math.sin(n.walkPhase), c = Math.sin(n.walkPhase + Math.PI);
+      n.legL.rotation.x = s * 0.5; n.legR.rotation.x = c * 0.5;
+      n.armL.rotation.x = c * 0.42; n.armR.rotation.x = s * 0.42;
+    } else {
+      n.legL.rotation.x = n.legR.rotation.x = n.armL.rotation.x = n.armR.rotation.x = 0;
+    }
   }
 }
 
@@ -109,6 +189,7 @@ Pedestrians.hit = function(n, force, gentle){
   if (!n || n.state === 'down') return;
   n.state = 'down';
   n.stateT = gentle ? 3.5 : 5.5;
+  n.cw = null;
   n.group.rotation.x = (rnd() < 0.5 ? 1 : -1) * Math.PI/2;
   n.body.position.set(n.pos.x, -50, n.pos.y);   // leżący pieszy nie zostawia niewidzialnej kolizji w miejscu, gdzie stał
   Sound.hurt();

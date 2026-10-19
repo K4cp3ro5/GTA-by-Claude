@@ -98,19 +98,17 @@ function texCross(){
 
 /* pojedynczy pas przejścia dla pieszych — osobna, lekka tekstura nakładana
    punktowo tylko na wybrane strony wybranych skrzyżowań (patrz sekcja 7) */
-function texCrossStrip(){
-  const W = 256, H = 96, c = mkCanvas(W,H), g = c.getContext('2d');
+/* kafel zebry P-10: jeden biały pas (50%) na okres 1 m — powtarzany wzdłuż przejścia bez przerw */
+function texCrossTile(){
+  const W = 64, H = 96, c = mkCanvas(W,H), g = c.getContext('2d');
   g.fillStyle = '#34363b'; g.fillRect(0,0,W,H);
   noiseOver(g, W, H, 14);
-  const stripes = 7, margin = 10, gap = (W - margin*2) / stripes;
   g.fillStyle = 'rgba(228,226,216,.86)';
-  for (let i = 0; i < stripes; i++){
-    g.fillRect(margin + i*gap + gap*0.16, 6, gap*0.58, H - 12);
-  }
+  g.fillRect(W*0.25, 5, W*0.5, H - 10);
   g.globalCompositeOperation = 'destination-out';
-  for (let i = 0; i < 70; i++){
+  for (let i = 0; i < 18; i++){
     g.fillStyle = 'rgba(0,0,0,' + rand(0.08,0.4) + ')';
-    g.beginPath(); g.ellipse(rnd()*W, rnd()*H, rand(1,4), rand(1,3), 0, 0, TAU); g.fill();
+    g.beginPath(); g.ellipse(rnd()*W, rnd()*H, rand(1,3), rand(1,3), 0, 0, TAU); g.fill();
   }
   g.globalCompositeOperation = 'source-over';
   return toTex(c);

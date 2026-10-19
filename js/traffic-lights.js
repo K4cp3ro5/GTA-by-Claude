@@ -38,10 +38,14 @@ function buildSignalHead(spot, mats){
   });
 }
 
+/* linia zatrzymania (STOP_AT od środka skrzyżowania) leży przed przejściem dla pieszych (CW_OFF ± 1.1),
+   sygnalizator i STOP stoją przy niej — piesi przechodzą obok, nie przez słupek */
+const STOP_AT = ROAD_H + 3.7;
+const STOP_ZONE = [2, STOP_AT + 2.8];        // środek auta w tym przedziale "przed" skrzyżowaniem => hamuje
 TL_PTS.forEach(p => {
   const cx = L(p[0]), cz = L(p[1]), o = ROAD_H + 1.0;
-  const tl = { x: cx, z: cz, radius: 10, t: rand(0, TL_FULL), ns: 'R', ew: 'R', nsMats: tlGroupMats(), ewMats: tlGroupMats() };
-  [{x:0,z:1},{x:0,z:-1},{x:1,z:0},{x:-1,z:0}].forEach(d => buildSignalHead(approachSpot(cx, cz, d, o, o), d.x === 0 ? tl.nsMats : tl.ewMats));
+  const tl = { x: cx, z: cz, radius: STOP_ZONE[1] + 2, t: rand(0, TL_FULL), ns: 'R', ew: 'R', nsMats: tlGroupMats(), ewMats: tlGroupMats() };
+  [{x:0,z:1},{x:0,z:-1},{x:1,z:0},{x:-1,z:0}].forEach(d => buildSignalHead(approachSpot(cx, cz, d, STOP_AT, o), d.x === 0 ? tl.nsMats : tl.ewMats));
   trafficLights.push(tl);
 });
 
@@ -68,19 +72,19 @@ function updateTrafficLights(dt){
 
 /* true, jeśli npc jadący kierunkiem (dx,dz) z pozycji (px,pz) powinien się teraz zatrzymać
    przed sygnalizatorem: czerwone / czerwone+żółte zawsze, żółte tylko jeśli da się
-   jeszcze zatrzymać przed linią (auto bliżej niż 9 m od środka już jedzie dalej) */
+   jeszcze zatrzymać przed linią (auto już za linią zatrzymania jedzie dalej) */
 function redLightAhead(px, pz, dx, dz){
   for (const tl of trafficLights){
     const ox = tl.x - px, oz = tl.z - pz;
     const dist = Math.hypot(ox, oz);
     if (dist > tl.radius) continue;
     const ahead = ox*dx + oz*dz;
-    if (ahead < 2 || ahead > 9.5) continue;
+    if (ahead < STOP_ZONE[0] || ahead > STOP_ZONE[1]) continue;
     const lat = Math.abs(ox*-dz + oz*dx);
     if (lat > 5.2) continue;          // pas jazdy = 3.5 m od osi (±1.75); próg dokładnie 3.5 odrzucał auta po minimalnym dryfie numerycznym
     const st = Math.abs(dz) >= Math.abs(dx) ? tl.ns : tl.ew;
     if (st === 'G') continue;
-    if (st === 'Y' && ahead < 9) continue;
+    if (st === 'Y' && ahead < STOP_AT + 0.5) continue;
     return true;
   }
   return false;
@@ -96,14 +100,14 @@ function redLightAhead(px, pz, dx, dz){
    --------------------------------------------------------------- */
 /* wybrane programowo (test: skrzyżowania, przez które realnie przejeżdżają prostopadłe trasy NPC,
    poza rondami, światłami, narożnikami tras i węzłem autostrady) */
-const STOP_PTS = [[5,6],[6,3],[6,7],[1,4],[7,10]];
+const STOP_PTS = [[5,6,'ns'],[6,3],[6,7],[1,4],[7,10]];   // 'ns' = STOP tylko na wlotach N–S (aleja j=6 ma pierwszeństwo)
 const stopSigns = [];
 
 STOP_PTS.forEach(p => {
   const cx = L(p[0]), cz = L(p[1]);
-  stopSigns.push({ x: cx, z: cz, radius: 10 });
-  [{x:0,z:1},{x:0,z:-1},{x:1,z:0},{x:-1,z:0}].forEach(d => {
-    const a = approachSpot(cx, cz, d, ROAD_H + 1.6, ROAD_H + 0.9);   // prawa krawędź dojazdu, przodem do kierowcy
+  stopSigns.push({ x: cx, z: cz, radius: STOP_ZONE[1] + 2, axis: p[2] || null });
+  [{x:0,z:1},{x:0,z:-1},{x:1,z:0},{x:-1,z:0}].filter(d => p[2] !== 'ns' || d.x === 0).forEach(d => {
+    const a = approachSpot(cx, cz, d, STOP_AT, ROAD_H + 0.9);       // prawa krawędź dojazdu przy linii zatrzymania, przodem do kierowcy
     placeSign(a.x, a.z, a.rot, [FACE.STOP()]);
   });
 });
@@ -116,10 +120,11 @@ placeSign(HWY_B_OUT + 1.6, HWY_Z1 - 50, 0, [FACE.B33(100)], { base: 0 });       
 function stopSignAhead(n, dx, dz, dt){
   let inZone = false;
   for (const s of stopSigns){
+    if (s.axis === 'ns' && Math.abs(dz) < Math.abs(dx)) continue;          // jadący aleją: bez STOP
     const ox = s.x - n.pos.x, oz = s.z - n.pos.y;
     if (Math.hypot(ox, oz) > s.radius) continue;
     const ahead = ox*dx + oz*dz;
-    if (ahead < 1.5 || ahead > 9) continue;
+    if (ahead < 1.5 || ahead > STOP_ZONE[1]) continue;
     const lat = Math.abs(ox*-dz + oz*dx);
     if (lat > 5.2) continue;          // pas jazdy = 3.5 m od osi (±1.75); próg dokładnie 3.5 odrzucał auta po minimalnym dryfie numerycznym
     inZone = true;

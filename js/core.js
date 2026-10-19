@@ -29,7 +29,8 @@ function mulberry32(a){
     return ((t ^ t >>> 14) >>> 0) / 4294967296;
   };
 }
-const rnd = mulberry32(0x5EED17);
+/* ziarno: stałe w grze; test/sim.js może podać inne (SEED=...), żeby sprawdzić inne układy miasta */
+const rnd = mulberry32((typeof window !== "undefined" && window.GAME_SEED) || 0x5EED17);
 const rand      = (a,b) => a + rnd() * (b - a);
 const randInt   = (a,b) => Math.floor(a + rnd() * (b - a + 1));
 const pick      = arr   => arr[Math.floor(rnd() * arr.length)];

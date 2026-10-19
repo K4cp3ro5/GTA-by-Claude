@@ -266,7 +266,7 @@ function spawnHighwayCar(side, lane, z, colorHex, vDes){
   body.allowSleep = false;
   addBody(body);
   hwyTraffic.push({ side: side, dir: side === 'A' ? 1 : -1, lane: lane, tlane: lane, x: hwyLaneX(side, lane), z: z,
-                    v: vDes, vDes: vDes, vx: 0, mesh: mesh, body: body, cool: rand(0, 8) });
+                    v: Math.min(vDes, hwyLimit(side, z)), vDes: vDes, vx: 0, mesh: mesh, body: body, cool: rand(0, 8), obey: rand(0.93, 1.07) });
 }
 function initHighwayTraffic(){
   const PER_SIDE = 6, slot = HWY_LOOP / PER_SIDE;
@@ -302,20 +302,54 @@ function hwyLaneFree(c, lane){
   }
   return true;
 }
+/* czy na prawym pasie jezdni A jest luka do włączenia się w punkcie z (55 m za, 18 m przed) */
+function hwyMergeFree(z){
+  for (const o of hwyTraffic){
+    if (o.side !== 'A' || (o.lane !== 0 && o.tlane !== 0)) continue;
+    const g = o.z - z;
+    if (g > -55 && g < 18) return false;
+  }
+  return true;
+}
+/* auto miejskie (NPC) wjeżdża na autostradę: przechodzi do hwyTraffic z tym samym modelem i ciałem */
+const HWY_OFF_Z = HWY_OFF_RAMP.p0.z;                    // początek łącznicy zjazdowej na jezdni A
+function npcToHighway(n){
+  const idx = npcs.indexOf(n); if (idx >= 0) npcs.splice(idx, 1);
+  hwyTraffic.push({ side: 'A', dir: 1, lane: 0, tlane: 0, x: n.pos.x, z: n.pos.y, v: Math.max(n.speed, 12), vDes: rand(24, 33), vx: 0,
+                    mesh: n.mesh, body: n.body, cool: 6, city: { path: n.path, color: n.color, id: n.id, target: n.target }, armed: false, obey: n.obey || 1 });
+  hwyStats.merges++;
+}
+const hwyStats = { merges: 0, exits: 0 };
 function updateHighwayTraffic(dt){
-  for (const c of hwyTraffic){
+  for (let ci = hwyTraffic.length - 1; ci >= 0; ci--){
+    const c = hwyTraffic[ci];
+    /* auto z miasta: po przejechaniu tunelu (armed) zjeżdża łącznicą — wcześniej zostaje na prawym pasie */
+    if (c.city && c.armed){
+      const toOff = HWY_OFF_Z - c.z;
+      if (toOff > 0 && toOff < 240){
+        c.vDes = Math.min(c.vDes, toOff < 120 ? 20 : 26);
+        if (c.lane === 1 && c.tlane === 1 && hwyLaneFree(c, 0)) c.tlane = 0;
+        if (c.tlane === 0) c.cool = 99;                    // bez wyprzedzania przed zjazdem
+        if (toOff < 10 && c.lane === 0 && Math.abs(c.x - hwyLaneX('A', 0)) < 0.6){
+          hwyTraffic.splice(ci, 1); npcFromHighway(c); hwyStats.exits++; continue;
+        }
+      }
+    }
     c.cool -= dt;
     const a = hwyLead(c, c.lane), b = (c.tlane !== c.lane) ? hwyLead(c, c.tlane) : a, lead = a.gap < b.gap ? a : b;
-    /* prędkość: nie szybciej niż pozwala odstęp do poprzednika (płynnie, bez skoków) */
+    /* prędkość: limit strefy (B-33 140/100, z wyprzedzeniem 70 m) i odstęp do poprzednika (płynnie, bez skoków) */
+    let zAhead = c.z + c.dir*90;                                  // z wyprzedzeniem także "przez" tunel (zawinięcie)
+    if (zAhead > HWY_WRAP) zAhead -= HWY_LOOP; else if (zAhead < -HWY_WRAP) zAhead += HWY_LOOP;
+    const vCap = Math.min(c.vDes, Math.min(hwyLimit(c.side, c.z), hwyLimit(c.side, zAhead)) * c.obey);
     const safe = 7 + c.v * 0.9;
-    const vWant = Math.max(0, Math.min(c.vDes, lead.v + (lead.gap - safe) * 0.4));
+    const vWant = Math.max(0, Math.min(vCap, lead.v + (lead.gap - safe) * 0.4));
     c.v += clamp(vWant - c.v, -7 * dt, 2.5 * dt);
     /* zmiana pasa: wyprzedzanie lewym, powrót na prawy */
     if (c.cool <= 0 && c.tlane === c.lane){
-      if (c.lane === 0 && lead.gap < 30 && lead.v < c.vDes - 2.5 && hwyLaneFree(c, 1)){ c.tlane = 1; c.cool = 10; }
+      if (c.lane === 0 && lead.gap < 30 && lead.v < vCap - 2.5 && hwyLaneFree(c, 1)){ c.tlane = 1; c.cool = 10; }
       else if (c.lane === 1 && hwyLaneFree(c, 0)){
         const r = hwyLead(c, 0);
-        if (r.gap > 45 || r.v >= c.vDes - 1){ c.tlane = 0; c.cool = 8; }
+        if (r.gap > 45 || r.v >= vCap - 1){ c.tlane = 0; c.cool = 8; }
       }
     }
     const tx = hwyLaneX(c.side, c.tlane), dx = clamp(tx - c.x, -1.6 * dt, 1.6 * dt);
@@ -324,7 +358,7 @@ function updateHighwayTraffic(dt){
     if (Math.abs(c.x - tx) < 0.05) c.lane = c.tlane;
 
     c.z += c.dir * c.v * dt;
-    if (c.dir > 0 && c.z > HWY_WRAP) c.z -= HWY_LOOP;
+    if (c.dir > 0 && c.z > HWY_WRAP){ c.z -= HWY_LOOP; if (c.city) c.armed = true; }
     if (c.dir < 0 && c.z < -HWY_WRAP) c.z += HWY_LOOP;
 
     const heading = (c.dir > 0 ? 0 : Math.PI) + c.dir * Math.atan2(c.vx, Math.max(c.v, 5));
@@ -386,8 +420,11 @@ const yardBuf = new GeoBuf(), yardPaintBuf = new GeoBuf(), shedBuf = new GeoBuf(
    droga serwisowa łączy się z ulicą pod estakadą (HWY2_Z).
    --------------------------------------------------------------- */
 const treeTrunkBuf = new GeoBuf(), treeCrownBuf = new GeoBuf();
+const EAST_ROAD_X = HWY_B_OUT + 24;                    // oś drogi serwisowej (8 m, pasy ±2 m)
+const EAST_TURN_Z = WALL_X - 14, EAST_TURN_R = 4.2;    // zawrotki (tarcza R=7.5) na obu końcach, tor auta r=4.2
 (function buildEastZone(){
-  const xs = HWY_B_OUT + 24, rw = 8, zA = -(WALL_X - 6), zB = WALL_X - 6;
+  const xs = EAST_ROAD_X, rw = 8, zA = -(WALL_X - 6), zB = WALL_X - 6;
+  [EAST_TURN_Z, -EAST_TURN_Z].forEach(z => { yardBuf.disc(xs, 0.02, z, 7.5, 24); mapExtras.push({ t:'disc', x: xs, z: z, r: 7.5, c:'#2b2e35' }); });
   [[zA, HWY2_Z - ROAD_H], [HWY2_Z + ROAD_H, zB]].forEach(pc => {
     const v0 = pc[0] / ROAD_TILE, v1 = pc[1] / ROAD_TILE;
     hwyRampBuf.quad([xs-rw/2,0.013,pc[1]],[xs+rw/2,0.013,pc[1]],[xs+rw/2,0.013,pc[0]],[xs-rw/2,0.013,pc[0]], [0,v1],[1,v1],[1,v0],[0,v0]);
@@ -419,6 +456,7 @@ const treeTrunkBuf = new GeoBuf(), treeCrownBuf = new GeoBuf();
     for (let z = -258; z <= 258; z += 18){
       if (Math.abs(z - HWY2_Z) < 16) continue;
       if (ci === 0 && Math.abs(z - HWY_IC_Z) < 28) continue;       // łącznice przechodzą tędy
+      if (ci === 2 && Math.abs(z) > EAST_TURN_Z - 9) continue;     // zawrotki na końcach drogi serwisowej
       tree(tx + rand(-1.5, 1.5), z + rand(-2, 2));
     }
   });

@@ -201,6 +201,117 @@ const FACE = {
   B33:  n  => signFace('B-33', speedTex(n), shapeCircle(0.35))
 };
 
+/* --- znaki organizacji ruchu (road-rules.js) --- */
+function texB2(){                                           // zakaz wjazdu: czerwone koło, biały poziomy pas
+  const S = 128, c = mkCanvas(S,S), g = c.getContext('2d');
+  g.fillStyle = '#f2f0ea'; g.beginPath(); g.arc(S/2,S/2,S/2-1,0,TAU); g.fill();
+  g.fillStyle = '#c5161d'; g.beginPath(); g.arc(S/2,S/2,S/2-4,0,TAU); g.fill();
+  g.fillStyle = '#f2f0ea'; g.fillRect(S*0.17, S*0.41, S*0.66, S*0.18);
+  return toTex(c);
+}
+function blueDisc(g, S){
+  g.fillStyle = '#1659b0'; g.beginPath(); g.arc(S/2,S/2,S/2-1,0,TAU); g.fill();
+  g.strokeStyle = '#fff'; g.lineWidth = 4; g.beginPath(); g.arc(S/2,S/2,S/2-6,0,TAU); g.stroke();
+}
+function arrowHead(g, x, y, ang, s){                        // grot strzałki w punkcie (x,y) skierowany pod kątem ang (canvas)
+  g.save(); g.translate(x, y); g.rotate(ang);
+  g.beginPath(); g.moveTo(s, 0); g.lineTo(-s*0.6, -s*0.9); g.lineTo(-s*0.6, s*0.9); g.closePath(); g.fill();
+  g.restore();
+}
+/* C-2 (w prawo za znakiem), C-4 (w lewo za znakiem), C-5 (prosto): biała strzałka na niebieskim kole */
+function texCArrow(kind){
+  const S = 128, c = mkCanvas(S,S), g = c.getContext('2d');
+  blueDisc(g, S);
+  g.fillStyle = '#fff'; g.strokeStyle = '#fff'; g.lineWidth = 13; g.lineCap = 'butt';
+  if (kind === 'C-6'){                                      // prosto lub w prawo
+    g.beginPath(); g.moveTo(S*0.42, S*0.84); g.lineTo(S*0.42, S*0.36); g.stroke();
+    arrowHead(g, S*0.42, S*0.2, -Math.PI/2, 20);
+    g.beginPath(); g.moveTo(S*0.42, S*0.6); g.quadraticCurveTo(S*0.42, S*0.5, S*0.56, S*0.5); g.lineTo(S*0.66, S*0.5); g.stroke();
+    arrowHead(g, S*0.8, S*0.5, 0, 18);
+  } else if (kind === 'C-5'){
+    g.beginPath(); g.moveTo(S/2, S*0.82); g.lineTo(S/2, S*0.36); g.stroke();
+    arrowHead(g, S/2, S*0.2, -Math.PI/2, 22);
+  } else {
+    const sgn = kind === 'C-2' ? 1 : -1;                    // C-2: zakręt w prawo, C-4: w lewo
+    g.beginPath(); g.moveTo(S/2 - sgn*14, S*0.84); g.lineTo(S/2 - sgn*14, S*0.48);
+    g.quadraticCurveTo(S/2 - sgn*14, S*0.36, S/2 + sgn*2, S*0.36); g.lineTo(S/2 + sgn*14, S*0.36); g.stroke();
+    arrowHead(g, S/2 + sgn*30, S*0.36, sgn > 0 ? 0 : Math.PI, 20);
+  }
+  return toTex(c);
+}
+function texD1(){                                           // droga z pierwszeństwem: żółty romb z białym obrzeżem (romb = kształt tarczy)
+  const S = 128, c = mkCanvas(S,S), g = c.getContext('2d');
+  const dia = (r, col) => { g.fillStyle = col; g.beginPath(); g.moveTo(S/2, S/2 - r); g.lineTo(S/2 + r, S/2); g.lineTo(S/2, S/2 + r); g.lineTo(S/2 - r, S/2); g.closePath(); g.fill(); };
+  dia(S/2, '#2a2a2a'); dia(S/2 - 3, '#f2f0ea'); dia(S/2 - 16, '#2a2a2a'); dia(S/2 - 19, '#f5c400');
+  return toTex(c);
+}
+function blueSquare(g, W, H){
+  g.fillStyle = '#f2f0ea'; g.fillRect(0, 0, W, H);
+  g.fillStyle = '#1659b0'; g.fillRect(4, 4, W - 8, H - 8);
+}
+function texD3(){                                           // droga jednokierunkowa: biała strzałka w górę
+  const S = 128, c = mkCanvas(S,S), g = c.getContext('2d');
+  blueSquare(g, S, S);
+  g.fillStyle = '#fff'; g.fillRect(S/2 - 8, S*0.4, 16, S*0.48);
+  arrowHead(g, S/2, S*0.26, -Math.PI/2, 26);
+  return toTex(c);
+}
+function texD6(){                                           // przejście dla pieszych: biały trójkąt, pieszy na pasach
+  const S = 128, c = mkCanvas(S,S), g = c.getContext('2d');
+  blueSquare(g, S, S);
+  g.fillStyle = '#f2f0ea'; g.beginPath(); g.moveTo(S/2, S*0.12); g.lineTo(S*0.9, S*0.86); g.lineTo(S*0.1, S*0.86); g.closePath(); g.fill();
+  g.fillStyle = '#111';
+  for (let k = 0; k < 4; k++) g.fillRect(S*0.25 + k*S*0.14, S*0.76, S*0.08, S*0.06);         // pasy zebry
+  g.beginPath(); g.arc(S*0.53, S*0.36, 6, 0, TAU); g.fill();                                // głowa
+  g.lineWidth = 6; g.strokeStyle = '#111'; g.lineCap = 'round';
+  g.beginPath(); g.moveTo(S*0.52, S*0.43); g.lineTo(S*0.49, S*0.58);                       // tułów
+  g.moveTo(S*0.49, S*0.58); g.lineTo(S*0.42, S*0.72); g.moveTo(S*0.49, S*0.58); g.lineTo(S*0.58, S*0.71);   // nogi
+  g.moveTo(S*0.51, S*0.47); g.lineTo(S*0.42, S*0.54); g.moveTo(S*0.51, S*0.47); g.lineTo(S*0.6, S*0.52);   // ręce
+  g.stroke();
+  return toTex(c);
+}
+/* D-42 obszar zabudowany (sylwetka miasta), D-43 koniec obszaru (przekreślona) */
+function texD42(end){
+  const W = 192, H = 128, c = mkCanvas(W,H), g = c.getContext('2d');
+  g.fillStyle = '#2a2a2a'; g.fillRect(0, 0, W, H);
+  g.fillStyle = '#f2f0ea'; g.fillRect(4, 4, W - 8, H - 8);
+  g.fillStyle = '#111';
+  [[20,70,22],[44,52,18],[64,80,14],[80,40,22],[104,62,20],[126,48,16],[144,74,24]].forEach(b => g.fillRect(b[0], b[1], b[2], 104 - b[1]));
+  g.beginPath(); g.moveTo(80, 40); g.lineTo(91, 22); g.lineTo(102, 40); g.closePath(); g.fill();        // wieża kościoła
+  g.fillRect(20, 102, W - 40, 6);
+  if (end){ g.strokeStyle = '#c5161d'; g.lineWidth = 12; g.beginPath(); g.moveTo(14, H - 14); g.lineTo(W - 14, 14); g.stroke(); }
+  return toTex(c);
+}
+/* B-43 strefa ograniczonej prędkości (n km/h), B-44 koniec strefy (szary, przekreślony czarnymi pasami) */
+function texB43(n, end){
+  const W = 128, H = 160, c = mkCanvas(W,H), g = c.getContext('2d');
+  g.fillStyle = '#2a2a2a'; g.fillRect(0, 0, W, H);
+  g.fillStyle = '#f2f0ea'; g.fillRect(4, 4, W - 8, H - 8);
+  g.fillStyle = '#111'; g.font = '700 22px Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText('STREFA', W/2, 26);
+  g.strokeStyle = end ? '#777' : '#c5161d'; g.lineWidth = 9; g.beginPath(); g.arc(W/2, 94, 40, 0, TAU); g.stroke();
+  g.fillStyle = end ? '#777' : '#111'; g.font = '700 38px Arial, sans-serif'; g.fillText(String(n), W/2, 96);
+  if (end){ g.strokeStyle = '#111'; g.lineWidth = 3; for (let k = -3; k <= 3; k++){ g.beginPath(); g.moveTo(W/2 - 60 + k*10, H - 10); g.lineTo(W/2 + 60 + k*10, 10); g.stroke(); } }
+  return toTex(c);
+}
+function shapeDiamond(r){ return { pts: [[0,-r],[r,0],[0,r],[-r,0]], tw: 2*r, th: 2*r }; }
+const SIGN_TEX2 = { B2: texB2(), C2: texCArrow('C-2'), C4: texCArrow('C-4'), C5: texCArrow('C-5'), C6: texCArrow('C-6'), D1: texD1(), D3: texD3(), D6: texD6(),
+                    D42: texD42(false), D43: texD42(true), B43: texB43(30, false), B44: texB43(30, true) };
+Object.assign(FACE, {
+  B2:  () => signFace('B-2', SIGN_TEX2.B2, shapeCircle(0.35)),
+  C2:  () => signFace('C-2', SIGN_TEX2.C2, shapeCircle(0.35)),
+  C4:  () => signFace('C-4', SIGN_TEX2.C4, shapeCircle(0.35)),
+  C5:  () => signFace('C-5', SIGN_TEX2.C5, shapeCircle(0.35)),
+  C6:  () => signFace('C-6', SIGN_TEX2.C6, shapeCircle(0.35)),
+  D1:  () => signFace('D-1', SIGN_TEX2.D1, shapeDiamond(0.42)),
+  D3:  () => signFace('D-3', SIGN_TEX2.D3, shapeRect(0.6, 0.6)),
+  D6:  () => signFace('D-6', SIGN_TEX2.D6, shapeRect(0.6, 0.6)),
+  D42: () => signFace('D-42', SIGN_TEX2.D42, shapeRect(1.2, 0.8)),
+  D43: () => signFace('D-43', SIGN_TEX2.D43, shapeRect(1.2, 0.8)),
+  B43: () => signFace('B-43', SIGN_TEX2.B43, shapeRect(0.64, 0.8)),
+  B44: () => signFace('B-44', SIGN_TEX2.B44, shapeRect(0.64, 0.8))
+});
+
 /* --- scalenie (wywoływane raz, po postawieniu wszystkich znaków) --- */
 const matSignBack = new THREE.MeshLambertMaterial({ color: 0x8e9196 });
 const matSignPole = new THREE.MeshLambertMaterial({ color: 0x7d8288 });

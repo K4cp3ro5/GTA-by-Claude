@@ -5,7 +5,7 @@ const texs = {
   asphalt: texAsphalt(),
   road:    texRoad(),
   cross:   texCross(),
-  crossStrip: texCrossStrip(),
+  crossStrip: texCrossTile(),
   walk:    texWalk(),
   curb:    texCurb(),
   roof:    texRoof()
@@ -58,26 +58,32 @@ const facadeBufs = FACADES.map(() => new GeoBuf());
   scene.add(m);
 })();
 
-/* pojedynczy pas przejścia dla pieszych na jednej krawędzi skrzyżowania —
-   dir: 'px'/'nx'/'pz'/'nz' (strona świata względem środka skrzyżowania) */
-function crosswalkStrip(cx, cz, dir){
-  const HW = ROAD_W/2, crossW = ROAD_W*0.62, band = ROAD_W*0.16, y = 0.021;
-  let qx, qz, sx, sz;
-  if (dir === 'pz'){ qx=cx; qz=cz+HW-band/2; sx=crossW; sz=band; }
-  else if (dir === 'nz'){ qx=cx; qz=cz-HW+band/2; sx=crossW; sz=band; }
-  else if (dir === 'px'){ qx=cx+HW-band/2; qz=cz; sx=band; sz=crossW; }
-  else { qx=cx-HW+band/2; qz=cz; sx=band; sz=crossW; }
-  const hx = sx/2, hz = sz/2;
+/* przejście dla pieszych (P-10) na wylocie ze skrzyżowania (i,j) — dir: 'px'/'nx'/'pz'/'nz'
+   (w którą stronę świata od środka). Pas leży na jezdni tuż za krawędzią skrzyżowania
+   (0.4–2.6 m), na całej szerokości jezdni, i łączy chodniki dwóch kwartałów po obu stronach
+   ulicy — z tych przejść korzystają piesi (pedestrians.js). a/b = końce na chodnikach. */
+const CW_OFF = ROAD_H + 0.4 + ROAD_W*0.08;            // 8.52: oś pasa od środka skrzyżowania
+const crosswalks = [];
+function crosswalkStrip(cx, cz, dir, i, j){
+  const HW = ROAD_W/2, crossW = ROAD_W - 0.6, band = ROAD_W*0.16, y = 0.021, e = HW + 0.7;
+  let qx, qz, sx, sz, rec;
+  if (dir === 'pz'){ qx=cx; qz=cz+CW_OFF; sx=crossW; sz=band; rec = { a:{x:cx-e,z:qz}, b:{x:cx+e,z:qz}, blocks:[[i-1,j],[i,j]] }; }
+  else if (dir === 'nz'){ qx=cx; qz=cz-CW_OFF; sx=crossW; sz=band; rec = { a:{x:cx-e,z:qz}, b:{x:cx+e,z:qz}, blocks:[[i-1,j-1],[i,j-1]] }; }
+  else if (dir === 'px'){ qx=cx+CW_OFF; qz=cz; sx=band; sz=crossW; rec = { a:{x:qx,z:cz-e}, b:{x:qx,z:cz+e}, blocks:[[i,j-1],[i,j]] }; }
+  else { qx=cx-CW_OFF; qz=cz; sx=band; sz=crossW; rec = { a:{x:qx,z:cz-e}, b:{x:qx,z:cz+e}, blocks:[[i-1,j-1],[i-1,j]] }; }
+  /* road = przekraczana jezdnia: 'ns' (ulica wzdłuż Z, auta jadą N–S) albo 'ew' */
+  crosswalks.push(Object.assign(rec, { x: qx, z: qz, i: i, j: j, dir: dir, road: (dir === 'pz' || dir === 'nz') ? 'ns' : 'ew', hw: sx/2, hd: sz/2 }));
+  const hx = sx/2, hz = sz/2, k = crossW;            // kafel tekstury = 1 m (jeden pas zebry + przerwa)
   if (dir === 'pz' || dir === 'nz'){
     crosswalkBuf.quad([qx-hx,y,qz+hz],[qx+hx,y,qz+hz],[qx+hx,y,qz-hz],[qx-hx,y,qz-hz],
-                       [0,0],[1,0],[1,1],[0,1]);
+                       [0,0],[k,0],[k,1],[0,1]);
   } else {
     crosswalkBuf.quad([qx-hx,y,qz+hz],[qx+hx,y,qz+hz],[qx+hx,y,qz-hz],[qx-hx,y,qz-hz],
-                       [0,1],[0,0],[1,0],[1,1]);
+                       [0,1],[0,0],[k,0],[k,1]);
   }
 }
 
-/* skrzyżowania wyznaczone na ronda (patrz niżej, buildRoundaboutIsland) —
+/* skrzyżowania wyznaczone na ronda (patrz niżej, buildRoundabout) —
    nie dostają zwykłych pasów przejścia, bo to inny typ skrzyżowania */
 const ROUNDABOUT_PTS = [[4,4],[8,4],[4,8],[8,8]];
 function isRoundaboutPt(i, j){ return ROUNDABOUT_PTS.some(p => p[0] === i && p[1] === j); }
@@ -105,10 +111,10 @@ for (let i = 0; i <= GRID; i++){
     else crossBuf.plane(L(i), 0.02, L(j), ROAD_W, ROAD_W, 1, 1);
     const cx = L(i), cz = L(j);
     if (!isRoundaboutPt(i, j)){
-      if (i < GRID && rnd() < 0.55) crosswalkStrip(cx, cz, 'px');
-      if (i > 0    && rnd() < 0.55) crosswalkStrip(cx, cz, 'nx');
-      if (j < GRID && rnd() < 0.55) crosswalkStrip(cx, cz, 'pz');
-      if (j > 0    && rnd() < 0.55) crosswalkStrip(cx, cz, 'nz');
+      if (i < GRID && rnd() < 0.55) crosswalkStrip(cx, cz, 'px', i, j);
+      if (i > 0    && rnd() < 0.55) crosswalkStrip(cx, cz, 'nx', i, j);
+      if (j < GRID && rnd() < 0.55) crosswalkStrip(cx, cz, 'pz', i, j);
+      if (j > 0    && rnd() < 0.55) crosswalkStrip(cx, cz, 'nz', i, j);
     }
   }
 }
@@ -369,6 +375,9 @@ for (let bi = 0; bi < GRID; bi++){
    Auta jeżdżą przeciwnie do wskazówek zegara (z góry): kąt a w parametryzacji (sin a, cos a) rośnie. */
 const RB = { island: 3.6, apron: 4.5, ringR: 6.75, outer: 9.0, lane: 3.5, fillet: 8, cornerR: 3.5,
              yieldAt: 10.5, splitFrom: 9.6, splitTo: 19, splitW0: 1.1, splitW1: 0.25 };
+/* auto czekające na wjazd stoi środkiem >= commit od środka ronda, czyli przodem (2.05) przed krawędzią
+   pasa okrężnego — inaczej jadący po rondzie musieliby je omijać i oba czekałyby na siebie */
+RB.commit = RB.outer + 2.3;
 (function(){
   const r = RB.ringR, Rf = RB.fillet, ln = RB.lane;
   RB.filletAlong = Math.sqrt((r + Rf)*(r + Rf) - (ln + Rf)*(ln + Rf));     // 9.24: początek łuku wlotu na pasie
@@ -478,7 +487,7 @@ function roundaboutEntryAngle(uIn){
   return Math.atan2(uIn.x*RB.tanAlong + vIn.x*RB.tanLat, uIn.z*RB.tanAlong + vIn.z*RB.tanLat);
 }
 
-/* NPC dojeżdżające do ronda (faza 'approach', 9.6–15.5 m od środka) ustępują pojazdom na pasie
+/* NPC dojeżdżające do ronda (faza 'approach', 11.3–18 m od środka) ustępują pojazdom na pasie
    okrężnym, które nadjeżdżają z lewej i dotrą do punktu włączenia, zanim wjeżdżający go minie
    (okno = 6 m + prędkość tamtego × 2.4 s z postoju / 1.4 s w ruchu), albo są tuż przy nim.
    Pojazdy na rondzie nie ustępują wjeżdżającym (A-7 na każdym wlocie). */
@@ -486,7 +495,7 @@ function roundaboutYield(n){
   if (n.rbPhase !== 'approach') return false;
   const p = ROUNDABOUT_PTS[n.rb], cx = L(p[0]), cz = L(p[1]);
   const dn = Math.hypot(n.pos.x - cx, n.pos.y - cz);
-  if (dn < RB.outer + 0.6 || dn > RB.outer + 6.5) return false;
+  if (dn < RB.commit || dn > RB.outer + 9) return false;
   const aE = roundaboutEntryAngle(n.rbArm);
   const ex = cx + Math.sin(aE)*RB.ringR, ez = cz + Math.cos(aE)*RB.ringR;
   const tReach = n.speed < 2 ? 2.4 : 1.4;
