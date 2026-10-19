@@ -89,6 +89,8 @@ function __follow(x0, z0, heading, wps, secs, kmhMax, doneFn){
 }
 function __bez(R, n){ const a = []; for (let k = 0; k <= n; k++){ const q = bezPt(R, k/n); a.push([q.x, q.z]); } return a; }
 function __consts(){ return { laneA0: hwyLaneX('A',0), laneA1: hwyLaneX('A',1), laneB0: hwyLaneX('B',0), laneB1: hwyLaneX('B',1),
+  tree: (() => { const s = treeSpots.find(q => Math.abs(q.x - L(5) - ROAD_H - 3) < 12 && q.z > -200 && q.z < 200); return s ? [s.x, s.z] : null; })(),
+  sign: (() => { const g = signGeomLog.find(q => q.poleTop < 3.6 && Math.abs(q.z) < 200); return g ? [g.x, g.z] : null; })(),
   zc: HWY_BR.zc, h: HWY_BR.h, z0: HWY_Z0, z1: HWY_Z1, ic: HWY_IC_Z, x2: HWY2_Z, yard: YARD_X, offs: __bez(HWY_OFF_RAMP, 20), ons: __bez(HWY_ON_RAMP, 20), wall: WALL_X, a0: HWY_A_OUT }; }
 `;
 const ctx = vm.createContext(base);
@@ -113,3 +115,15 @@ console.log(' ślad:', JSON.stringify(r.tr)); rep(' zjazd:', r, '| maks. odchyle
 console.log('=== 5) WJAZD: skrzyżowanie miasta -> łącznica -> prawy pas jezdni A ===');
 r = base.__follow(245, K.ic, Math.PI/2, K.ons.concat([[K.laneA0, K.ic+90],[K.laneA0, K.ic+160]]), 60, 60, p => p.z > K.ic + 120 && Math.abs(p.x - K.laneA0) < 2.5);
 console.log(' ślad:', JSON.stringify(r.tr)); rep(' wjazd:', r, '| maks. odchylenie od osi: ' + r.maxDev.toFixed(2) + ' m');
+
+console.log('=== 6) kolizje: drzewo, słupek znaku, mur przy 150 km/h ===');
+const hit = (name, tx, tz, fromDx, fromDz, kmh) => {
+  const d = Math.hypot(fromDx, fromDz), ux = -fromDx/d, uz = -fromDz/d;      // kierunek jazdy: na cel
+  const hd = Math.atan2(ux, uz);
+  const rr = base.__run(tx + fromDx, tz + fromDz, hd, 8, p => false, kmh);
+  const pass = (rr.end[0] - tx)*ux + (rr.end[2] - tz)*uz;                     // > 0 = przejechał przez obiekt
+  console.log(' ' + name + ': koniec ' + JSON.stringify(rr.end) + ' | za obiektem o ' + pass.toFixed(2) + ' m (ma być < 0) | przewrócone: ' + rr.flipped);
+};
+if (K.tree) hit('drzewo', K.tree[0], K.tree[1], 0, 16, 40);
+if (K.sign) hit('słupek znaku', K.sign[0], K.sign[1], 16, 0, 40);
+hit('mur północny', 3.5, -K.wall, 0, 160, 150);
