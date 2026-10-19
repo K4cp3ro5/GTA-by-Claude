@@ -29,7 +29,8 @@ function mulberry32(a){
     return ((t ^ t >>> 14) >>> 0) / 4294967296;
   };
 }
-const rnd = mulberry32(0x5EED17);
+/* ziarno: stałe w grze; test/sim.js może podać inne (SEED=...), żeby sprawdzić inne układy miasta */
+const rnd = mulberry32((typeof window !== "undefined" && window.GAME_SEED) || 0x5EED17);
 const rand      = (a,b) => a + rnd() * (b - a);
 const randInt   = (a,b) => Math.floor(a + rnd() * (b - a + 1));
 const pick      = arr   => arr[Math.floor(rnd() * arr.length)];
@@ -64,7 +65,7 @@ const BLOCK      = 44;                    // rozstaw osi ulic
 const ROAD_W     = 14;                    // szerokość jezdni
 const ROAD_H     = ROAD_W / 2;
 const LOT        = BLOCK - ROAD_W;        // 30 — bok podestu chodnika
-const HALF       = GRID * BLOCK / 2;      // 176
+const HALF       = GRID * BLOCK / 2;      // 264
 const WALK_H     = 0.25;                  // wysokość krawężnika
 const ROAD_TILE  = 15;                    // jednostek na kafel jezdni
 const WALL_X     = HALF + ROAD_H + 1.5;   // bariera betonowa

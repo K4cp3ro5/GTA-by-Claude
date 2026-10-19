@@ -2,9 +2,11 @@ core.js
 textures.js
 geobuf.js
 physics-world.js
+signs.js
 city-generation.js
 highway.js
 traffic-lights.js
+road-rules.js
 city-props.js
 player.js
 vehicle.js

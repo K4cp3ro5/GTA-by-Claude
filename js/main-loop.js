@@ -16,7 +16,6 @@ function frame(now){
   updateTrafficLights(dt);
   updateNpcs(dt);
   updateHighwayTraffic(dt);
-  updateRoundaboutTraffic(dt);
   updatePedestrians(dt);
   const carState = updateCar(dt);
   if (mode === 'foot' && pointerLocked) updatePlayer(dt);
@@ -45,6 +44,8 @@ function frame(now){
 /* ---------------------------------------------------------------
    22. START
    --------------------------------------------------------------- */
+finalizeSigns();
+
 /* jedna klatka "na sucho", żeby shadery skompilowały się przed startem */
 renderer.compile(scene, camera);
 syncCar();

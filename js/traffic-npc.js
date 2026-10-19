@@ -3,7 +3,10 @@
    --------------------------------------------------------------- */
 const NPC_COLORS = [0x2e4d8f, 0xd9d4c8, 0x2f6f4e, 0x8a8f96, 0xe0a52c, 0x6b3a8f];
 const npcs = [];
+let npcIdSeq = 0;
 
+/* pętla po prostokącie siatki, prawy pas (3.5 m od osi): wschód -> południe -> zachód -> północ,
+   na narożnikach skręty w prawo */
 function npcLoop(i0, j0, i1, j1){
   const o = 3.5;
   return [
@@ -12,6 +15,41 @@ function npcLoop(i0, j0, i1, j1){
     { x: L(i1) - o, z: L(j1) - o },
     { x: L(i0) + o, z: L(j1) - o }
   ];
+}
+/* ten sam prostokąt w drugą stronę (południe -> wschód -> północ -> zachód): skręty w lewo */
+function npcLoopRev(i0, j0, i1, j1){
+  const o = 3.5;
+  return [
+    { x: L(i0) - o, z: L(j0) - o },
+    { x: L(i0) - o, z: L(j1) + o },
+    { x: L(i1) + o, z: L(j1) + o },
+    { x: L(i1) + o, z: L(j0) - o }
+  ];
+}
+/* Przejazd przez ronda: odcinki pętli przechodzące przez rondo (prosto lub ze skrętem
+   w narożniku na rondzie) zastępowane są trasą roundaboutRoute (wlot -> pas okrężny -> wylot). */
+function routeThroughRoundabouts(path){
+  const ZONE = 12.5, dense = [];
+  for (let i = 0; i < path.length; i++){
+    const a = path[i], b = path[(i + 1) % path.length], len = Math.hypot(b.x - a.x, b.z - a.z);
+    for (let s = 0; s < len; s += 0.5) dense.push({ x: a.x + (b.x - a.x)*s/len, z: a.z + (b.z - a.z)*s/len, corner: s === 0 ? a : null });
+  }
+  const zoneOf = p => ROUNDABOUT_PTS.findIndex(q => Math.hypot(p.x - L(q[0]), p.z - L(q[1])) < ZONE);
+  let start = dense.findIndex(p => zoneOf(p) < 0);
+  const out = [], N = dense.length;
+  const axis = (c, p) => { const dx = p.x - c.x, dz = p.z - c.z; return Math.abs(dx) > Math.abs(dz) ? { x: Math.sign(dx), z: 0 } : { x: 0, z: Math.sign(dz) }; };
+  for (let k = 0; k < N; k++){
+    const p = dense[(start + k) % N], zi = zoneOf(p);
+    if (zi < 0){ if (p.corner) out.push({ x: p.corner.x, z: p.corner.z }); continue; }
+    /* cały przejazd przez strefę ronda */
+    const before = dense[(start + k - 1 + N) % N];
+    let e = k; while (e + 1 < N && zoneOf(dense[(start + e + 1) % N]) === zi) e++;
+    const after = dense[(start + e + 1) % N];
+    const c = { x: L(ROUNDABOUT_PTS[zi][0]), z: L(ROUNDABOUT_PTS[zi][1]) };
+    roundaboutRoute(zi, axis(c, before), axis(c, after)).forEach(q => out.push(q));
+    k = e;
+  }
+  return out;
 }
 const LOOPS = [
   npcLoop(1, 1, 6, 6),
@@ -22,54 +60,131 @@ const LOOPS = [
   npcLoop(3, 9, 10, 10),
   npcLoop(0, 4, 5, 9),
   npcLoop(5, 3, 12, 7),
-  npcLoop(2, 7, 7, 12)
-];
-
-function buildNpcModel(color){
-  const g = new THREE.Group();
-  const paint = new THREE.MeshPhongMaterial({ color: color, shininess: 60 });
-  const dark  = new THREE.MeshLambertMaterial({ color: 0x15171b });
-  const glass = new THREE.MeshPhongMaterial({ color: 0x141d22, shininess: 100, transparent:true, opacity:0.8 });
-  const lampR = new THREE.MeshBasicMaterial({ color: 0x5a1512 });
-  function add(w,h,d,mat,x,y,z){
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
-    m.position.set(x,y,z); m.castShadow = true; g.add(m); return m;
+  npcLoop(2, 7, 7, 12),
+  /* ronda (4,4) (8,4) (4,8) (8,8): skręty w prawo, w lewo i jazda na wprost przez każde z nich */
+  npcLoop(4, 4, 8, 8),
+  npcLoopRev(4, 4, 8, 8),
+  npcLoop(2, 4, 10, 8),
+  npcLoop(4, 2, 8, 10)
+].map(routeThroughRoundabouts);
+/* --- pętla z wyjazdem na autostradę: miasto -> skrzyżowanie (12,6) -> łącznica wjazdowa ->
+   jezdnia A (na południe) -> tunel (zawinięcie) -> jezdnia A od północy -> łącznica zjazdowa ->
+   miasto. Na łącznicach auta jadą prawym pasem (1.55 m w prawo od osi łącznicy), bo przy mieście
+   obie łącznice biegną jednym korytarzem w dwóch kierunkach. Na autostradzie auto przechodzi do
+   systemu hwyTraffic (punkt hwyMerge), a przed zjazdem wraca do ruchu miejskiego (npcFromHighway). --- */
+const RAMP_LANE = 1.55;
+function rampLanePts(R, t0, t1, n, wFn, vmax, tag){
+  const pts = [];
+  for (let k = 0; k <= n; k++){
+    const t = t0 + (t1 - t0) * k/n, p = bezPt(R, t), d = bezTan(R, t), w = RAMP_LANE * wFn(t);
+    pts.push({ x: p.x - d.z*w, z: p.z + d.x*w, vmax: vmax, ramp: tag });       // prawa strona kierunku jazdy = (-d.z, d.x)
   }
-  add(1.86, 0.52, 4.10, paint, 0, 0.62, 0);
-  add(1.60, 0.52, 2.10, glass, 0, 1.10, -0.10);
-  add(1.48, 0.10, 1.70, paint, 0, 1.36, -0.22);
-  add(1.88, 0.20, 0.28, dark, 0, 0.50, 2.02);
-  add(1.88, 0.20, 0.28, dark, 0, 0.50, -2.02);
-  add(0.40, 0.12, 0.08, lampR,  0.62, 0.80, -2.06);
-  add(0.40, 0.12, 0.08, lampR, -0.62, 0.80, -2.06);
-  const hl = new THREE.MeshBasicMaterial({ color: 0xfff3d0 });
-  add(0.40, 0.12, 0.08, hl,  0.62, 0.78, 2.04);
-  add(0.40, 0.12, 0.08, hl, -0.62, 0.78, 2.04);
-  const tg = new THREE.CylinderGeometry(0.34, 0.34, 0.26, 12);
-  tg.rotateZ(Math.PI/2);
-  const tm = new THREE.MeshLambertMaterial({ color: 0x141518 });
-  [[0.84,1.34],[-0.84,1.34],[0.84,-1.34],[-0.84,-1.34]].forEach(p => {
-    const w = new THREE.Mesh(tg, tm);
-    w.position.set(p[0], 0.34, p[1]); w.castShadow = true; g.add(w);
-  });
+  return pts;
+}
+function hwyExcursionLoop(){
+  const o = 3.5, z6 = L(6);
+  const off = rampLanePts(HWY_OFF_RAMP, 0.12, 1, 14, t => Math.min(1, t / 0.3), 13.9, 'off');
+  const city = [ { x: L(10) + o, z: z6 - o }, { x: L(10) + o, z: L(5) + o }, { x: L(11) - o, z: L(5) + o }, { x: L(11) - o, z: z6 + o } ];
+  const on = rampLanePts(HWY_ON_RAMP, 0, 0.9, 14, t => Math.min(1, (1 - t) / 0.3), 15, 'on');
+  const merge = { x: HWY_A_OUT + 1.2, z: HWY_IC_Z + 62 + 16, hwyMerge: true, vmax: 17 };
+  return off.concat(city, on, [merge]);
+}
+/* strefa wschodnia: ulica pod estakadą -> zawrotka na placu -> z powrotem -> droga serwisowa na
+   południe -> zawrotka -> na północ (przez skrzyżowanie) -> zawrotka -> na południe -> plac */
+function circlePts(cx, cz, r, a0, a1, vmax){
+  const pts = [], n = Math.max(2, Math.ceil(Math.abs(a1 - a0) * r / 2.2));
+  for (let k = 0; k <= n; k++){ const a = a0 + (a1 - a0) * k/n; pts.push({ x: cx + Math.sin(a)*r, z: cz + Math.cos(a)*r, vmax: vmax }); }
+  return pts;
+}
+function eastZoneLoop(){
+  const J = EAST_ROAD_X, zU = HWY2_Z, ln = 2, yr = 6.5, tr = EAST_TURN_R;
+  const ccw = (cx, cz, r, x0, z0, x1, z1, v) => {           // łuk przeciwnie do wskazówek zegara od (x0,z0) do (x1,z1)
+    const a0 = Math.atan2(x0 - cx, z0 - cz); let a1 = Math.atan2(x1 - cx, z1 - cz);
+    while (a1 <= a0) a1 += TAU;
+    return circlePts(cx, cz, r, a0, a1, v);
+  };
+  const ye = Math.sqrt(yr*yr - 3.5*3.5), te = Math.sqrt(tr*tr - ln*ln);
+  return [
+    { x: J + 6, z: zU + 3.5 },
+    ...ccw(YARD_X, zU, yr, YARD_X - ye, zU + 3.5, YARD_X - ye, zU - 3.5, 5.5),
+    { x: J - ln, z: zU - 3.5 },
+    ...ccw(J, EAST_TURN_Z, tr, J - ln, EAST_TURN_Z - te, J + ln, EAST_TURN_Z - te, 4.5),
+    ...ccw(J, -EAST_TURN_Z, tr, J + ln, -EAST_TURN_Z + te, J - ln, -EAST_TURN_Z + te, 4.5),
+    { x: J - ln, z: zU + 3.5 }
+  ];
+}
+LOOPS.push(hwyExcursionLoop(), hwyExcursionLoop(), eastZoneLoop());
+
+/* indeks i ułamek odcinka w miejscu f (0..1) długości pętli — na odcinku poza rondem */
+function pathSpot(path, f, tries){
+  const segs = path.map((a, i) => { const b = path[(i + 1) % path.length]; return Math.hypot(b.x - a.x, b.z - a.z); });
+  const total = segs.reduce((s, v) => s + v, 0);
+  let d = ((f % 1) + 1) % 1 * total;
+  for (let i = 0; i < path.length; i++){
+    if (d <= segs[i]){
+      const p = path[i], q = path[(i + 1) % path.length];
+      const inside = (p.rb !== undefined && q.rb === p.rb && !q.first) || p.hwyMerge || p.ramp;   // rondo, odcinek "autostradowy", łącznica
+      if (inside && (tries || 0) < 40) return pathSpot(path, f + 0.03, (tries || 0) + 1);
+      return { idx: i, frac: segs[i] ? d / segs[i] : 0 };
+    }
+    d -= segs[i];
+  }
+  return { idx: 0, frac: 0 };
+}
+
+/* model auta NPC: 3 siatki (karoseria+koła z kolorami wierzchołków, szyby, światła) zamiast 13;
+   geometria wspólna dla wszystkich aut danego koloru (cache) */
+const _npcGeoCache = {};
+const _npcMatBody  = new THREE.MeshPhongMaterial({ vertexColors: true, shininess: 60 });
+const _npcMatGlass = new THREE.MeshPhongMaterial({ color: 0x141d22, shininess: 100, transparent: true, opacity: 0.8 });
+const _npcMatLamp  = new THREE.MeshBasicMaterial({ vertexColors: true });
+function npcGeometries(color){
+  if (_npcGeoCache[color]) return _npcGeoCache[color];
+  const B = (w,h,d) => new THREE.BoxGeometry(w,h,d);
+  const tg = new THREE.CylinderGeometry(0.34, 0.34, 0.26, 12); tg.rotateZ(Math.PI/2);
+  const body = [
+    { geo: B(1.86, 0.52, 4.10), color: color, y: 0.62 },
+    { geo: B(1.48, 0.10, 1.70), color: color, y: 1.36, z: -0.22 },
+    { geo: B(1.88, 0.20, 0.28), color: 0x15171b, y: 0.50, z: 2.02 },
+    { geo: B(1.88, 0.20, 0.28), color: 0x15171b, y: 0.50, z: -2.02 }
+  ];
+  [[0.84,1.34],[-0.84,1.34],[0.84,-1.34],[-0.84,-1.34]].forEach(p => body.push({ geo: tg, color: 0x141518, x: p[0], y: 0.34, z: p[1] }));
+  const lamps = [
+    { geo: B(0.40, 0.12, 0.08), color: 0x5a1512, x:  0.62, y: 0.80, z: -2.06 },
+    { geo: B(0.40, 0.12, 0.08), color: 0x5a1512, x: -0.62, y: 0.80, z: -2.06 },
+    { geo: B(0.40, 0.12, 0.08), color: 0xfff3d0, x:  0.62, y: 0.78, z:  2.04 },
+    { geo: B(0.40, 0.12, 0.08), color: 0xfff3d0, x: -0.62, y: 0.78, z:  2.04 }
+  ];
+  const glass = new THREE.BoxGeometry(1.60, 0.52, 2.10); glass.translate(0, 1.10, -0.10);
+  return (_npcGeoCache[color] = { body: mergeColored(body), lamps: mergeColored(lamps), glass: glass });
+}
+function buildNpcModel(color){
+  const g = new THREE.Group(), G = npcGeometries(color);
+  const body = new THREE.Mesh(G.body, _npcMatBody); body.castShadow = true; g.add(body);
+  g.add(new THREE.Mesh(G.glass, _npcMatGlass));
+  g.add(new THREE.Mesh(G.lamps, _npcMatLamp));
   scene.add(g);
   return g;
 }
 
-function spawnNpcCar(path, colorHex, startIdx){
+/* frac = położenie na odcinku idx -> idx+1 (0 = w narożniku pętli) */
+function spawnNpcCar(path, colorHex, startIdx, frac){
   const idx = (startIdx !== undefined) ? startIdx : randInt(0, path.length - 1);
+  const p0 = path[idx], p1 = path[(idx + 1) % path.length], f = frac || 0;
   const n = {
+    id: ++npcIdSeq,
     path: path,
     wp: (idx + 1) % path.length,
-    pos: new THREE.Vector2(path[idx].x, path[idx].z),
-    heading: 0,
+    pos: new THREE.Vector2(lerp(p0.x, p1.x, f), lerp(p0.z, p1.z, f)),
+    heading: Math.atan2(p1.x - p0.x, p1.z - p0.z),
     speed: 0,
     /* prędkość zależna od strefy (centrum wolniej, obrzeża szybciej) i od "charakteru" kierowcy 0.7–1.35x */
     target: clamp(clamp(6.5 + Math.hypot(path[idx].x, path[idx].z) / 26, 6.5, 14) * rand(0.7, 1.35), 5, 18),
     mesh: buildNpcModel(colorHex),
     color: colorHex,
     body: null,
-    blocked: false
+    blocked: false,
+    obey: rand(0.9, 1.05)              // jak dokładnie trzyma się limitów prędkości
   };
   const b = new CANNON.Body({ mass: 0, type: CANNON.Body.KINEMATIC, material: matCar });
   b.addShape(new CANNON.Box(new CANNON.Vec3(0.95, 0.62, 2.1)));
@@ -82,9 +197,29 @@ function spawnNpcCar(path, colorHex, startIdx){
   npcs.push(n);
   return n;
 }
+/* nowe auto (kradzież, menu debug): w losowym miejscu którejś pętli, ale poza zasięgiem
+   wzroku gracza (> 60 m) i nie na innym aucie (> 12 m od każdego NPC) */
 function spawnRandomNpcCar(){
-  const path = LOOPS[randInt(0, LOOPS.length - 1)];
-  return spawnNpcCar(path, NPC_COLORS[randInt(0, NPC_COLORS.length - 1)]);
+  const p = mode === 'car' ? chassisBody.position : player.body.position;
+  let path, idx, frac;
+  for (let tries = 0; tries < 40; tries++){
+    path = LOOPS[randInt(0, LOOPS.length - 1)];
+    const sp = pathSpot(path, rnd()); idx = sp.idx; frac = sp.frac;
+    const a = path[idx], b = path[(idx + 1) % path.length];
+    const x = lerp(a.x, b.x, frac), z = lerp(a.z, b.z, frac);
+    if (Math.hypot(x - p.x, z - p.z) < 60) continue;
+    if (npcs.some(m => Math.hypot(m.pos.x - x, m.pos.y - z) < 12)) continue;
+    break;
+  }
+  return spawnNpcCar(path, NPC_COLORS[randInt(0, NPC_COLORS.length - 1)], idx, frac);
+}
+/* auto wraca z autostrady do ruchu miejskiego tuż przed łącznicą zjazdową (pierwszy punkt pętli) */
+function npcFromHighway(c){
+  const n = { id: c.city.id, path: c.city.path, wp: 0, pos: new THREE.Vector2(c.x, c.z), heading: 0, speed: c.v,
+              target: c.city.target, mesh: c.mesh, color: c.city.color, body: c.body, blocked: false, dirX: 0, dirZ: 1, obey: c.obey };
+  c.body.position.set(c.x, 0.72, c.z);
+  npcs.push(n);
+  return n;
 }
 function removeNpcCar(n){
   delBody(n.body);
@@ -93,14 +228,22 @@ function removeNpcCar(n){
   if (idx >= 0) npcs.splice(idx, 1);
 }
 
-/* dwa auta na każdej pętli, na przeciwległych narożnikach — gęstszy ruch */
+/* dwa auta na każdej pętli, w przeciwległych miejscach (poza rondami) — gęstszy ruch; pętle dzielą
+   pasy, więc miejsce startu przesuwane, aż będzie co najmniej 12 m od każdego już postawionego auta */
 for (let i = 0; i < LOOPS.length; i++){
-  const st = randInt(0, 3);
-  spawnNpcCar(LOOPS[i], NPC_COLORS[i % NPC_COLORS.length], st);
-  spawnNpcCar(LOOPS[i], NPC_COLORS[(i + 3) % NPC_COLORS.length], (st + 2) % 4);
+  const f0 = rnd();
+  [f0, f0 + 0.5].forEach((f, k) => {
+    let sp = null;
+    for (let tries = 0; tries < 30; tries++, f += 0.017){
+      const q = pathSpot(LOOPS[i], f);
+      const a = LOOPS[i][q.idx], b = LOOPS[i][(q.idx + 1) % LOOPS[i].length];
+      const x = lerp(a.x, b.x, q.frac), z = lerp(a.z, b.z, q.frac);
+      if (!npcs.some(m => Math.hypot(m.pos.x - x, m.pos.y - z) < 12)){ sp = q; break; }
+    }
+    if (sp) spawnNpcCar(LOOPS[i], NPC_COLORS[(i + 3*k) % NPC_COLORS.length], sp.idx, sp.frac);   // brak wolnego miejsca: auto nie powstaje
+  });
 }
 
 /* ruch na autostradzie: dedykowany system, patrz highway.js (buduje się
    po tym pliku — potrzebuje buildNpcModel i G_CAR stąd) */
 initHighwayTraffic();
-initRoundaboutTraffic();

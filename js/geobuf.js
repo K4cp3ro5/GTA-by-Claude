@@ -14,6 +14,17 @@ GeoBuf.prototype.quad = function(a,b,c,d, ua,ub,uc,ud){
   this.u.push(ua[0],ua[1], ub[0],ub[1], uc[0],uc[1],
               ua[0],ua[1], uc[0],uc[1], ud[0],ud[1]);
 };
+/* trójkąt; normalna = (b−a)×(c−a) */
+GeoBuf.prototype.tri = function(a,b,c, ua,ub,uc){
+  const e1x = b[0]-a[0], e1y = b[1]-a[1], e1z = b[2]-a[2];
+  const e2x = c[0]-a[0], e2y = c[1]-a[1], e2z = c[2]-a[2];
+  let nx = e1y*e2z - e1z*e2y, ny = e1z*e2x - e1x*e2z, nz = e1x*e2y - e1y*e2x;
+  const len = Math.sqrt(nx*nx + ny*ny + nz*nz) || 1;
+  nx /= len; ny /= len; nz /= len;
+  this.p.push(a[0],a[1],a[2], b[0],b[1],b[2], c[0],c[1],c[2]);
+  for (let i = 0; i < 3; i++) this.n.push(nx,ny,nz);
+  this.u.push(ua[0],ua[1], ub[0],ub[1], uc[0],uc[1]);
+};
 /* prostokąt poziomy (normalna +Y) */
 GeoBuf.prototype.plane = function(cx, y, cz, sx, sz, uw, uh){
   const hx = sx/2, hz = sz/2;
@@ -81,3 +92,34 @@ GeoBuf.prototype.boxRot = function(cx, cy, cz, w, h, d, rotY, uS, withTop){
   if (withTop)
     this.quad([p01[0],y1,p01[1]],[p11[0],y1,p11[1]],[p10[0],y1,p10[1]],[p00[0],y1,p00[1]], [0,0],[uw,0],[uw,ud],[0,ud]);
 };
+/* czworokąt z automatycznie poprawnym zwrotem normalnej (w stronę "out") */
+function quadOut(buf, a, b, c, d, out){
+  const e1 = [b[0]-a[0], b[1]-a[1], b[2]-a[2]], e2 = [d[0]-a[0], d[1]-a[1], d[2]-a[2]];
+  const nx = e1[1]*e2[2]-e1[2]*e2[1], ny = e1[2]*e2[0]-e1[0]*e2[2], nz = e1[0]*e2[1]-e1[1]*e2[0];
+  if (nx*out[0] + ny*out[1] + nz*out[2] < 0) buf.quad(a, d, c, b, [0,0],[0,1],[1,1],[1,0]);
+  else buf.quad(a, b, c, d, [0,0],[1,0],[1,1],[0,1]);
+}
+/* scalenie kilku prostych brył Three.js (BoxGeometry, CylinderGeometry…) w jedną geometrię
+   z kolorami wierzchołków — jedna siatka = jedno wywołanie rysowania zamiast kilkunastu.
+   parts: [{ geo, color, x, y, z, rx? }] (geo nie jest modyfikowane) */
+const _mcM = new THREE.Matrix4(), _mcE = new THREE.Euler(), _mcC = new THREE.Color();
+function mergeColored(parts){
+  const P = [], N = [], C = [];
+  for (const pt of parts){
+    const g = (pt.geo.index ? pt.geo.toNonIndexed() : pt.geo.clone());
+    _mcE.set(pt.rx || 0, 0, 0);
+    _mcM.makeRotationFromEuler(_mcE).setPosition(pt.x || 0, pt.y || 0, pt.z || 0);
+    g.applyMatrix4(_mcM);
+    _mcC.setHex(pt.color);
+    const p = g.attributes.position.array, n = g.attributes.normal.array;
+    for (let i = 0; i < p.length; i++){ P.push(p[i]); N.push(n[i]); }
+    for (let i = 0; i < p.length / 3; i++) C.push(_mcC.r, _mcC.g, _mcC.b);
+    g.dispose();
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+  out.setAttribute('normal',   new THREE.Float32BufferAttribute(N, 3));
+  out.setAttribute('color',    new THREE.Float32BufferAttribute(C, 3));
+  out.computeBoundingSphere();
+  return out;
+}

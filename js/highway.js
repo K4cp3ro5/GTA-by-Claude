@@ -80,13 +80,6 @@ function hwySlope(z){   // dh/dz
 const HWY_ZS = [HWY_Z0, HWY_BR.zc - HWY_BR.half - HWY_BR.ramp, HWY_BR.zc - HWY_BR.half,
                 HWY_BR.zc + HWY_BR.half, HWY_BR.zc + HWY_BR.half + HWY_BR.ramp, HWY_Z1];
 
-/* czworokąt z automatycznie poprawnym zwrotem normalnej (w stronę "out") */
-function quadOut(buf, a, b, c, d, out){
-  const e1 = [b[0]-a[0], b[1]-a[1], b[2]-a[2]], e2 = [d[0]-a[0], d[1]-a[1], d[2]-a[2]];
-  const nx = e1[1]*e2[2]-e1[2]*e2[1], ny = e1[2]*e2[0]-e1[0]*e2[2], nz = e1[0]*e2[1]-e1[1]*e2[0];
-  if (nx*out[0] + ny*out[1] + nz*out[2] < 0) buf.quad(a, d, c, b, [0,0],[0,1],[1,1],[1,0]);
-  else buf.quad(a, b, c, d, [0,0],[1,0],[1,1],[0,1]);
-}
 /* pochylona bryła kolizji wzdłuż Z: linia (zA,yA)-(zB,yB), t = grubość,
    up=+1 bryła nad linią, -1 pod linią */
 function tiltBox(xc, w, t, zA, yA, zB, yB, up){
@@ -176,6 +169,31 @@ function embankSide(buf, xe, zA, yA, zB, yB, outX){
   });
 })();
 
+/* wnętrze tuneli: ciemna "głębia" przy murze (zamiast muru z niebem nad nim) i świecące
+   oprawy pod stropem nad każdym pasem — tunel wygląda na ciągnący się dalej, także nocą */
+const tunnelLightBuf = new GeoBuf(), tunnelVoidBuf = new GeoBuf();
+(function buildTunnelInterior(){
+  const xl = HWY_A_OUT - 0.5, xr = HWY_B_OUT + 0.5;
+  [[HWY_Z0, 1], [HWY_Z1, -1]].forEach(t => {
+    const zw = t[0] + t[1] * 0.05;                                     // tuż przed licem muru
+    quadOut(tunnelVoidBuf, [xl,0,zw], [xr,0,zw], [xr,5.4,zw], [xl,5.4,zw], [0,0,t[1]]);
+    [hwyLaneX('A',0), hwyLaneX('A',1), hwyLaneX('B',0), hwyLaneX('B',1)].forEach(lx => {
+      for (let k = 1; k < HWY_TUN_L; k += 3){
+        const z = t[0] + t[1] * k;
+        quadOut(tunnelLightBuf, [lx-0.15,5.38,z-0.6], [lx+0.15,5.38,z-0.6], [lx+0.15,5.38,z+0.6], [lx-0.15,5.38,z+0.6], [0,-1,0]);
+      }
+    });
+  });
+})();
+
+/* latarnie wzdłuż zewnętrznych krawędzi obu jezdni (tylko na odcinkach na poziomie terenu,
+   poza łącznicami, estakadą i tunelami); wysięgnik nad pobocze */
+for (let z = -216; z <= 216; z += 48){
+  if (Math.abs(z - HWY_BR.zc) < HWY_BR.half + HWY_BR.ramp + 8) continue;
+  if (Math.abs(z - HWY_IC_Z) > 80) lampSpots.push({ x: HWY_A_OUT - 0.5, z: z, rot:  Math.PI/2, y: 0 });
+  lampSpots.push({ x: HWY_B_OUT + 0.5, z: z, rot: -Math.PI/2, y: 0 });
+}
+
 /* --- łącznica: krzywa Beziera między autostradą a istniejącym skrzyżowaniem
    miejskim (WALL_X-ROAD_H-ish, HWY_IC_Z) — zwęża się do zera na końcu
    zjazdowym (gore), stała szerokość na reszcie długości --- */
@@ -248,7 +266,7 @@ function spawnHighwayCar(side, lane, z, colorHex, vDes){
   body.allowSleep = false;
   addBody(body);
   hwyTraffic.push({ side: side, dir: side === 'A' ? 1 : -1, lane: lane, tlane: lane, x: hwyLaneX(side, lane), z: z,
-                    v: vDes, vDes: vDes, vx: 0, mesh: mesh, body: body, cool: rand(0, 8) });
+                    v: Math.min(vDes, hwyLimit(side, z)), vDes: vDes, vx: 0, mesh: mesh, body: body, cool: rand(0, 8), obey: rand(0.93, 1.07) });
 }
 function initHighwayTraffic(){
   const PER_SIDE = 6, slot = HWY_LOOP / PER_SIDE;
@@ -284,20 +302,54 @@ function hwyLaneFree(c, lane){
   }
   return true;
 }
+/* czy na prawym pasie jezdni A jest luka do włączenia się w punkcie z (55 m za, 18 m przed) */
+function hwyMergeFree(z){
+  for (const o of hwyTraffic){
+    if (o.side !== 'A' || (o.lane !== 0 && o.tlane !== 0)) continue;
+    const g = o.z - z;
+    if (g > -55 && g < 18) return false;
+  }
+  return true;
+}
+/* auto miejskie (NPC) wjeżdża na autostradę: przechodzi do hwyTraffic z tym samym modelem i ciałem */
+const HWY_OFF_Z = HWY_OFF_RAMP.p0.z;                    // początek łącznicy zjazdowej na jezdni A
+function npcToHighway(n){
+  const idx = npcs.indexOf(n); if (idx >= 0) npcs.splice(idx, 1);
+  hwyTraffic.push({ side: 'A', dir: 1, lane: 0, tlane: 0, x: n.pos.x, z: n.pos.y, v: Math.max(n.speed, 12), vDes: rand(24, 33), vx: 0,
+                    mesh: n.mesh, body: n.body, cool: 6, city: { path: n.path, color: n.color, id: n.id, target: n.target }, armed: false, obey: n.obey || 1 });
+  hwyStats.merges++;
+}
+const hwyStats = { merges: 0, exits: 0 };
 function updateHighwayTraffic(dt){
-  for (const c of hwyTraffic){
+  for (let ci = hwyTraffic.length - 1; ci >= 0; ci--){
+    const c = hwyTraffic[ci];
+    /* auto z miasta: po przejechaniu tunelu (armed) zjeżdża łącznicą — wcześniej zostaje na prawym pasie */
+    if (c.city && c.armed){
+      const toOff = HWY_OFF_Z - c.z;
+      if (toOff > 0 && toOff < 240){
+        c.vDes = Math.min(c.vDes, toOff < 120 ? 20 : 26);
+        if (c.lane === 1 && c.tlane === 1 && hwyLaneFree(c, 0)) c.tlane = 0;
+        if (c.tlane === 0) c.cool = 99;                    // bez wyprzedzania przed zjazdem
+        if (toOff < 10 && c.lane === 0 && Math.abs(c.x - hwyLaneX('A', 0)) < 0.6){
+          hwyTraffic.splice(ci, 1); npcFromHighway(c); hwyStats.exits++; continue;
+        }
+      }
+    }
     c.cool -= dt;
     const a = hwyLead(c, c.lane), b = (c.tlane !== c.lane) ? hwyLead(c, c.tlane) : a, lead = a.gap < b.gap ? a : b;
-    /* prędkość: nie szybciej niż pozwala odstęp do poprzednika (płynnie, bez skoków) */
+    /* prędkość: limit strefy (B-33 140/100, z wyprzedzeniem 70 m) i odstęp do poprzednika (płynnie, bez skoków) */
+    let zAhead = c.z + c.dir*90;                                  // z wyprzedzeniem także "przez" tunel (zawinięcie)
+    if (zAhead > HWY_WRAP) zAhead -= HWY_LOOP; else if (zAhead < -HWY_WRAP) zAhead += HWY_LOOP;
+    const vCap = Math.min(c.vDes, Math.min(hwyLimit(c.side, c.z), hwyLimit(c.side, zAhead)) * c.obey);
     const safe = 7 + c.v * 0.9;
-    const vWant = Math.max(0, Math.min(c.vDes, lead.v + (lead.gap - safe) * 0.4));
+    const vWant = Math.max(0, Math.min(vCap, lead.v + (lead.gap - safe) * 0.4));
     c.v += clamp(vWant - c.v, -7 * dt, 2.5 * dt);
     /* zmiana pasa: wyprzedzanie lewym, powrót na prawy */
     if (c.cool <= 0 && c.tlane === c.lane){
-      if (c.lane === 0 && lead.gap < 30 && lead.v < c.vDes - 2.5 && hwyLaneFree(c, 1)){ c.tlane = 1; c.cool = 10; }
+      if (c.lane === 0 && lead.gap < 30 && lead.v < vCap - 2.5 && hwyLaneFree(c, 1)){ c.tlane = 1; c.cool = 10; }
       else if (c.lane === 1 && hwyLaneFree(c, 0)){
         const r = hwyLead(c, 0);
-        if (r.gap > 45 || r.v >= c.vDes - 1){ c.tlane = 0; c.cool = 8; }
+        if (r.gap > 45 || r.v >= vCap - 1){ c.tlane = 0; c.cool = 8; }
       }
     }
     const tx = hwyLaneX(c.side, c.tlane), dx = clamp(tx - c.x, -1.6 * dt, 1.6 * dt);
@@ -306,7 +358,7 @@ function updateHighwayTraffic(dt){
     if (Math.abs(c.x - tx) < 0.05) c.lane = c.tlane;
 
     c.z += c.dir * c.v * dt;
-    if (c.dir > 0 && c.z > HWY_WRAP) c.z -= HWY_LOOP;
+    if (c.dir > 0 && c.z > HWY_WRAP){ c.z -= HWY_LOOP; if (c.city) c.armed = true; }
     if (c.dir < 0 && c.z < -HWY_WRAP) c.z += HWY_LOOP;
 
     const heading = (c.dir > 0 ? 0 : Math.PI) + c.dir * Math.atan2(c.vx, Math.max(c.v, 5));
@@ -319,36 +371,14 @@ function updateHighwayTraffic(dt){
   }
 }
 
-/* --- skromne oznakowanie: tablica "AUTOSTRADA" na wjeździe i znak zjazdu
-   przy węźle. Pełny system znaków drogowych (sygnalizacja, pierwszeństwo
-   itd.) to osobny, kolejny etap — tu tylko tyle, by węzeł nie wyglądał na
-   nieoznakowany. --- */
-function texHwySign(lines){
-  const W = 256, H = 160, c = mkCanvas(W,H), g = c.getContext('2d');
-  g.fillStyle = '#0d5c3a'; g.fillRect(0,0,W,H);
-  g.strokeStyle = '#f2f0ea'; g.lineWidth = 7;
-  g.strokeRect(8,8,W-16,H-16);
-  g.fillStyle = '#f2f0ea';
-  g.font = '700 34px Arial, sans-serif';
-  g.textAlign = 'center'; g.textBaseline = 'middle';
-  lines.forEach((t, i) => g.fillText(t, W/2, H/2 + (i - (lines.length-1)/2) * 40));
-  return toTex(c);
+/* --- tablice autostradowe: "AUTOSTRADA A18" na początku obu jezdni i zapowiedź zjazdu przed węzłem --- */
+/* tablica 3.4 x 2.1 m na dwóch słupkach schowanych za licem, dolna krawędź 2.2 m nad poboczem */
+function hwySign(x, z, rotY, tex){
+  placeSign(x, z, rotY, [signFace('autostrada', tex, shapeRect(3.4, 2.1))], { base: 0, bottom: 2.2, poleR: 0.08, poleX: [-1.2, 1.2] });
 }
-function buildSignPost(x, z, rotY, tex){
-  signLog.push({kind:'autostrada',x:x,z:z,rot:rotY});
-  const g = new THREE.Group();
-  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.14,4.2,8), new THREE.MeshLambertMaterial({ color:0x3a3d42 }));
-  pole.position.y = 2.1; pole.castShadow = true; g.add(pole);
-  const panel = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 2.1), new THREE.MeshLambertMaterial({ map: tex, side: THREE.DoubleSide }));
-  panel.position.set(0, 3.6, 0.08); panel.castShadow = true; g.add(panel);
-  g.position.set(x, 0, z);
-  g.rotation.y = rotY;
-  scene.add(g);
-  staticBox(x, 2.1, z, 0.3, 4.2, 0.3);
-}
-buildSignPost(HWY_A_OUT - 1.6, HWY_Z0 + 30, Math.PI, texHwySign(['AUTOSTRADA','A-18']));   // jezdnia A jedzie na +Z, nadjeżdża od północy
-buildSignPost(HWY_B_OUT + 1.6, HWY_Z1 - 30, 0, texHwySign(['AUTOSTRADA','A-18']));        // jezdnia B jedzie na -Z, nadjeżdża od południa
-buildSignPost(HWY_A_OUT - 1.6, HWY_IC_Z - 97, Math.PI, texHwySign(['ZJAZD','300 m']));    // przed początkiem łącznicy zjazdowej (z=IC-62)
+hwySign(HWY_A_OUT - 2.2, HWY_Z0 + 30, Math.PI, texHwySign(['AUTOSTRADA'], 'A18'));   // jezdnia A jedzie na +Z, nadjeżdża od północy
+hwySign(HWY_B_OUT + 2.2, HWY_Z1 - 30, 0, texHwySign(['AUTOSTRADA'], 'A18'));        // jezdnia B jedzie na -Z, nadjeżdża od południa
+hwySign(HWY_A_OUT - 2.2, HWY_IC_Z - 97, Math.PI, texHwySign(['ZJAZD', '300 m']));    // przed początkiem łącznicy zjazdowej (z=IC-62)
 
 /* ---------------------------------------------------------------
    Droga z miasta pod estakadą: ulica HWY2_Z wychodzi przez drugą przerwę
@@ -390,8 +420,11 @@ const yardBuf = new GeoBuf(), yardPaintBuf = new GeoBuf(), shedBuf = new GeoBuf(
    droga serwisowa łączy się z ulicą pod estakadą (HWY2_Z).
    --------------------------------------------------------------- */
 const treeTrunkBuf = new GeoBuf(), treeCrownBuf = new GeoBuf();
+const EAST_ROAD_X = HWY_B_OUT + 24;                    // oś drogi serwisowej (8 m, pasy ±2 m)
+const EAST_TURN_Z = WALL_X - 14, EAST_TURN_R = 4.2;    // zawrotki (tarcza R=7.5) na obu końcach, tor auta r=4.2
 (function buildEastZone(){
-  const xs = HWY_B_OUT + 24, rw = 8, zA = -(WALL_X - 6), zB = WALL_X - 6;
+  const xs = EAST_ROAD_X, rw = 8, zA = -(WALL_X - 6), zB = WALL_X - 6;
+  [EAST_TURN_Z, -EAST_TURN_Z].forEach(z => { yardBuf.disc(xs, 0.02, z, 7.5, 24); mapExtras.push({ t:'disc', x: xs, z: z, r: 7.5, c:'#2b2e35' }); });
   [[zA, HWY2_Z - ROAD_H], [HWY2_Z + ROAD_H, zB]].forEach(pc => {
     const v0 = pc[0] / ROAD_TILE, v1 = pc[1] / ROAD_TILE;
     hwyRampBuf.quad([xs-rw/2,0.013,pc[1]],[xs+rw/2,0.013,pc[1]],[xs+rw/2,0.013,pc[0]],[xs-rw/2,0.013,pc[0]], [0,v1],[1,v1],[1,v0],[0,v0]);
@@ -423,6 +456,7 @@ const treeTrunkBuf = new GeoBuf(), treeCrownBuf = new GeoBuf();
     for (let z = -258; z <= 258; z += 18){
       if (Math.abs(z - HWY2_Z) < 16) continue;
       if (ci === 0 && Math.abs(z - HWY_IC_Z) < 28) continue;       // łącznice przechodzą tędy
+      if (ci === 2 && Math.abs(z) > EAST_TURN_Z - 9) continue;     // zawrotki na końcach drogi serwisowej
       tree(tx + rand(-1.5, 1.5), z + rand(-2, 2));
     }
   });
@@ -447,3 +481,5 @@ const shedMesh      = addMerged(shedBuf,      new THREE.MeshLambertMaterial({ co
 const shedRoofMesh  = addMerged(shedRoofBuf,  new THREE.MeshLambertMaterial({ color: 0x4b525a }), true, true);
 const treeTrunkMesh = addMerged(treeTrunkBuf, new THREE.MeshLambertMaterial({ color: 0x584434 }), true, true);
 const treeCrownMesh = addMerged(treeCrownBuf, new THREE.MeshLambertMaterial({ color: 0x4a7a3a }), true, true);
+addMerged(tunnelLightBuf, new THREE.MeshBasicMaterial({ color: 0xffdca8 }), false, false);
+addMerged(tunnelVoidBuf,  new THREE.MeshBasicMaterial({ color: 0x050607 }), false, false);

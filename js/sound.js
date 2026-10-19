@@ -229,5 +229,5 @@ chassisBody.addEventListener('collide', e => {
   const v = e.contact ? Math.abs(e.contact.getImpactVelocityAlongNormal()) : 0;
   if (v > 3.2) Sound.thud(v);
   if (mode === 'car' && v > 10) damagePlayer((v - 10) * 4, 'kraksa');
-  if (e.body && e.body.isPed && v > 2.2) Pedestrians.hit(e.body, v);
+  if (e.body && e.body.isPed && v > 2.2) Pedestrians.hit(e.body.pedRef, v);   // body.pedRef = obiekt pieszego (samo ciało nie ma group/state)
 });

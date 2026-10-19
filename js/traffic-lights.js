@@ -6,73 +6,86 @@
    się zatrzymują (patrz update-npc.js) — nie tylko wizualne światła.
    --------------------------------------------------------------- */
 const TL_PTS = [[3,3],[9,3],[6,9]];   // (i,j) siatki, poza rondami i narożnikami
-const TL_CYCLE = 9, TL_ALLRED = 1.4;  // sekundy na fazę / przerwę
+/* fazy jednego kierunku (s): czerwone+żółte -> zielone -> żółte -> czerwone (drugi kierunek ma to samo przesunięte o pół cyklu) */
+const TL_RY = 1.0, TL_GREEN = 8, TL_YELLOW = 2.5, TL_ALLRED = 1.2;
+const TL_HALF = TL_RY + TL_GREEN + TL_YELLOW + TL_ALLRED, TL_FULL = TL_HALF * 2;
 const trafficLights = [];
+const _tlLampGeo = new THREE.SphereGeometry(0.1, 10, 8);
+const TL_ON  = { R: 0xff2a22, Y: 0xffb21e, G: 0x2ad94a };
+const TL_OFF = { R: 0x3a0f0c, Y: 0x3a2a0a, G: 0x0f3a16 };
+function tlGroupMats(){ return { R: new THREE.MeshBasicMaterial({ color: TL_OFF.R }), Y: new THREE.MeshBasicMaterial({ color: TL_OFF.Y }), G: new THREE.MeshBasicMaterial({ color: TL_OFF.G }) }; }
 
-function buildSignalHead(x, z, rotY){
-  signLog.push({kind:'sygnalizator',x:x,z:z,rot:rotY});
-  const g = new THREE.Group();
-  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.09,3.2,6), new THREE.MeshLambertMaterial({color:0x2a2b2e}));
-  pole.position.y = 1.6; g.add(pole);
-  const box = new THREE.Mesh(new THREE.BoxGeometry(0.32,0.78,0.26), new THREE.MeshLambertMaterial({color:0x17181b}));
-  box.position.set(0, 3.0, 0.14); g.add(box);
-  const matR = new THREE.MeshBasicMaterial({ color:0x3a0f0c });
-  const matG = new THREE.MeshBasicMaterial({ color:0x0f3a16 });
-  const red = new THREE.Mesh(new THREE.SphereGeometry(0.1,8,8), matR);
-  red.position.set(0, 3.24, 0.28); g.add(red);
-  const grn = new THREE.Mesh(new THREE.SphereGeometry(0.1,8,8), matG);
-  grn.position.set(0, 2.78, 0.28); g.add(grn);
-  g.position.set(x, 0, z);
-  g.rotation.y = rotY;
-  scene.add(g);
-  staticBox(x, 1.6, z, 0.25, 3.2, 0.25);
-  return { red: matR, grn: matG };
+/* sygnalizator S-1 przy PRAWEJ krawędzi wlotu, przodem do nadjeżdżających (approachSpot);
+   słupek kończy się w połowie komory, komora wisi przed słupkiem — od przodu go nie widać */
+function buildSignalHead(spot, mats){
+  const base = WALK_H, r = 0.06, hw = 0.34, hh = 1.0, hd = 0.26, cy = base + 2.2 + hh/2;
+  const xf = signXf(spot.x, spot.z, spot.rot), zc = r + hd/2;
+  signLog.push({ kind: 'sygnalizator', x: spot.x, z: spot.z, rot: spot.rot });
+  signPole(spot.x, spot.z, base, cy, r);
+  const c = xf(0, cy, zc);
+  signDarkBuf.boxRot(c[0], cy, c[2], hw, hh, hd, spot.rot, 1, true);
+  /* daszki nad komorami */
+  [0.33, 0, -0.33].forEach(dy => {
+    const v = xf(0, cy + dy + 0.12, zc + hd/2 + 0.06);
+    signDarkBuf.boxRot(v[0], v[1], v[2], 0.26, 0.02, 0.12, spot.rot, 1, true);
+  });
+  [['R', 0.33], ['Y', 0], ['G', -0.33]].forEach(l => {
+    const m = new THREE.Mesh(_tlLampGeo, mats[l[0]]);
+    const p = xf(0, cy + l[1], zc + hd/2 - 0.03);
+    m.position.set(p[0], p[1], p[2]);
+    m.matrixAutoUpdate = false; m.updateMatrix();
+    scene.add(m);
+  });
 }
 
+/* linia zatrzymania (STOP_AT od środka skrzyżowania) leży przed przejściem dla pieszych (CW_OFF ± 1.1),
+   sygnalizator i STOP stoją przy niej — piesi przechodzą obok, nie przez słupek */
+const STOP_AT = ROAD_H + 3.7;
+const STOP_ZONE = [2, STOP_AT + 2.8];        // środek auta w tym przedziale "przed" skrzyżowaniem => hamuje
 TL_PTS.forEach(p => {
   const cx = L(p[0]), cz = L(p[1]), o = ROAD_H + 1.0;
-  const heads = [
-    buildSignalHead(cx - o, cz - o, 0),           // od -Z (patrzy w +Z)
-    buildSignalHead(cx + o, cz + o, Math.PI),     // od +Z
-    buildSignalHead(cx - o, cz + o, -Math.PI/2),  // od -X
-    buildSignalHead(cx + o, cz - o,  Math.PI/2)   // od +X
-  ];
-  trafficLights.push({ x: cx, z: cz, radius: 10, nsHeads: [heads[0],heads[1]], ewHeads: [heads[2],heads[3]], nsGreen: true, t: rand(0, TL_CYCLE) });
+  const tl = { x: cx, z: cz, radius: STOP_ZONE[1] + 2, t: rand(0, TL_FULL), ns: 'R', ew: 'R', nsMats: tlGroupMats(), ewMats: tlGroupMats() };
+  [{x:0,z:1},{x:0,z:-1},{x:1,z:0},{x:-1,z:0}].forEach(d => buildSignalHead(approachSpot(cx, cz, d, STOP_AT, o), d.x === 0 ? tl.nsMats : tl.ewMats));
+  trafficLights.push(tl);
 });
 
-function setHead(h, isGreen){
-  h.red.color.setHex(isGreen ? 0x3a0f0c : 0xff2a22);
-  h.grn.color.setHex(isGreen ? 0x2ad94a : 0x0f3a16);
+/* stan jednego kierunku w chwili t cyklu: 'RY' | 'G' | 'Y' | 'R' */
+function tlState(t){
+  if (t < TL_RY) return 'RY';
+  if (t < TL_RY + TL_GREEN) return 'G';
+  if (t < TL_RY + TL_GREEN + TL_YELLOW) return 'Y';
+  return 'R';
+}
+function setLamps(m, st){
+  m.R.color.setHex(st === 'R' || st === 'RY' ? TL_ON.R : TL_OFF.R);
+  m.Y.color.setHex(st === 'Y' || st === 'RY' ? TL_ON.Y : TL_OFF.Y);
+  m.G.color.setHex(st === 'G' ? TL_ON.G : TL_OFF.G);
 }
 function updateTrafficLights(dt){
-  const full = TL_CYCLE + TL_ALLRED;
   for (const tl of trafficLights){
-    tl.t = (tl.t + dt) % (full * 2);
-    const inFirst = tl.t < full;
-    const local = inFirst ? tl.t : tl.t - full;
-    const nsOn = inFirst && local < TL_CYCLE;
-    const ewOn = !inFirst && local < TL_CYCLE;
-    tl.nsGreen = nsOn;
-    tl.ewGreenNow = ewOn;
-    tl.nsHeads.forEach(h => setHead(h, nsOn));
-    tl.ewHeads.forEach(h => setHead(h, ewOn));
+    tl.t = (tl.t + dt) % TL_FULL;
+    const ns = tlState(tl.t), ew = tlState((tl.t + TL_HALF) % TL_FULL);
+    if (ns !== tl.ns){ tl.ns = ns; setLamps(tl.nsMats, ns); }
+    if (ew !== tl.ew){ tl.ew = ew; setLamps(tl.ewMats, ew); }
   }
 }
 
-/* true, jeśli npc jadący kierunkiem (dx,dz) z pozycji (px,pz) powinien
-   się teraz zatrzymać przed najbliższą czerwoną sygnalizacją */
+/* true, jeśli npc jadący kierunkiem (dx,dz) z pozycji (px,pz) powinien się teraz zatrzymać
+   przed sygnalizatorem: czerwone / czerwone+żółte zawsze, żółte tylko jeśli da się
+   jeszcze zatrzymać przed linią (auto już za linią zatrzymania jedzie dalej) */
 function redLightAhead(px, pz, dx, dz){
   for (const tl of trafficLights){
     const ox = tl.x - px, oz = tl.z - pz;
     const dist = Math.hypot(ox, oz);
     if (dist > tl.radius) continue;
     const ahead = ox*dx + oz*dz;
-    if (ahead < 2 || ahead > 9.5) continue;
+    if (ahead < STOP_ZONE[0] || ahead > STOP_ZONE[1]) continue;
     const lat = Math.abs(ox*-dz + oz*dx);
-    if (lat > 3.5) continue;
-    const isNS = Math.abs(dz) >= Math.abs(dx);
-    const green = isNS ? tl.nsGreen : tl.ewGreenNow;
-    if (!green) return true;
+    if (lat > 5.2) continue;          // pas jazdy = 3.5 m od osi (±1.75); próg dokładnie 3.5 odrzucał auta po minimalnym dryfie numerycznym
+    const st = Math.abs(dz) >= Math.abs(dx) ? tl.ns : tl.ew;
+    if (st === 'G') continue;
+    if (st === 'Y' && ahead < STOP_AT + 0.5) continue;
+    return true;
   }
   return false;
 }
@@ -87,66 +100,33 @@ function redLightAhead(px, pz, dx, dz){
    --------------------------------------------------------------- */
 /* wybrane programowo (test: skrzyżowania, przez które realnie przejeżdżają prostopadłe trasy NPC,
    poza rondami, światłami, narożnikami tras i węzłem autostrady) */
-const STOP_PTS = [[5,6],[6,3],[6,7],[1,4],[7,10]];
+const STOP_PTS = [[5,6,'ns'],[6,3],[6,7],[1,4],[7,10]];   // 'ns' = STOP tylko na wlotach N–S (aleja j=6 ma pierwszeństwo)
 const stopSigns = [];
 
-function texStop(){
-  const S = 128, c = mkCanvas(S,S), g = c.getContext('2d');
-  g.fillStyle = '#f2f0ea'; g.beginPath();
-  for (let k = 0; k < 8; k++){ const a = TAU*(k+0.5)/8; g.lineTo(S/2+Math.cos(a)*S*0.5, S/2+Math.sin(a)*S*0.5); }
-  g.closePath(); g.fill();
-  g.fillStyle = '#c5161d'; g.beginPath();
-  for (let k = 0; k < 8; k++){ const a = TAU*(k+0.5)/8; g.lineTo(S/2+Math.cos(a)*S*0.44, S/2+Math.sin(a)*S*0.44); }
-  g.closePath(); g.fill();
-  g.fillStyle = '#fff'; g.font = '700 38px Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.fillText('STOP', S/2, S/2+2);
-  return toTex(c);
-}
-function texSpeed(n){
-  const S = 128, c = mkCanvas(S,S), g = c.getContext('2d');
-  g.fillStyle = '#f2f0ea'; g.beginPath(); g.arc(S/2,S/2,S/2-2,0,TAU); g.fill();
-  g.strokeStyle = '#c5161d'; g.lineWidth = 12; g.beginPath(); g.arc(S/2,S/2,S/2-12,0,TAU); g.stroke();
-  g.fillStyle = '#111'; g.font = '700 50px Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.fillText(String(n), S/2, S/2+3);
-  return toTex(c);
-}
-const stopTex = texStop();
-function buildDiscSign(x, z, rotY, tex, seg, r){
-  signLog.push({kind:(seg === 8 ? 'STOP' : 'B-33'),x:x,z:z,rot:rotY});
-  const g = new THREE.Group();
-  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,2.3,6), new THREE.MeshLambertMaterial({color:0x3a3d42}));
-  pole.position.y = 1.15; g.add(pole);
-  const disc = new THREE.Mesh(new THREE.CircleGeometry(r, seg), new THREE.MeshLambertMaterial({ map: tex, side: THREE.DoubleSide }));
-  disc.position.set(0, 2.35, 0.03);
-  if (seg === 8) disc.rotation.z = 0;
-  g.add(disc);
-  g.position.set(x,0,z); g.rotation.y = rotY;
-  scene.add(g);
-  staticBox(x, 1.15, z, 0.18, 2.3, 0.18);
-}
 STOP_PTS.forEach(p => {
   const cx = L(p[0]), cz = L(p[1]);
-  stopSigns.push({ x: cx, z: cz, radius: 10 });
-  [{x:0,z:1},{x:0,z:-1},{x:1,z:0},{x:-1,z:0}].forEach(d => {
-    const a = approachSpot(cx, cz, d, ROAD_H + 1.6, ROAD_H + 0.9);   // prawa krawędź dojazdu, przodem do kierowcy
-    buildDiscSign(a.x, a.z, a.rot, stopTex, 8, 0.42);
+  stopSigns.push({ x: cx, z: cz, radius: STOP_ZONE[1] + 2, axis: p[2] || null });
+  [{x:0,z:1},{x:0,z:-1},{x:1,z:0},{x:-1,z:0}].filter(d => p[2] !== 'ns' || d.x === 0).forEach(d => {
+    const a = approachSpot(cx, cz, d, STOP_AT, ROAD_H + 0.9);       // prawa krawędź dojazdu przy linii zatrzymania, przodem do kierowcy
+    placeSign(a.x, a.z, a.rot, [FACE.STOP()]);
   });
 });
 /* B-33 (ograniczenie do 100 km/h): na wjeździe na autostradę w obu kierunkach (prawa krawędź, przodem do kierowcy);
-   B-33 (50 km/h) na łącznicy zjazdowej przed miastem */
-buildDiscSign(HWY_A_OUT - 1.6, HWY_IC_Z - 78, Math.PI, texSpeed(100), 24, 0.45);   // jezdnia A (jedzie na +Z, nadjeżdża od północy), za estakadą
-buildDiscSign(HWY_B_OUT + 1.6, HWY_Z1 - 50, 0, texSpeed(100), 24, 0.45);         // kierunek B jedzie na -Z, nadjeżdża od południa
-{ const rs = rampSignSpot(HWY_OFF_RAMP, 0.74, HWY_RAMP_W/2 + 1.3); buildDiscSign(rs.x, rs.z, rs.rot, texSpeed(50), 24, 0.45); }
+   B-33 (50 km/h) na łącznicy zjazdowej przed miastem. Znaki na poboczu (podłoże y=0). */
+placeSign(HWY_A_OUT - 1.6, HWY_IC_Z - 78, Math.PI, [FACE.B33(100)], { base: 0 });   // jezdnia A (jedzie na +Z, nadjeżdża od północy), za estakadą
+placeSign(HWY_B_OUT + 1.6, HWY_Z1 - 50, 0, [FACE.B33(100)], { base: 0 });         // kierunek B jedzie na -Z, nadjeżdża od południa
+{ const rs = rampSignSpot(HWY_OFF_RAMP, 0.74, HWY_RAMP_W/2 + 1.3); placeSign(rs.x, rs.z, rs.rot, [FACE.B33(50)], { base: 0 }); }
 
 function stopSignAhead(n, dx, dz, dt){
   let inZone = false;
   for (const s of stopSigns){
+    if (s.axis === 'ns' && Math.abs(dz) < Math.abs(dx)) continue;          // jadący aleją: bez STOP
     const ox = s.x - n.pos.x, oz = s.z - n.pos.y;
     if (Math.hypot(ox, oz) > s.radius) continue;
     const ahead = ox*dx + oz*dz;
-    if (ahead < 1.5 || ahead > 9) continue;
+    if (ahead < 1.5 || ahead > STOP_ZONE[1]) continue;
     const lat = Math.abs(ox*-dz + oz*dx);
-    if (lat > 3.5) continue;
+    if (lat > 5.2) continue;          // pas jazdy = 3.5 m od osi (±1.75); próg dokładnie 3.5 odrzucał auta po minimalnym dryfie numerycznym
     inZone = true;
     if (n.stopPass) return false;
     if (n.speed < 0.6){          // postój gdziekolwiek w strefie dojazdu liczy się do odczekania

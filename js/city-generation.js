@@ -5,7 +5,7 @@ const texs = {
   asphalt: texAsphalt(),
   road:    texRoad(),
   cross:   texCross(),
-  crossStrip: texCrossStrip(),
+  crossStrip: texCrossTile(),
   walk:    texWalk(),
   curb:    texCurb(),
   roof:    texRoof()
@@ -58,26 +58,32 @@ const facadeBufs = FACADES.map(() => new GeoBuf());
   scene.add(m);
 })();
 
-/* pojedynczy pas przejścia dla pieszych na jednej krawędzi skrzyżowania —
-   dir: 'px'/'nx'/'pz'/'nz' (strona świata względem środka skrzyżowania) */
-function crosswalkStrip(cx, cz, dir){
-  const HW = ROAD_W/2, crossW = ROAD_W*0.62, band = ROAD_W*0.16, y = 0.021;
-  let qx, qz, sx, sz;
-  if (dir === 'pz'){ qx=cx; qz=cz+HW-band/2; sx=crossW; sz=band; }
-  else if (dir === 'nz'){ qx=cx; qz=cz-HW+band/2; sx=crossW; sz=band; }
-  else if (dir === 'px'){ qx=cx+HW-band/2; qz=cz; sx=band; sz=crossW; }
-  else { qx=cx-HW+band/2; qz=cz; sx=band; sz=crossW; }
-  const hx = sx/2, hz = sz/2;
+/* przejście dla pieszych (P-10) na wylocie ze skrzyżowania (i,j) — dir: 'px'/'nx'/'pz'/'nz'
+   (w którą stronę świata od środka). Pas leży na jezdni tuż za krawędzią skrzyżowania
+   (0.4–2.6 m), na całej szerokości jezdni, i łączy chodniki dwóch kwartałów po obu stronach
+   ulicy — z tych przejść korzystają piesi (pedestrians.js). a/b = końce na chodnikach. */
+const CW_OFF = ROAD_H + 0.4 + ROAD_W*0.08;            // 8.52: oś pasa od środka skrzyżowania
+const crosswalks = [];
+function crosswalkStrip(cx, cz, dir, i, j){
+  const HW = ROAD_W/2, crossW = ROAD_W - 0.6, band = ROAD_W*0.16, y = 0.021, e = HW + 0.7;
+  let qx, qz, sx, sz, rec;
+  if (dir === 'pz'){ qx=cx; qz=cz+CW_OFF; sx=crossW; sz=band; rec = { a:{x:cx-e,z:qz}, b:{x:cx+e,z:qz}, blocks:[[i-1,j],[i,j]] }; }
+  else if (dir === 'nz'){ qx=cx; qz=cz-CW_OFF; sx=crossW; sz=band; rec = { a:{x:cx-e,z:qz}, b:{x:cx+e,z:qz}, blocks:[[i-1,j-1],[i,j-1]] }; }
+  else if (dir === 'px'){ qx=cx+CW_OFF; qz=cz; sx=band; sz=crossW; rec = { a:{x:qx,z:cz-e}, b:{x:qx,z:cz+e}, blocks:[[i,j-1],[i,j]] }; }
+  else { qx=cx-CW_OFF; qz=cz; sx=band; sz=crossW; rec = { a:{x:qx,z:cz-e}, b:{x:qx,z:cz+e}, blocks:[[i-1,j-1],[i-1,j]] }; }
+  /* road = przekraczana jezdnia: 'ns' (ulica wzdłuż Z, auta jadą N–S) albo 'ew' */
+  crosswalks.push(Object.assign(rec, { x: qx, z: qz, i: i, j: j, dir: dir, road: (dir === 'pz' || dir === 'nz') ? 'ns' : 'ew', hw: sx/2, hd: sz/2 }));
+  const hx = sx/2, hz = sz/2, k = crossW;            // kafel tekstury = 1 m (jeden pas zebry + przerwa)
   if (dir === 'pz' || dir === 'nz'){
     crosswalkBuf.quad([qx-hx,y,qz+hz],[qx+hx,y,qz+hz],[qx+hx,y,qz-hz],[qx-hx,y,qz-hz],
-                       [0,0],[1,0],[1,1],[0,1]);
+                       [0,0],[k,0],[k,1],[0,1]);
   } else {
     crosswalkBuf.quad([qx-hx,y,qz+hz],[qx+hx,y,qz+hz],[qx+hx,y,qz-hz],[qx-hx,y,qz-hz],
-                       [0,1],[0,0],[1,0],[1,1]);
+                       [0,1],[0,0],[k,0],[k,1]);
   }
 }
 
-/* skrzyżowania wyznaczone na ronda (patrz niżej, buildRoundaboutIsland) —
+/* skrzyżowania wyznaczone na ronda (patrz niżej, buildRoundabout) —
    nie dostają zwykłych pasów przejścia, bo to inny typ skrzyżowania */
 const ROUNDABOUT_PTS = [[4,4],[8,4],[4,8],[8,8]];
 function isRoundaboutPt(i, j){ return ROUNDABOUT_PTS.some(p => p[0] === i && p[1] === j); }
@@ -100,19 +106,21 @@ for (let i = 0; i <= GRID; i++){
    nie wychodzi poza siatkę) dostaje pas z prawdopodobieństwem 55% */
 for (let i = 0; i <= GRID; i++){
   for (let j = 0; j <= GRID; j++){
-    crossBuf.plane(L(i), 0.02, L(j), ROAD_W, ROAD_W, 1, 1);
+    /* rondo: asfalt skrzyżowania sięga do zewnętrznej krawędzi pasa okrężnego (R=9) i zakrywa oznakowanie ramion */
+    if (isRoundaboutPt(i, j)) crossBuf.plane(L(i), 0.024, L(j), 18.4, 18.4, 1.3, 1.3);
+    else crossBuf.plane(L(i), 0.02, L(j), ROAD_W, ROAD_W, 1, 1);
     const cx = L(i), cz = L(j);
     if (!isRoundaboutPt(i, j)){
-      if (i < GRID && rnd() < 0.55) crosswalkStrip(cx, cz, 'px');
-      if (i > 0    && rnd() < 0.55) crosswalkStrip(cx, cz, 'nx');
-      if (j < GRID && rnd() < 0.55) crosswalkStrip(cx, cz, 'pz');
-      if (j > 0    && rnd() < 0.55) crosswalkStrip(cx, cz, 'nz');
+      if (i < GRID && rnd() < 0.55) crosswalkStrip(cx, cz, 'px', i, j);
+      if (i > 0    && rnd() < 0.55) crosswalkStrip(cx, cz, 'nx', i, j);
+      if (j < GRID && rnd() < 0.55) crosswalkStrip(cx, cz, 'pz', i, j);
+      if (j > 0    && rnd() < 0.55) crosswalkStrip(cx, cz, 'nz', i, j);
     }
   }
 }
 
 /* --- podesty chodników + budynki + detale --- */
-const lampSpots = [];   // {x,z,rot}
+const lampSpots = [];   // {x,z,rot, y?: podłoże (domyślnie chodnik), street?: latarnia przy krawężniku}
 const treeSpots = [];   // {x,z,type,scale}
 const binSpots  = [];
 const hydSpots  = [];
@@ -140,6 +148,7 @@ function addBuilding(cx, cz, w, d, h, pool, yBase){
 /* --- przystanki autobusowe i parkingi (doc pkt 2) --- */
 const busBuf = new GeoBuf();        // wiata (kolor stalowy)
 const busSignBuf = new GeoBuf();    // żółta tabliczka przystankowa
+const busStopSpots = [];            // środki wiat (latarnie omijają to miejsce)
 function buildBusStop(cx, cz, side){
   /* side: 0=E, 1=W, 2=N, 3=S względem środka kwartału; wiata przy krawędzi chodnika */
   const e = LOT/2 - 0.7, y = WALK_H;
@@ -155,6 +164,7 @@ function buildBusStop(cx, cz, side){
   busBuf.box(px, y + 0.5, pz, alongX ? L1*0.7 : 0.35, 0.1, alongX ? 0.35 : L1*0.7, 2, true);   // ławka
   busSignBuf.box(px + (alongX ? L1/2 + 0.5 : 0), y + 2.5, pz + (alongX ? 0 : L1/2 + 0.5), 0.5, 0.5, 0.06, 1, true);
   staticBox(px, y + 1.2, pz, w, 2.4, d);
+  busStopSpots.push({ x: px, z: pz });
 }
 function buildParkingBlock(cx, cz){
   const y = WALK_H;
@@ -305,11 +315,13 @@ for (let bi = 0; bi < GRID; bi++){
 
     /* detale na obrzeżu kwartału */
     const edge = LOT/2 - 1.3;
-    lampSpots.push({ x: cx + edge, z: cz + rand(-edge*0.55, edge*0.55), rot: -Math.PI/2 });
-    lampSpots.push({ x: cx + rand(-edge*0.55, edge*0.55), z: cz - edge, rot: 0 });
-    if ((bi + bj) % 2 === 0){
-      lampSpots.push({ x: cx - edge, z: cz + rand(-edge*0.5, edge*0.5), rot: Math.PI/2 });
-    }
+    /* latarnie 0.6 m od krawężnika, wysięgnik (lokalne +Z, kierunek (sin rot, cos rot)) nad jezdnię;
+       pomijane, gdy w tym miejscu stoi wiata przystanku */
+    const edgeL = LOT/2 - 0.6;
+    const lamp = (x, z, rot) => { if (!busStopSpots.some(b => Math.hypot(b.x - x, b.z - z) < 3)) lampSpots.push({ x: x, z: z, rot: rot, street: true }); };
+    lamp(cx + edgeL, cz + rand(-edge*0.55, edge*0.55), Math.PI/2);
+    lamp(cx + rand(-edge*0.55, edge*0.55), cz - edgeL, Math.PI);
+    if ((bi + bj) % 2 === 0) lamp(cx - edgeL, cz + rand(-edge*0.5, edge*0.5), -Math.PI/2);
     for (let t = 0; t < 3; t++){
       const side = randInt(0,3);
       const p = rand(-edge*0.8, edge*0.8);
@@ -352,140 +364,154 @@ for (let bi = 0; bi < GRID; bi++){
   scene.add(mesh);
 })();
 
-/* --- ronda na wybranych skrzyżowaniach wewnątrz siatki ---
-   promień wyspy policzony pod kątem przejeżdżających aut NPC: pas mija
-   środek z przesunięciem o=3.5 (patrz npcLoop), auto ma połowę szerokości
-   0.95, więc najbliższy punkt nadwozia to 2.55 od środka — R=2.2 zostawia
-   bezpieczny zapas (sprawdzone numerycznie, R=2.6 już lekko kolidowało).
-   Malowana linia ustąpienia pierwszeństwa (promień 5.0–5.4, bez kolizji,
-   więc nieograniczona tym progiem) to główny element, który faktycznie
-   czyni je rondami "na oko", a nie zwykłym skrzyżowaniem z przeszkodą */
-function buildRoundaboutIsland(cx, cz){
-  const R = 2.2, H = 0.6, seg = 20;
+/* --- RONDA (skrzyżowania ROUNDABOUT_PTS) ---
+   Jednolite parametry wszystkich rond (metry, od środka skrzyżowania):
+   wyspa centralna R=3.6 (krawężnik 0.3 m + trawa, z kolizją), opaska R=3.6–4.5 (najazdowa, 8 cm),
+   pas okrężny 4.5–9.0 (4.5 m), tor auta po okręgu r=6.75 (nadwozie 5.8–7.7 — zapas do opaski i krawędzi).
+   Zewnętrzna krawędź R=9 < 9.9 (narożnik kwartału), więc rondo mieści się w krzyżu jezdni.
+   Wlot i wylot: łuk R=8 styczny do pasa wlotu/wylotu (3.5 m od osi) i do toru na rondzie,
+   wysepka rozdzielająca na osi ramienia 9.6–19 m (krawężnik 15 cm), linia P-13 na wlocie,
+   A-7 nad C-12 przy prawej krawędzi wlotu, C-9 na czole wysepki.
+   Auta jeżdżą przeciwnie do wskazówek zegara (z góry): kąt a w parametryzacji (sin a, cos a) rośnie. */
+const RB = { island: 3.6, apron: 4.5, ringR: 6.75, outer: 9.0, lane: 3.5, fillet: 8, cornerR: 3.5,
+             yieldAt: 10.5, splitFrom: 9.6, splitTo: 19, splitW0: 1.1, splitW1: 0.25 };
+/* auto czekające na wjazd stoi środkiem >= commit od środka ronda, czyli przodem (2.05) przed krawędzią
+   pasa okrężnego — inaczej jadący po rondzie musieliby je omijać i oba czekałyby na siebie */
+RB.commit = RB.outer + 2.3;
+(function(){
+  const r = RB.ringR, Rf = RB.fillet, ln = RB.lane;
+  RB.filletAlong = Math.sqrt((r + Rf)*(r + Rf) - (ln + Rf)*(ln + Rf));     // 9.24: początek łuku wlotu na pasie
+  RB.tanAlong = RB.filletAlong * r / (r + Rf);                             // 4.23: punkt styczności z torem na rondzie
+  RB.tanLat   = (ln + Rf) * r / (r + Rf);                                  // 5.26
+})();
+const RB_ARMS = [ {x:0,z:1}, {x:0,z:-1}, {x:1,z:0}, {x:-1,z:0} ];          // u = od środka ronda w stronę ramienia
+const grassBuf = new GeoBuf(), apronBuf = new GeoBuf();
+function rbArc(buf, cx, cz, r0, r1, a0, a1, y, seg){                       // płaski wycinek pierścienia, normalna w górę
   for (let s = 0; s < seg; s++){
-    const a0 = s/seg*TAU, a1 = (s+1)/seg*TAU;
-    const x0 = cx + Math.cos(a0)*R, z0 = cz + Math.sin(a0)*R;
-    const x1 = cx + Math.cos(a1)*R, z1 = cz + Math.sin(a1)*R;
-    curbBuf.quad([x0,0.02,z0],[x1,0.02,z1],[x1,0.02+H,z1],[x0,0.02+H,z0], [0,0],[1,0],[1,1],[0,1]);
+    const t0 = a0 + (a1 - a0) * s/seg, t1 = a0 + (a1 - a0) * (s+1)/seg;
+    const P = (rr, t) => [cx + Math.sin(t)*rr, y, cz + Math.cos(t)*rr];
+    quadOut(buf, P(r0,t0), P(r0,t1), P(r1,t1), P(r1,t0), [0,1,0]);
   }
-  curbBuf.disc(cx, 0.02 + H, cz, R, seg);
-  staticCylinder(cx, 0.02 + H/2, cz, R, H);
-  facadeBufs[2].box(cx, 0.02 + H + 1.9, cz, 0.7, 3.8, 0.7, 2, true);
-  /* linia ustąpienia pierwszeństwa — cienki malowany pierścień w pół drogi
-     między wyspą a krawędzią skrzyżowania */
-  roundaboutPaintBuf.ring(cx, 0.022, cz, 5.0, 5.4, seg);
 }
-ROUNDABOUT_PTS.forEach(p => buildRoundaboutIsland(L(p[0]), L(p[1])));
-
-/* --- ruch okrężny na rondach: auta faktycznie krążą dookoła wyspy
-   (przeciwnie do wskazówek zegara — jak przy ruchu prawostronnym),
-   nie tylko mijają skrzyżowanie po prostej. initRoundaboutTraffic()
-   wywoływane z traffic-npc.js (tam żyje buildNpcModel). --- */
-const roundaboutCars = [];
-function initRoundaboutTraffic(){
-  ROUNDABOUT_PTS.forEach((p, i) => {
-    const cx = L(p[0]), cz = L(p[1]);
-    const mesh = buildNpcModel(NPC_COLORS[(i + 4) % NPC_COLORS.length]);
-    scene.add(mesh);
-    const body = new CANNON.Body({ mass:0, type: CANNON.Body.KINEMATIC, material: matCar });
-    body.addShape(new CANNON.Box(new CANNON.Vec3(0.95,0.62,2.1)));
-    body.collisionFilterGroup = G_CAR;
-    body.collisionFilterMask  = -1;
-    body.allowSleep = false;
-    addBody(body);
-    roundaboutCars.push({ cx:cx, cz:cz, a: rand(0,TAU), r: 3.8, speed: 0.4 + rand(-0.05,0.05), mesh:mesh, body:body });
+function rbCylinderSide(buf, cx, cz, R, y0, y1, seg){                      // pobocznica walca, normalne na zewnątrz
+  for (let s = 0; s < seg; s++){
+    const a0 = s/seg*TAU, a1 = (s+1)/seg*TAU, am = (a0 + a1)/2;
+    const x0 = cx + Math.sin(a0)*R, z0 = cz + Math.cos(a0)*R, x1 = cx + Math.sin(a1)*R, z1 = cz + Math.cos(a1)*R;
+    quadOut(buf, [x0,y0,z0], [x1,y0,z1], [x1,y1,z1], [x0,y1,z0], [Math.sin(am), 0, Math.cos(am)]);
+  }
+}
+function buildRoundabout(cx, cz){
+  const seg = 32;
+  /* wyspa centralna z kolizją (krawężnik nie do przejechania) + opaska najazdowa */
+  rbCylinderSide(curbBuf, cx, cz, RB.island, 0.02, 0.32, seg);
+  grassBuf.disc(cx, 0.32, cz, RB.island, seg);
+  staticCylinder(cx, 0.3, cz, RB.island, 0.6);
+  rbCylinderSide(curbBuf, cx, cz, RB.apron, 0.02, 0.10, seg);
+  rbArc(apronBuf, cx, cz, RB.island, RB.apron, 0, TAU, 0.10, seg);
+  staticCylinder(cx, 0.05, cz, RB.apron, 0.1);
+  facadeBufs[2].box(cx, 0.32 + 1.6, cz, 0.7, 3.2, 0.7, 2, true);          // pomnik na wyspie
+  /* zewnętrzna krawędź pasa okrężnego: ciągła tylko między ramionami (±6° od przekątnej — dalej okrąg
+     R=9 wychodzi już na jezdnię ramienia), na wlotach i wylotach przerywana (P-7b, 1 m kreska / 1 m przerwy) */
+  const half = Math.asin(ROAD_H / RB.outer) - Math.PI/4, dash = 1 / RB.outer;
+  for (let k = 0; k < 4; k++){
+    const am = Math.PI/4 + k*Math.PI/2;
+    rbArc(roundaboutPaintBuf, cx, cz, RB.outer - 0.15, RB.outer, am - half, am + half, 0.03, 2);
+    for (let a = am + half + dash; a + dash < am + Math.PI/2 - half; a += 2*dash) rbArc(roundaboutPaintBuf, cx, cz, RB.outer - 0.15, RB.outer, a, a + dash, 0.03, 1);
+  }
+  RB_ARMS.forEach(u => {
+    const v = { x: u.z, z: -u.x };                                         // strona pasa WLOTU (prawa kierowcy jadącego do ronda)
+    const P = (al, lat, y) => [cx + u.x*al + v.x*lat, y, cz + u.z*al + v.z*lat];
+    /* P-13 (linia warunkowego zatrzymania złożona z trójkątów) w poprzek wlotu, wierzchołkami do kierowcy */
+    for (let lat = RB.splitW0 + 0.45; lat < ROAD_H - 0.3; lat += 0.75){
+      quadOut(roundaboutPaintBuf, P(RB.splitFrom + 0.1, lat - 0.25, 0.03), P(RB.splitFrom + 0.1, lat + 0.25, 0.03),
+              P(RB.splitFrom + 0.7, lat, 0.03), P(RB.splitFrom + 0.7, lat, 0.03), [0,1,0]);
+    }
+    /* wysepka rozdzielająca: trapez na osi ramienia, krawężnik 15 cm */
+    const a0 = RB.splitFrom, a1 = RB.splitTo, w0 = RB.splitW0, w1 = RB.splitW1, h = 0.15;
+    const A = P(a0, -w0, h), B = P(a0, w0, h), C = P(a1, w1, h), D = P(a1, -w1, h);
+    quadOut(walkBuf, A, B, C, D, [0,1,0]);
+    const side = (p, q, out) => quadOut(curbBuf, [p[0],0.02,p[2]], [q[0],0.02,q[2]], [q[0],h,q[2]], [p[0],h,p[2]], out);
+    side(A, B, [-u.x,0,-u.z]); side(C, D, [u.x,0,u.z]); side(B, C, [v.x,0,v.z]); side(D, A, [-v.x,0,-v.z]);
+    const mid = (a0 + a1)/2;
+    [[a0, mid, w0], [mid, a1, (w0 + w1)/2]].forEach(b => {
+      const c0 = P((b[0] + b[1])/2, 0, h/2), lx = Math.abs(u.x) ? (b[1] - b[0]) : 2*b[2], lz = Math.abs(u.z) ? (b[1] - b[0]) : 2*b[2];
+      staticBox(c0[0], h/2, c0[2], lx, h, lz);
+    });
+    /* znaki: A-7 nad C-12 przy prawej krawędzi wlotu (chodnik), C-9 na czole wysepki */
+    const s1 = approachSpot(cx, cz, u, RB.yieldAt + 0.8, ROAD_H + 0.9);
+    placeSign(s1.x, s1.z, s1.rot, [FACE.C12(), FACE.A7()]);
+    const s2 = approachSpot(cx, cz, u, RB.splitTo - 0.5, 0);
+    placeSign(s2.x, s2.z, s2.rot, [FACE.C9()], { base: h, bottom: 0.6 });
   });
+  mapExtras.push({ t:'disc', x: cx, z: cz, r: RB.apron, c:'#3d5a3a' });
 }
-const _rbAxisY = new CANNON.Vec3(0,1,0);
-function updateRoundaboutTraffic(dt){
-  for (const c of roundaboutCars){
-    c.a += c.speed * dt;          // pozycja (sin a, cos a): rosnące a = przeciwnie do wskazówek zegara patrząc z góry
-    const x = c.cx + Math.sin(c.a)*c.r, z = c.cz + Math.cos(c.a)*c.r;
-    const heading = c.a + Math.PI/2;    // styczna do okręgu w kierunku jazdy: (cos a, -sin a)
-    c.body.position.set(x, 0.72, z);
-    c.body.quaternion.setFromAxisAngle(_rbAxisY, heading);
-    c.mesh.position.set(x, 0, z);
-    c.mesh.rotation.y = heading;
+ROUNDABOUT_PTS.forEach(p => buildRoundabout(L(p[0]), L(p[1])));
+
+/* Trasa przez rondo dla auta wjeżdżającego z ramienia uIn i zjeżdżającego w ramię uOut
+   (wektory jednostkowe od środka). Zwraca punkty od miejsca ustąpienia pierwszeństwa (first)
+   do prostego wyjazdu; k: 'in' (dojazd/łuk wlotu), 'ring' (pas okrężny), 'out' (łuk wylotu). */
+function roundaboutRoute(ri, uIn, uOut){
+  const c = { x: L(ROUNDABOUT_PTS[ri][0]), z: L(ROUNDABOUT_PTS[ri][1]) };
+  const vIn = { x: uIn.z, z: -uIn.x }, vOut = { x: uOut.z, z: -uOut.x };
+  const at = (u, v, al, lat) => ({ x: c.x + u.x*al + v.x*lat, z: c.z + u.z*al + v.z*lat });
+  const pts = [], push = (p, k, extra) => pts.push(Object.assign({ x: p.x, z: p.z, rb: ri, k: k }, extra || {}));
+  /* łuk o środku o od punktu p do q (krótszą drogą), punkty co ~2.5 m (bez p, z q) */
+  const arc = (o, p, q, R, k) => {
+    const a0 = Math.atan2(p.x - o.x, p.z - o.z), a1 = Math.atan2(q.x - o.x, q.z - o.z);
+    const da = wrapAngle(a1 - a0), n = Math.max(1, Math.ceil(Math.abs(da) * R / 2.5));
+    for (let i = 1; i <= n; i++){ const a = a0 + da*i/n; push({ x: o.x + Math.sin(a)*R, z: o.z + Math.cos(a)*R }, k); }
+  };
+  push(at(uIn, vIn, RB.yieldAt, RB.lane), 'in', { first: true });
+  const right = (uOut.x === vIn.x && uOut.z === vIn.z);                    // wylot w ramię po prawej: skręt łukiem przy narożniku
+  if (right){
+    const R = RB.cornerR, o = at(uIn, vIn, RB.lane + R, RB.lane + R);
+    const s = at(uIn, vIn, RB.lane + R, RB.lane), e = at(uIn, vIn, RB.lane, RB.lane + R);
+    push(s, 'in'); arc(o, s, e, R, 'ring');
+  } else {
+    const LE = at(uIn, vIn, RB.filletAlong, RB.lane), TE = at(uIn, vIn, RB.tanAlong, RB.tanLat), CE = at(uIn, vIn, RB.filletAlong, RB.lane + RB.fillet);
+    const TX = at(uOut, vOut, RB.tanAlong, -RB.tanLat), LX = at(uOut, vOut, RB.filletAlong, -RB.lane), CX = at(uOut, vOut, RB.filletAlong, -RB.lane - RB.fillet);
+    push(LE, 'in'); arc(CE, LE, TE, RB.fillet, 'in');
+    const aE = Math.atan2(TE.x - c.x, TE.z - c.z);
+    let aX = Math.atan2(TX.x - c.x, TX.z - c.z);
+    while (aX <= aE) aX += TAU;                                            // przeciwnie do wskazówek zegara: kąt rośnie
+    const n = Math.ceil((aX - aE) * RB.ringR / 2.5);
+    for (let i = 1; i < n; i++){ const a = aE + (aX - aE)*i/n; push({ x: c.x + Math.sin(a)*RB.ringR, z: c.z + Math.cos(a)*RB.ringR }, 'ring'); }
+    push(TX, 'ring'); arc(CX, TX, LX, RB.fillet, 'out');
   }
+  push(at(uOut, vOut, RB.yieldAt, -RB.lane), 'out');
+  return pts;
+}
+/* punkt, w którym auto z ramienia uIn włącza się do ruchu okrężnego (kąt na torze) */
+function roundaboutEntryAngle(uIn){
+  const vIn = { x: uIn.z, z: -uIn.x };
+  return Math.atan2(uIn.x*RB.tanAlong + vIn.x*RB.tanLat, uIn.z*RB.tanAlong + vIn.z*RB.tanLat);
 }
 
-/* NPC jadące do ronda ustępują pierwszeństwa autom już na nim krążącym:
-   blokada, gdy krążące auto jest blisko drogi dojazdu przed wjazdem.
-   Krążące auta jadą stale, więc nie ma zakleszczenia — luka zawsze się trafi. */
-function roundaboutYield(px, pz, dx, dz){
-  for (const c of roundaboutCars){
-    const ox = c.cx - px, oz = c.cz - pz;
-    const ahead = ox*dx + oz*dz;
-    if (ahead < 6 || ahead > 13) continue;        // tylko PRZED wjazdem; auto już na rondzie nie ustępuje
-    const lat = Math.abs(ox*-dz + oz*dx);
-    if (lat > 6) continue;
-    /* punkt włączenia: najbliższy punkt okręgu względem auta oczekującego */
-    const vx = px - c.cx, vz = pz - c.cz, vl = Math.hypot(vx, vz) || 1;
-    const ex = c.cx + vx/vl*c.r, ez = c.cz + vz/vl*c.r;
-    const wx = c.cx + Math.sin(c.a)*c.r, wz = c.cz + Math.cos(c.a)*c.r;
-    if (Math.hypot(wx - ex, wz - ez) < 6.5) return true;
-  }
+/* NPC dojeżdżające do ronda (faza 'approach', 11.3–18 m od środka) ustępują pojazdom na pasie
+   okrężnym, które nadjeżdżają z lewej i dotrą do punktu włączenia, zanim wjeżdżający go minie
+   (okno = 6 m + prędkość tamtego × 2.4 s z postoju / 1.4 s w ruchu), albo są tuż przy nim.
+   Pojazdy na rondzie nie ustępują wjeżdżającym (A-7 na każdym wlocie). */
+function roundaboutYield(n){
+  if (n.rbPhase !== 'approach') return false;
+  const p = ROUNDABOUT_PTS[n.rb], cx = L(p[0]), cz = L(p[1]);
+  const dn = Math.hypot(n.pos.x - cx, n.pos.y - cz);
+  if (dn < RB.commit || dn > RB.outer + 9) return false;
+  const aE = roundaboutEntryAngle(n.rbArm);
+  const ex = cx + Math.sin(aE)*RB.ringR, ez = cz + Math.cos(aE)*RB.ringR;
+  const tReach = n.speed < 2 ? 2.4 : 1.4;
+  const conflict = (x, z, v) => {
+    const d = Math.hypot(x - cx, z - cz);
+    if (d < RB.apron || d > RB.outer + 0.4) return false;
+    if (Math.hypot(x - ex, z - ez) < 4.5) return true;
+    const up = ((aE - Math.atan2(x - cx, z - cz)) % TAU + TAU) % TAU;     // ile toru (rad) przed punktem włączenia
+    return up * RB.ringR < 6 + Math.max(v, 4) * tReach;
+  };
+  for (const m of npcs){ if (m !== n && conflict(m.pos.x, m.pos.y, m.speed)) return true; }
+  const cv = chassisBody.velocity;
+  if (conflict(chassisBody.position.x, chassisBody.position.z, Math.hypot(cv.x, cv.z))) return true;
+  if (mainCarPlaceholder && conflict(mainCarPlaceholder.body.position.x, mainCarPlaceholder.body.position.z, 0)) return true;
   return false;
 }
-
-/* --- C-12 "ruch okrężny" + A-7 "ustąp pierwszeństwa" na każdym z 4
-   wjazdów na każde rondo --- */
-function texC12(){
-  const S = 160, c = mkCanvas(S,S), g = c.getContext('2d');
-  g.fillStyle = '#1659b0'; g.beginPath(); g.arc(S/2,S/2,S/2-4,0,TAU); g.fill();
-  g.strokeStyle = '#fff'; g.lineWidth = 6; g.beginPath(); g.arc(S/2,S/2,S/2-10,0,TAU); g.stroke();
-  g.strokeStyle = '#fff'; g.lineWidth = 9;
-  for (let k = 0; k < 3; k++){
-    const a0 = k*TAU/3, a1 = a0 + TAU/3*0.72;
-    g.beginPath(); g.arc(S/2, S/2, 34, a0, a1); g.stroke();
-    const ex = S/2+Math.cos(a1)*34, ey = S/2+Math.sin(a1)*34;
-    g.beginPath(); g.moveTo(ex,ey); g.lineTo(ex-8, ey-5); g.lineTo(ex-3, ey+8); g.closePath(); g.fillStyle='#fff'; g.fill();
-  }
-  return toTex(c);
-}
-const c12Tex = texC12();
-function buildC12(x, z, rotY){
-  signLog.push({kind:'C-12',x:x,z:z,rot:rotY});
-  const g = new THREE.Group();
-  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,2.1,6), new THREE.MeshLambertMaterial({color:0x3a3d42}));
-  pole.position.y = 1.05; g.add(pole);
-  const disc = new THREE.Mesh(new THREE.CircleGeometry(0.4,20), new THREE.MeshLambertMaterial({ map:c12Tex, side:THREE.DoubleSide }));
-  disc.position.set(0, 2.15, 0.03); g.add(disc);
-  g.position.set(x,0,z); g.rotation.y = rotY;
-  scene.add(g);
-  staticBox(x, 1.05, z, 0.18, 2.1, 0.18);
-}
-function buildA7(x, z, rotY){
-  signLog.push({kind:'A-7',x:x,z:z,rot:rotY});
-  const g = new THREE.Group();
-  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,1.9,6), new THREE.MeshLambertMaterial({color:0x3a3d42}));
-  pole.position.y = 0.95; g.add(pole);
-  function tri(scale, color, zOff){
-    const h = 0.42*scale, w = 0.48*scale;
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute([0,h,0, -w,-h,0, w,-h,0], 3));
-    geo.setIndex([0,1,2]); geo.computeVertexNormals();
-    const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color, side:THREE.DoubleSide }));
-    m.position.set(0, 1.9, zOff);
-    return m;
-  }
-  g.add(tri(1.0, 0xcf1f1f, 0.02));
-  g.add(tri(0.78, 0xf2f0ea, 0.03));
-  g.position.set(x,0,z); g.rotation.y = rotY;
-  scene.add(g);
-  staticBox(x, 0.95, z, 0.18, 1.9, 0.18);
-}
-ROUNDABOUT_PTS.forEach(p => {
-  const cx = L(p[0]), cz = L(p[1]);
-  /* d = od ronda w stronę nadjeżdżających aut; znaki stoją przy PRAWEJ krawędzi jezdni
-     (lateral ROAD_H+0.9 = na chodniku), C-12 bliżej ronda, A-7 za nim, oba przodem do kierowcy */
-  [ {x:0,z:1}, {x:0,z:-1}, {x:1,z:0}, {x:-1,z:0} ].forEach(d => {
-    const a = approachSpot(cx, cz, d, ROAD_H + 2.2, ROAD_H + 0.9);
-    const b = approachSpot(cx, cz, d, ROAD_H + 3.6, ROAD_H + 0.9);
-    buildC12(a.x, a.z, a.rot);
-    buildA7(b.x, b.z, b.rot);
-  });
-});
 
 /* --- scalenie statycznej geometrii w kilka siatek --- */
 function addMerged(buf, material, cast, receive){
@@ -506,6 +532,8 @@ const roundaboutPaintMesh = addMerged(roundaboutPaintBuf, new THREE.MeshLambertM
 const walkMesh  = addMerged(walkBuf,  new THREE.MeshLambertMaterial({ map: texs.walk }), false, true);
 const curbMesh  = addMerged(curbBuf,  new THREE.MeshLambertMaterial({ map: texs.curb }), true, true);
 const roofMesh  = addMerged(roofBuf,  new THREE.MeshLambertMaterial({ map: texs.roof }), true, true);
+const grassMesh = addMerged(grassBuf, new THREE.MeshLambertMaterial({ color: 0x3e6a31 }), false, true);
+const apronMesh = addMerged(apronBuf, new THREE.MeshLambertMaterial({ color: 0x6b5a54 }), false, true);
 const facadeMeshes = facadeBufs.map((b, i) => addMerged(b, facadeMats[i], true, true)).filter(Boolean);
 
 /* obiekty do sprawdzania kolizji kamery */

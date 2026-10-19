@@ -46,8 +46,8 @@ let mainCarPlaceholder = null;          // { mesh, body } albo null gdy główne
 
 function showMainCarPlaceholder(){
   if (mainCarPlaceholder) return;
-  const mdl = buildCarModel(MAIN_CAR_COLOR);
-  mdl.root.position.set(mainCarPos.x, mainCarPos.y - COM_H, mainCarPos.z);
+  const mdl = buildCarModel(MAIN_CAR_COLOR, true);
+  mdl.root.position.set(mainCarPos.x, mainCarPos.y, mainCarPos.z);   // root = środek masy (jak w syncCar); wcześniej -COM_H wkopywało atrapę w ziemię
   mdl.root.rotation.y = mainCarHeading + Math.PI;
   const b = new CANNON.Body({ mass: 0, material: matCar });
   b.addShape(new CANNON.Box(new CANNON.Vec3(0.95, 0.62, 2.1)), new CANNON.Vec3(0, COM_H, 0));
