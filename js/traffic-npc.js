@@ -3,6 +3,7 @@
    --------------------------------------------------------------- */
 const NPC_COLORS = [0x2e4d8f, 0xd9d4c8, 0x2f6f4e, 0x8a8f96, 0xe0a52c, 0x6b3a8f];
 const npcs = [];
+let npcIdSeq = 0;
 
 /* pętla po prostokącie siatki, prawy pas (3.5 m od osi): wschód -> południe -> zachód -> północ,
    na narożnikach skręty w prawo */
@@ -122,6 +123,7 @@ function spawnNpcCar(path, colorHex, startIdx, frac){
   const idx = (startIdx !== undefined) ? startIdx : randInt(0, path.length - 1);
   const p0 = path[idx], p1 = path[(idx + 1) % path.length], f = frac || 0;
   const n = {
+    id: ++npcIdSeq,
     path: path,
     wp: (idx + 1) % path.length,
     pos: new THREE.Vector2(lerp(p0.x, p1.x, f), lerp(p0.z, p1.z, f)),

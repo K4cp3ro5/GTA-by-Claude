@@ -479,7 +479,8 @@ function roundaboutEntryAngle(uIn){
 }
 
 /* NPC dojeżdżające do ronda (faza 'approach', 9.6–15.5 m od środka) ustępują pojazdom na pasie
-   okrężnym, które nadjeżdżają z lewej w ciągu ~9 m toru albo są tuż przy punkcie włączenia.
+   okrężnym, które nadjeżdżają z lewej i dotrą do punktu włączenia, zanim wjeżdżający go minie
+   (okno = 6 m + prędkość tamtego × 2.4 s z postoju / 1.4 s w ruchu), albo są tuż przy nim.
    Pojazdy na rondzie nie ustępują wjeżdżającym (A-7 na każdym wlocie). */
 function roundaboutYield(n){
   if (n.rbPhase !== 'approach') return false;
@@ -488,16 +489,18 @@ function roundaboutYield(n){
   if (dn < RB.outer + 0.6 || dn > RB.outer + 6.5) return false;
   const aE = roundaboutEntryAngle(n.rbArm);
   const ex = cx + Math.sin(aE)*RB.ringR, ez = cz + Math.cos(aE)*RB.ringR;
-  const conflict = (x, z) => {
+  const tReach = n.speed < 2 ? 2.4 : 1.4;
+  const conflict = (x, z, v) => {
     const d = Math.hypot(x - cx, z - cz);
     if (d < RB.apron || d > RB.outer + 0.4) return false;
     if (Math.hypot(x - ex, z - ez) < 4.5) return true;
     const up = ((aE - Math.atan2(x - cx, z - cz)) % TAU + TAU) % TAU;     // ile toru (rad) przed punktem włączenia
-    return up * RB.ringR < 9;
+    return up * RB.ringR < 6 + Math.max(v, 4) * tReach;
   };
-  for (const m of npcs){ if (m !== n && conflict(m.pos.x, m.pos.y)) return true; }
-  if (conflict(chassisBody.position.x, chassisBody.position.z)) return true;
-  if (mainCarPlaceholder && conflict(mainCarPlaceholder.body.position.x, mainCarPlaceholder.body.position.z)) return true;
+  for (const m of npcs){ if (m !== n && conflict(m.pos.x, m.pos.y, m.speed)) return true; }
+  const cv = chassisBody.velocity;
+  if (conflict(chassisBody.position.x, chassisBody.position.z, Math.hypot(cv.x, cv.z))) return true;
+  if (mainCarPlaceholder && conflict(mainCarPlaceholder.body.position.x, mainCarPlaceholder.body.position.z, 0)) return true;
   return false;
 }
 

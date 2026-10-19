@@ -86,7 +86,11 @@ function npcConflict(n, m, dx, dz, onlyClose){
   const rx = m.pos.x - n.pos.x, rz = m.pos.y - n.pos.y, dist = Math.hypot(rx, rz);
   if (dist > 16) return Infinity;
   const ahead = rx*dx + rz*dz, lat = Math.abs(rx*-dz + rz*dx);
-  if (dist < 3.2 && ahead > 0) return true;                        // tuż przed maską — zawsze stop
+  if (dist < 3.2 && ahead > 0){                                    // tuż przed maską — stop...
+    const mdx0 = m.dirX !== undefined ? m.dirX : Math.sin(m.heading), mdz0 = m.dirZ !== undefined ? m.dirZ : Math.cos(m.heading);
+    const mutual = (-rx*mdx0 - rz*mdz0) > 0;                       // ...chyba że m też widzi nas przed sobą: wtedy
+    return !(mutual && n.id < m.id);                               // ustępuje tylko jedno (wyższe id), inaczej stałyby w nieskończoność
+  }
   if (onlyClose) return Infinity;
   const mdx = m.dirX !== undefined ? m.dirX : Math.sin(m.heading), mdz = m.dirZ !== undefined ? m.dirZ : Math.cos(m.heading);
   const dot = dx*mdx + dz*mdz;
