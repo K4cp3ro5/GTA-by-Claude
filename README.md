@@ -40,18 +40,20 @@ Menu debug pozwala m.in. zmieniać liczbę aut i pieszych, ustawić i zatrzymać
 ## Co jest w grze
 
 - **Miasto** 12×12 kwartałów z dzielnicami (centrum z wieżowcami, handlowa, przemysłowa, mieszkalna), placami, parkami, parkingami i przystankami.
-- **Ruch uliczny**: auta NPC jeżdżą prawostronnie, stają na czerwonym świetle, zatrzymują się przy znakach STOP, stosują regułę prawej ręki, jadą z różnymi prędkościami i zwalniają za wolniejszym autem.
-- **Ronda** z krążącymi autami, znakami C-12 i A-7 oraz ustępowaniem pierwszeństwa.
-- **Autostrada** dwujezdniowa z wyprzedzaniem lewym pasem, węzłem (zjazd i wjazd), estakadą, drogą pod nią i tunelami na końcach.
+- **Ruch uliczny**: auta NPC jeżdżą prawostronnie, stają na czerwonym (sygnalizatory trzykomorowe z fazą żółtą), zatrzymują się na STOP, ustępują wg reguły prawej ręki, a przy alei z pierwszeństwem — autom na niej. Konflikty na skrzyżowaniach rozstrzygają wg czasu dojazdu, więc auta się nie przenikają.
+- **Przepisy i znaki**: limity są egzekwowane (miasto 50 km/h, strefa 30 w Starym Mieście, droga serwisowa 40, autostrada 140, a przy węźle i tunelach 100). Jednokierunkowa obwodnica przy murze, aleja z pierwszeństwem, ponad 900 znaków (A-7, B-2, B-20, B-33, B-43/B-44, C-2, C-6, C-9, C-12, D-1, D-3, D-6, D-42/D-43) na słupkach, które nie przebijają tarcz.
+- **Ronda** o jednolitych parametrach: wyspa z opaską (R 4,5 m), pas okrężny 4,5 m, wloty i wyloty łukami z wysepkami rozdzielającymi, linie P-13. Auta NPC objeżdżają wyspę przeciwnie do ruchu wskazówek zegara i ustępują jadącym po rondzie.
+- **Piesi** spacerują po chodnikach i przechodzą przez jezdnię po przejściach (na światłach w swojej fazie), a auta im ustępują.
+- **Autostrada** dwujezdniowa z wyprzedzaniem lewym pasem, węzłem, estakadą, drogą pod nią, tunelami z oświetleniem i latarniami. Część aut miejskich wjeżdża na nią i zjeżdża łącznicami. W strefie wschodniej jeździ ruch po drodze serwisowej z zawrotkami.
 - **Gracz**: tryb pieszy i jazda autem z fizyką zawieszenia (RaycastVehicle), kradzież aut NPC, ekwipunek (pięści, kij, pistolet), pasek zdrowia i kondycji.
-- **Świat**: cykl dnia i nocy ze zmianą nieba, mgły i oświetlenia, minimapa całego świata, piesi na chodnikach, dźwięk syntezowany (Web Audio).
+- **Świat**: cykl dnia i nocy (słońce, księżyc, mgła, latarnie z plamami światła na jezdni), minimapa całego świata, dźwięk syntezowany (Web Audio).
 
 ## Struktura projektu
 
 ```
 index.html        strona, style i HUD
 loadorder.txt     kolejność ładowania skryptów (ważna!)
-js/               kod gry (23 pliki ładowane kolejno z index.html)
+js/               kod gry (25 plików ładowanych kolejno z index.html)
 test/             testy: harness, symulacja ruchu, jazda autem, skrypt bundle
 ```
 
@@ -61,18 +63,18 @@ Skrypty to zwykłe pliki (bez bundlera) ze wspólnym zakresem globalnym, więc i
 
 ```
 npm install          # instaluje cannon@0.6.2 potrzebny testowi jazdy
-npm test             # harness + symulacja ruchu NPC
-npm run test:drive   # jazda prawdziwym autem po autostradzie i łącznicach (ok. 2 min)
+npm test             # harness + symulacja ruchu NPC (nakładanie aut, zakleszczenia, ronda, piesi, przepisy)
+npm run test:drive   # jazda prawdziwym autem: autostrada, łącznice, rondo, kolizje (ok. 3 min)
 npm run bundle       # skleja grę w jeden plik gta-by-claude-single.html
 ```
 
 ## Plany i ograniczenia
 
-- Ronda są małe, a miejskie auta NPC mijają je prosto.
-- Wnętrze miasta to nadal siatka ortogonalna, bez nieregularnych ulic.
-- Auta miejskie nie wjeżdżają na autostradę.
-- Limity prędkości z znaków nie są egzekwowane, brakuje znaków zakazu wjazdu i nakazu kierunku.
-- Piesi nie korzystają jeszcze z przejść dla pieszych.
+- Wnętrze miasta to nadal siatka ortogonalna, bez nieregularnych ulic (trasy NPC to stałe pętle, nie graf).
+- Węzeł autostradowy jest jednopoziomowy (jedna estakada), łącznice są tylko po stronie jezdni A.
+- Auta autostradowe nie dają się ukraść, a w tunelu auta „zawijają się” na drugi koniec.
+- AI NPC działa w całym mieście naraz (bez ograniczania obliczeń daleko od gracza i bez LOD).
+- Auta NPC nie omijają przeszkody na pasie (np. zaparkowanego auta gracza), tylko przed nią czekają.
 
 ## Technologie
 
