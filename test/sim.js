@@ -74,7 +74,6 @@ function __static(){
     if (!['C-12','A-7','STOP','sygnalizator'].includes(g.kind)) return;
     if (nearAxis(g.x) < ROAD_H - 0.01 && nearAxis(g.z) < ROAD_H - 0.01) bad.push(g.kind+' w skrzyżowaniu '+g.x.toFixed(0)+','+g.z.toFixed(0));
     else if (nearAxis(g.x) < ROAD_H - 0.01 || nearAxis(g.z) < ROAD_H - 0.01) bad.push(g.kind+' NA JEZDNI '+g.x.toFixed(1)+','+g.z.toFixed(1));
-    if (g.kind === 'sygnalizator') return;
     // środek najbliższego skrzyżowania
     let best = null, bd = 1e9;
     for (let i = 0; i <= GRID; i++) for (let j = 0; j <= GRID; j++){
@@ -83,6 +82,12 @@ function __static(){
     const f = [Math.sin(g.rot), Math.cos(g.rot)], rx = g.x - best[0], rz = g.z - best[1];
     const along = rx*f[0] + rz*f[1], lateral = rx*f[1] - rz*f[0];     // prawa kierowcy = (d.z, -d.x)
     if (along < ROAD_H || lateral < ROAD_H) bad.push(g.kind+' źle: along '+along.toFixed(1)+' lateral '+lateral.toFixed(1)+' @'+g.x.toFixed(0)+','+g.z.toFixed(0));
+  });
+  /* konstrukcja znaków: lico każdej tarczy przed słupkiem (od przodu słupek niewidoczny), rewers za licem */
+  signFaceBufs.forEach(e => { for (let i = 0; i < e.buf.n.length; i += 3) if (Math.abs(e.buf.n[i+1]) > 0.01) bad.push('lico tarczy nie jest pionowe'); });
+  signGeomLog.forEach(g => {
+    if (!(g.poleTop < g.faceTop && g.poleTop > g.faceBottom)) bad.push('słupek ' + g.poleTop.toFixed(2) + ' poza tarczami ' + g.faceBottom.toFixed(2) + '–' + g.faceTop.toFixed(2) + ' @' + g.x.toFixed(0) + ',' + g.z.toFixed(0));
+    if (g.poleFront >= g.backZ) bad.push('słupek przebija rewers @' + g.x.toFixed(0) + ',' + g.z.toFixed(0));
   });
   out.signProblems = bad;
   /* ronda: kierunek okrążania (matematyczny kąt z mapy: wschód=+x, północ=-z) musi rosnąć = przeciwnie do wskazówek */

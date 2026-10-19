@@ -80,13 +80,6 @@ function hwySlope(z){   // dh/dz
 const HWY_ZS = [HWY_Z0, HWY_BR.zc - HWY_BR.half - HWY_BR.ramp, HWY_BR.zc - HWY_BR.half,
                 HWY_BR.zc + HWY_BR.half, HWY_BR.zc + HWY_BR.half + HWY_BR.ramp, HWY_Z1];
 
-/* czworokąt z automatycznie poprawnym zwrotem normalnej (w stronę "out") */
-function quadOut(buf, a, b, c, d, out){
-  const e1 = [b[0]-a[0], b[1]-a[1], b[2]-a[2]], e2 = [d[0]-a[0], d[1]-a[1], d[2]-a[2]];
-  const nx = e1[1]*e2[2]-e1[2]*e2[1], ny = e1[2]*e2[0]-e1[0]*e2[2], nz = e1[0]*e2[1]-e1[1]*e2[0];
-  if (nx*out[0] + ny*out[1] + nz*out[2] < 0) buf.quad(a, d, c, b, [0,0],[0,1],[1,1],[1,0]);
-  else buf.quad(a, b, c, d, [0,0],[1,0],[1,1],[0,1]);
-}
 /* pochylona bryła kolizji wzdłuż Z: linia (zA,yA)-(zB,yB), t = grubość,
    up=+1 bryła nad linią, -1 pod linią */
 function tiltBox(xc, w, t, zA, yA, zB, yB, up){
@@ -319,36 +312,14 @@ function updateHighwayTraffic(dt){
   }
 }
 
-/* --- skromne oznakowanie: tablica "AUTOSTRADA" na wjeździe i znak zjazdu
-   przy węźle. Pełny system znaków drogowych (sygnalizacja, pierwszeństwo
-   itd.) to osobny, kolejny etap — tu tylko tyle, by węzeł nie wyglądał na
-   nieoznakowany. --- */
-function texHwySign(lines){
-  const W = 256, H = 160, c = mkCanvas(W,H), g = c.getContext('2d');
-  g.fillStyle = '#0d5c3a'; g.fillRect(0,0,W,H);
-  g.strokeStyle = '#f2f0ea'; g.lineWidth = 7;
-  g.strokeRect(8,8,W-16,H-16);
-  g.fillStyle = '#f2f0ea';
-  g.font = '700 34px Arial, sans-serif';
-  g.textAlign = 'center'; g.textBaseline = 'middle';
-  lines.forEach((t, i) => g.fillText(t, W/2, H/2 + (i - (lines.length-1)/2) * 40));
-  return toTex(c);
+/* --- tablice autostradowe: "AUTOSTRADA A18" na początku obu jezdni i zapowiedź zjazdu przed węzłem --- */
+/* tablica 3.4 x 2.1 m na dwóch słupkach schowanych za licem, dolna krawędź 2.2 m nad poboczem */
+function hwySign(x, z, rotY, tex){
+  placeSign(x, z, rotY, [signFace('autostrada', tex, shapeRect(3.4, 2.1))], { base: 0, bottom: 2.2, poleR: 0.08, poleX: [-1.2, 1.2] });
 }
-function buildSignPost(x, z, rotY, tex){
-  signLog.push({kind:'autostrada',x:x,z:z,rot:rotY});
-  const g = new THREE.Group();
-  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.14,4.2,8), new THREE.MeshLambertMaterial({ color:0x3a3d42 }));
-  pole.position.y = 2.1; pole.castShadow = true; g.add(pole);
-  const panel = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 2.1), new THREE.MeshLambertMaterial({ map: tex, side: THREE.DoubleSide }));
-  panel.position.set(0, 3.6, 0.08); panel.castShadow = true; g.add(panel);
-  g.position.set(x, 0, z);
-  g.rotation.y = rotY;
-  scene.add(g);
-  staticBox(x, 2.1, z, 0.3, 4.2, 0.3);
-}
-buildSignPost(HWY_A_OUT - 1.6, HWY_Z0 + 30, Math.PI, texHwySign(['AUTOSTRADA','A-18']));   // jezdnia A jedzie na +Z, nadjeżdża od północy
-buildSignPost(HWY_B_OUT + 1.6, HWY_Z1 - 30, 0, texHwySign(['AUTOSTRADA','A-18']));        // jezdnia B jedzie na -Z, nadjeżdża od południa
-buildSignPost(HWY_A_OUT - 1.6, HWY_IC_Z - 97, Math.PI, texHwySign(['ZJAZD','300 m']));    // przed początkiem łącznicy zjazdowej (z=IC-62)
+hwySign(HWY_A_OUT - 2.2, HWY_Z0 + 30, Math.PI, texHwySign(['AUTOSTRADA'], 'A18'));   // jezdnia A jedzie na +Z, nadjeżdża od północy
+hwySign(HWY_B_OUT + 2.2, HWY_Z1 - 30, 0, texHwySign(['AUTOSTRADA'], 'A18'));        // jezdnia B jedzie na -Z, nadjeżdża od południa
+hwySign(HWY_A_OUT - 2.2, HWY_IC_Z - 97, Math.PI, texHwySign(['ZJAZD', '300 m']));    // przed początkiem łącznicy zjazdowej (z=IC-62)
 
 /* ---------------------------------------------------------------
    Droga z miasta pod estakadą: ulica HWY2_Z wychodzi przez drugą przerwę

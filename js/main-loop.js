@@ -45,6 +45,8 @@ function frame(now){
 /* ---------------------------------------------------------------
    22. START
    --------------------------------------------------------------- */
+finalizeSigns();
+
 /* jedna klatka "na sucho", żeby shadery skompilowały się przed startem */
 renderer.compile(scene, camera);
 syncCar();

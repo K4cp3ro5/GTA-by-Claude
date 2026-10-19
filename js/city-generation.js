@@ -428,62 +428,15 @@ function roundaboutYield(px, pz, dx, dz){
   return false;
 }
 
-/* --- C-12 "ruch okrężny" + A-7 "ustąp pierwszeństwa" na każdym z 4
-   wjazdów na każde rondo --- */
-function texC12(){
-  const S = 160, c = mkCanvas(S,S), g = c.getContext('2d');
-  g.fillStyle = '#1659b0'; g.beginPath(); g.arc(S/2,S/2,S/2-4,0,TAU); g.fill();
-  g.strokeStyle = '#fff'; g.lineWidth = 6; g.beginPath(); g.arc(S/2,S/2,S/2-10,0,TAU); g.stroke();
-  g.strokeStyle = '#fff'; g.lineWidth = 9;
-  for (let k = 0; k < 3; k++){
-    const a0 = k*TAU/3, a1 = a0 + TAU/3*0.72;
-    g.beginPath(); g.arc(S/2, S/2, 34, a0, a1); g.stroke();
-    const ex = S/2+Math.cos(a1)*34, ey = S/2+Math.sin(a1)*34;
-    g.beginPath(); g.moveTo(ex,ey); g.lineTo(ex-8, ey-5); g.lineTo(ex-3, ey+8); g.closePath(); g.fillStyle='#fff'; g.fill();
-  }
-  return toTex(c);
-}
-const c12Tex = texC12();
-function buildC12(x, z, rotY){
-  signLog.push({kind:'C-12',x:x,z:z,rot:rotY});
-  const g = new THREE.Group();
-  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,2.1,6), new THREE.MeshLambertMaterial({color:0x3a3d42}));
-  pole.position.y = 1.05; g.add(pole);
-  const disc = new THREE.Mesh(new THREE.CircleGeometry(0.4,20), new THREE.MeshLambertMaterial({ map:c12Tex, side:THREE.DoubleSide }));
-  disc.position.set(0, 2.15, 0.03); g.add(disc);
-  g.position.set(x,0,z); g.rotation.y = rotY;
-  scene.add(g);
-  staticBox(x, 1.05, z, 0.18, 2.1, 0.18);
-}
-function buildA7(x, z, rotY){
-  signLog.push({kind:'A-7',x:x,z:z,rot:rotY});
-  const g = new THREE.Group();
-  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,1.9,6), new THREE.MeshLambertMaterial({color:0x3a3d42}));
-  pole.position.y = 0.95; g.add(pole);
-  function tri(scale, color, zOff){
-    const h = 0.42*scale, w = 0.48*scale;
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute([0,h,0, -w,-h,0, w,-h,0], 3));
-    geo.setIndex([0,1,2]); geo.computeVertexNormals();
-    const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color, side:THREE.DoubleSide }));
-    m.position.set(0, 1.9, zOff);
-    return m;
-  }
-  g.add(tri(1.0, 0xcf1f1f, 0.02));
-  g.add(tri(0.78, 0xf2f0ea, 0.03));
-  g.position.set(x,0,z); g.rotation.y = rotY;
-  scene.add(g);
-  staticBox(x, 0.95, z, 0.18, 1.9, 0.18);
-}
+/* --- A-7 "ustąp pierwszeństwa" nad C-12 "ruch okrężny" na wspólnym słupku na każdym z 4
+   wlotów każdego ronda (znaki pierwszeństwa umieszcza się najwyżej) --- */
 ROUNDABOUT_PTS.forEach(p => {
   const cx = L(p[0]), cz = L(p[1]);
-  /* d = od ronda w stronę nadjeżdżających aut; znaki stoją przy PRAWEJ krawędzi jezdni
-     (lateral ROAD_H+0.9 = na chodniku), C-12 bliżej ronda, A-7 za nim, oba przodem do kierowcy */
+  /* d = od ronda w stronę nadjeżdżających aut; znak stoi przy PRAWEJ krawędzi jezdni
+     (lateral ROAD_H+0.9 = na chodniku), przodem do kierowcy */
   [ {x:0,z:1}, {x:0,z:-1}, {x:1,z:0}, {x:-1,z:0} ].forEach(d => {
     const a = approachSpot(cx, cz, d, ROAD_H + 2.2, ROAD_H + 0.9);
-    const b = approachSpot(cx, cz, d, ROAD_H + 3.6, ROAD_H + 0.9);
-    buildC12(a.x, a.z, a.rot);
-    buildA7(b.x, b.z, b.rot);
+    placeSign(a.x, a.z, a.rot, [FACE.C12(), FACE.A7()]);
   });
 });
 
