@@ -24,12 +24,6 @@ function updateNpcs(dt){
     } else { n.rb = -1; n.rbPhase = null; }
     let dx = tgt.x - n.pos.x, dz = tgt.z - n.pos.y;
     let d = Math.hypot(dx, dz);
-    if (tgt.hwyMerge && d < 4){
-      /* koniec łącznicy wjazdowej: włączenie do ruchu na autostradzie, gdy jest luka; inaczej czeka */
-      if (hwyMergeFree(tgt.z)){ npcToHighway(n); i--; continue; }
-      n.speed = 0; n.body.velocity.set(0, 0, 0); n.blocked = true; n.why = 'włączanie';
-      continue;
-    }
     if (d < 2.2){
       n.wp = (n.wp + 1) % n.path.length;
       continue;

@@ -11,6 +11,26 @@ world.solver.tolerance  = 0.002;
 world.defaultContactMaterial.friction = 0.45;
 world.defaultContactMaterial.restitution = 0.02;
 
+/* cannon.js 0.6.2: Body.computeAABB obraca przesunięcie kształtu jego WŁASNĄ orientacją zamiast orientacją
+   ciała (błąd biblioteki). Dla ciał złożonych z obróconych kształtów (staticShape: pomosty autostrad,
+   wyspy rond, ukośne ściany) AABB wypadało obok kształtu, a broadphase i promienie kół auta je gubiły
+   — w jezdni powstawały "dziury". Poprawna wersja: orientacja = ciało × kształt, pozycja = ciało × przesunięcie. */
+(function fixComputeAABB(){
+  if (!CANNON.Body || !CANNON.Body.prototype || !CANNON.AABB) return;
+  const off = new CANNON.Vec3(), ori = new CANNON.Quaternion(), sa = new CANNON.AABB();
+  CANNON.Body.prototype.computeAABB = function(){
+    const N = this.shapes.length, aabb = this.aabb;
+    for (let i = 0; i < N; i++){
+      this.quaternion.mult(this.shapeOrientations[i], ori);
+      this.quaternion.vmult(this.shapeOffsets[i], off);
+      off.vadd(this.position, off);
+      this.shapes[i].calculateWorldAABB(off, ori, sa.lowerBound, sa.upperBound);
+      if (i === 0) aabb.copy(sa); else aabb.extend(sa);
+    }
+    this.aabbNeedsUpdate = false;
+  };
+})();
+
 const matGround = new CANNON.Material('ground');
 const matCar    = new CANNON.Material('car');
 const matPlayer = new CANNON.Material('player');
@@ -62,4 +82,8 @@ function staticBoxRot(cx, cy, cz, w, h, d, rotY){
 function staticCylinder(cx, cy, cz, radius, h){
   const q = new CANNON.Quaternion(); q.setFromAxisAngle(_axisX, -Math.PI/2);   // cylinder cannon.js ma oś lokalną Z — stawiamy pionowo (sprawdzone numerycznie)
   return staticShape(new CANNON.Cylinder(radius, radius, h, 14), cx, cy, cz, q, radius * 2 > STATIC_CELL);
+}
+/* bryła o dowolnej orientacji (q: CANNON.Quaternion) — pomosty, rampy, bariery autostrad */
+function staticBoxQ(cx, cy, cz, w, h, d, q){
+  return staticShape(new CANNON.Box(new CANNON.Vec3(w/2, h/2, d/2)), cx, cy, cz, q, Math.max(w, d) > STATIC_CELL);
 }

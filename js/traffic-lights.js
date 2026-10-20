@@ -111,11 +111,6 @@ STOP_PTS.forEach(p => {
     placeSign(a.x, a.z, a.rot, [FACE.STOP()]);
   });
 });
-/* B-33 (ograniczenie do 100 km/h): na wjeździe na autostradę w obu kierunkach (prawa krawędź, przodem do kierowcy);
-   B-33 (50 km/h) na łącznicy zjazdowej przed miastem. Znaki na poboczu (podłoże y=0). */
-placeSign(HWY_A_OUT - 1.6, HWY_IC_Z - 78, Math.PI, [FACE.B33(100)], { base: 0 });   // jezdnia A (jedzie na +Z, nadjeżdża od północy), za estakadą
-placeSign(HWY_B_OUT + 1.6, HWY_Z1 - 50, 0, [FACE.B33(100)], { base: 0 });         // kierunek B jedzie na -Z, nadjeżdża od południa
-{ const rs = rampSignSpot(HWY_OFF_RAMP, 0.74, HWY_RAMP_W/2 + 1.3); placeSign(rs.x, rs.z, rs.rot, [FACE.B33(50)], { base: 0 }); }
 
 function stopSignAhead(n, dx, dz, dt){
   let inZone = false;

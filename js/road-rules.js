@@ -17,17 +17,11 @@ const ZONE30 = { i0: 4, i1: 8, j0: 4, j1: 8 };
 function inZone30(x, z){
   return x > L(ZONE30.i0) + ROAD_H && x < L(ZONE30.i1) - ROAD_H && z > L(ZONE30.j0) + ROAD_H && z < L(ZONE30.j1) - ROAD_H;
 }
-/* limit prędkości [m/s] w punkcie (ruch miejski); null = łącznica (limit w punktach trasy) albo autostrada (hwyLimit) */
+/* limit prędkości [m/s] w punkcie (ruch po ulicach); na autostradach i łącznicach obowiązuje vmax
+   z punktów trasy (hwy-plan.js), drogi pasa podmiejskiego: 50 km/h */
 function speedLimitAt(x, z){
-  if (x <= WALL_X + 1) return inZone30(x, z) ? 30*KMH : 50*KMH;
-  if (Math.abs(x - EAST_ROAD_X) < 6 && Math.abs(z - HWY2_Z) > ROAD_H + 2) return 40*KMH;
-  if (x > HWY_B_OUT + 2) return 50*KMH;
-  return null;
-}
-const HWY_ZONE100 = { A: [HWY_Z0 + 40, HWY_IC_Z + 124], B: [HWY_IC_Z + 116, HWY_Z1 - 50] };
-function hwyLimit(side, z){
-  const r = HWY_ZONE100[side];
-  return (z > r[0] && z < r[1]) ? 100*KMH : 140*KMH;
+  if (Math.abs(x) <= CITY_EDGE + 1 && Math.abs(z) <= CITY_EDGE + 1) return inZone30(x, z) ? 30*KMH : 50*KMH;
+  return 50*KMH;
 }
 
 /* --- droga z pierwszeństwem: aleja j=6 od i=1 do i=12 (i=0 to zwykłe skrzyżowanie T przy murze) --- */
@@ -60,7 +54,7 @@ function oneWayWrong(x, z, dx, dz){
 
 /* --- rozstawianie znaków bez kolizji z innymi znakami, latarniami, drzewami, koszami --- */
 function signSpotFree(x, z){
-  if (Math.abs(x) > WALL_X - 1.2 || Math.abs(z) > WALL_X - 1.2) return false;          // poza miastem / w murze
+  if (Math.abs(x) > CITY_EDGE - 0.3 || Math.abs(z) > CITY_EDGE - 0.3) return false;    // poza chodnikami miasta
   const near = (list, r) => list.some(s => Math.hypot(s.x - x, s.z - z) < r);
   return !near(signGeomLog, 1.1) && !near(lampSpots, 0.9) && !near(treeSpots, 1.0) && !near(binSpots, 0.9) && !near(hydSpots, 0.8);
 }
@@ -92,7 +86,7 @@ function legalTravel(i, j, u, travel){
 crosswalks.forEach(c => {
   const u = { px:{x:1,z:0}, nx:{x:-1,z:0}, pz:{x:0,z:1}, nz:{x:0,z:-1} }[c.dir];
   const cx = L(c.i), cz = L(c.j), far = CW_OFF + ROAD_W*0.08 + 0.6;
-  if (Math.abs(cx + u.x*far) > WALL_X - 2 || Math.abs(cz + u.z*far) > WALL_X - 2) return;
+  if (Math.abs(cx + u.x*far) > CITY_EDGE - 1 || Math.abs(cz + u.z*far) > CITY_EDGE - 1) return;
   if (legalTravel(c.i, c.j, u, neg(u))) placeRuleSign(cx, cz, u, far, neg(u), [FACE.D6()]);   // dla jadących do skrzyżowania (przed pasami)
   if (legalTravel(c.i, c.j, u, u)) placeRuleSign(cx, cz, u, far, u, [FACE.D6()]);             // dla wyjeżdżających (zaraz za pasami)
 });
@@ -133,16 +127,10 @@ ONE_WAY.forEach(w => {
     /* wylot ulicy poprzecznej (ramię skierowane do środka miasta) */
     const inward = w.line === 'z' ? { x: 0, z: w.at === 0 ? 1 : -1 } : { x: w.at === 0 ? 1 : -1, z: 0 };
     if (k === 0 || k === GRID) continue;                                       // narożniki: jedyna droga to skręt w prawo
-    const straightOn = (w.at === GRID && w.line === 'x' && (j === PRIO_J || j === 2));   // łącznice (12,6) i ulica pod estakadą (12,2)
+    /* wyloty, z których prosto jedzie się na wjazd na autostradę (hwy-plan.js: końce w pasie podmiejskim) */
+    const straightOn = (w.line === 'x' && w.at === GRID && j === 10) || (w.line === 'z' && w.at === GRID && i === 2) ||
+                       (w.line === 'x' && w.at === 0 && j === 2) || (w.line === 'z' && w.at === 0 && i === 10);
     placeRuleSign(cx, cz, inward, STOP_AT, neg(inward), [straightOn ? FACE.C6() : FACE.C2()]);
   }
 });
 
-/* autostrada: B-33 100 na początku stref 100, B-33 140 na ich końcu; droga serwisowa 40; obszar zabudowany */
-placeSign(HWY_A_OUT - 1.6, HWY_ZONE100.A[0], Math.PI, [FACE.B33(100)], { base: 0 });
-placeSign(HWY_A_OUT - 1.6, HWY_ZONE100.A[1], Math.PI, [FACE.B33(140)], { base: 0 });
-placeSign(HWY_B_OUT + 1.6, HWY_ZONE100.B[0], 0, [FACE.B33(140)], { base: 0 });
-placeSign(EAST_ROAD_X - 4.9, HWY2_Z + ROAD_H + 5, Math.PI, [FACE.B33(40)], { base: 0 });   // na drogę serwisową na południe
-placeSign(EAST_ROAD_X + 4.9, HWY2_Z - ROAD_H - 5, 0, [FACE.B33(40)], { base: 0 });         // na północ
-placeSign(WALL_X + 3.5, HWY_IC_Z - 6.5, Math.PI/2, [FACE.D42()], { base: 0 });           // z łącznicy zjazdowej do miasta
-placeSign(WALL_X + 3.5, HWY_IC_Z + 6.5, -Math.PI/2, [FACE.D43()], { base: 0 });          // z miasta na łącznicę wjazdową

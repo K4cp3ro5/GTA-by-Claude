@@ -43,7 +43,6 @@ function frame(now){
   updateSky(dt);
   updateTrafficLights(dt);
   updateNpcs(dt);
-  updateHighwayTraffic(dt);
   updatePedestrians(dt);
   const carState = updateCar(dt);
   if (mode === 'foot' && pointerLocked) updatePlayer(dt);

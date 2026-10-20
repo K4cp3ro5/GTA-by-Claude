@@ -1,10 +1,11 @@
 core.js
+hwy-plan.js
 textures.js
 geobuf.js
 physics-world.js
 signs.js
 city-generation.js
-highway.js
+highways.js
 traffic-lights.js
 road-rules.js
 city-props.js
