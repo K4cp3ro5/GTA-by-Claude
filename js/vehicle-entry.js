@@ -80,6 +80,7 @@ function nearestVehicle(){
     if (d < best.dist) best = { kind: 'main', dist: d };
   }
   for (const n of npcs){
+    if (Math.abs((n.y || 0) - (p.y - 0.9)) > 2) continue;           // auto na estakadzie nad / pod graczem
     npcDoorPoint(n, _npcDoor);
     const d = Math.hypot(p.x - _npcDoor.x, p.z - _npcDoor.z);
     if (d < best.dist) best = { kind: 'npc', dist: d, npc: n };
@@ -103,7 +104,7 @@ function jackCar(n){
   removeNpcCar(n);
   spawnRandomNpcCar();
 
-  chassisBody.position.set(targetX, COM_H + 0.06, targetZ);
+  chassisBody.position.set(targetX, (n.y || 0) + COM_H + 0.06, targetZ);
   chassisBody.quaternion.setFromAxisAngle(new CANNON.Vec3(0,1,0), targetHeading + Math.PI);
   chassisBody.velocity.set(0, 0, 0);
   chassisBody.angularVelocity.set(0, 0, 0);

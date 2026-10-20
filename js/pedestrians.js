@@ -94,7 +94,7 @@ function pedCrossSafe(c){
     const sp = Math.hypot(vx, vz);
     return sp > 0.8 && (ox*vx + oz*vz) / (d || 1) > 0.3 * sp;                            // jedzie w stronę przejścia
   };
-  for (const m of npcs) if (near(m.pos.x, m.pos.y, (m.dirX || 0) * m.speed, (m.dirZ || 0) * m.speed)) return false;
+  for (const m of npcs) if ((m.y || 0) < 1 && near(m.pos.x, m.pos.y, (m.dirX || 0) * m.speed, (m.dirZ || 0) * m.speed)) return false;
   const v = chassisBody.velocity;
   if (near(chassisBody.position.x, chassisBody.position.z, v.x, v.z)) return false;
   return true;

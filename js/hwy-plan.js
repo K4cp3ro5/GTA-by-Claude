@@ -309,12 +309,12 @@ function wayAt(w, d){
   return { x: lerp(a.x, b.x, t), z: lerp(a.z, b.z, t), y: lerp(a.y, b.y, t), hx: hx, hz: hz, a: a, b: b, t: t };
 }
 /* punkty wzdłuż drogi od d0 do d1 co ~step, przesunięte w prawo o off(d) */
-function wayLane(w, d0, d1, off, step, vmax){
+function wayLane(w, d0, d1, off, step, vmax, tag){
   const out = [], n = Math.max(1, Math.ceil(Math.abs(d1 - d0) / step));
   for (let i = 0; i <= n; i++){
     const d = d0 + (d1 - d0) * i / n, q = wayAt(w, d), o = off(d, q);
     const vm = vmax !== undefined ? vmax : (q.a.vmax !== undefined ? lerp(q.a.vmax, q.b.vmax !== undefined ? q.b.vmax : q.a.vmax, q.t) : w.vmax);
-    out.push({ x: q.x - q.hz * o, z: q.z + q.hx * o, y: q.y, vmax: vm, hwy: true });
+    out.push(Object.assign({ x: q.x - q.hz * o, z: q.z + q.hx * o, y: q.y, vmax: vm, hwy: true }, tag || {}));
   }
   return out;
 }
@@ -333,21 +333,21 @@ function hwyTripPoints(cwInName, cwOutName, lane){
     /* kolektor jezdni wejściowej: z pasa na kolektor między wjazdem poprzedniej pętli a zjazdem */
     const dEnd = cwD(cin, cin.sg * HP.colS);
     out.push(...wayLane(cin, 0, dEnd, d => d < dEnd - 40 ? HP.laneR : ease(d, dEnd - 40, dEnd - 8, HP.laneR, aux), step, v));
-    out.push(...wayLane(w, 2, w.len - 2, () => 0, 3));
+    out.push(...wayLane(w, 2, w.len - 2, () => 0, 3, undefined, { rk: 'loop' }));
     const dSt = cwD(cout, -cout.sg * HP.colS);
     out.push(...wayLane(cout, dSt, cout.len, d => d > dSt + 40 ? HP.laneR : ease(d, dSt + 8, dSt + 40, aux, HP.laneR), step, v));
   } else {
     /* łącznica: pas wyłączenia (pierwsze 50 m drogi łącznicy biegnie wzdłuż jezdni) */
     const dA = cwD(cin, cin.sg * -HP.connS) - HP.auxLen;
     out.push(...wayLane(cin, 0, dA + 40, d => d < dA ? HP.laneR : ease(d, dA, dA + 36, HP.laneR, aux), step, v));
-    out.push(...wayLane(w, 42, w.len - 42, () => 0, 3));
+    out.push(...wayLane(w, 42, w.len - 42, () => 0, 3, undefined, { rk: 'conn' }));
     const dB = cwD(cout, cout.sg * HP.connS);
     out.push(...wayLane(cout, dB + 40, cout.len, d => d > dB + HP.auxLen ? HP.laneR : ease(d, dB + 14, dB + HP.auxLen, aux, HP.laneR), step, v));
   }
   return out;
 }
 /* końcówka (wjazd z miasta / zjazd do miasta) po prawym pasie */
-function termPoints(w){ return wayLane(w, 0, w.len, (d, q) => lerp(q.a.lr, q.b.lr, q.t), 4); }
+function termPoints(w, tag){ return wayLane(w, 0, w.len, (d, q) => lerp(q.a.lr, q.b.lr, q.t), 4, undefined, tag); }
 /* ograniczenie zmian prędkości: vmax w punkcie <= tyle, by zdążyć zwolnić do następnych (a = 2.5 m/s²) */
 function smoothVmax(pts, a){
   for (let pass = 0; pass < 2; pass++){

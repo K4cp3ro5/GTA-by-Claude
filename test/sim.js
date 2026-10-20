@@ -192,12 +192,19 @@ function __sim(seconds){
       const n = npcs[i];
       const sp = Math.hypot(n.body.velocity.x, n.body.velocity.z);
       if (n.__rbPrev === 'ring' && n.rbPhase !== 'ring') cnt.rbPass++;
+      /* autostrady: przejazdy pętli / łącznic, wjazdy z przekątnych, prędkość */
+      const rk = n.path[n.wp].rk;
+      if (rk !== n.__rk){ if (rk === 'loop') cnt.loopPass = (cnt.loopPass || 0) + 1; if (rk === 'conn') cnt.connPass = (cnt.connPass || 0) + 1; if (rk === 'enter') cnt.hwyEnter = (cnt.hwyEnter || 0) + 1; n.__rk = rk; }
+      if ((n.y || 0) > 1) cnt.hwyMax = Math.max(cnt.hwyMax, n.speed);
       /* przepisy: limit prędkości strefy (z tolerancją 10%), jednokierunkowe */
-      const lim = speedLimitAt(n.pos.x, n.pos.y);
+      /* na autostradzie / łącznicy limitem jest vmax punktu trasy (znaki B-33 przy rampach), ulice pod estakadą nie liczą się */
+      const tg = n.path[n.wp], onHwy = tg.hwy || (n.y || 0) > 1;
+      const tp = n.path[(n.wp - 1 + n.path.length) % n.path.length];   // limit odcinka: większy z jego końców (hamowanie trwa)
+      const lim = onHwy ? (tg.vmax !== undefined && tp.vmax !== undefined ? Math.max(tg.vmax, tp.vmax) : tg.vmax) : speedLimitAt(n.pos.x, n.pos.y);
       if (lim && n.speed > lim * 1.1 + 0.3) cnt.overLimit++;
-      if (inZone30(n.pos.x, n.pos.y)) cnt.v30 = Math.max(cnt.v30, n.speed);
-      else if (lim) cnt.v50 = Math.max(cnt.v50, n.speed);
-      if (n.speed > 1 && oneWayWrong(n.pos.x, n.pos.y, n.dirX || 0, n.dirZ || 0)) cnt.wrongWay++;
+      if (!onHwy && inZone30(n.pos.x, n.pos.y)) cnt.v30 = Math.max(cnt.v30, n.speed);
+      else if (!onHwy && lim) cnt.v50 = Math.max(cnt.v50, n.speed);
+      if (!onHwy && n.speed > 1 && oneWayWrong(n.pos.x, n.pos.y, n.dirX || 0, n.dirZ || 0)) cnt.wrongWay++;
       n.__rbPrev = n.rbPhase;
       const st = (stuck.get(i)||0);
       stuck.set(i, sp < 0.3 ? st + dt : 0);
@@ -213,7 +220,7 @@ function __sim(seconds){
       }
       for (let k = i+1; k < npcs.length; k++){
         const m = npcs[k];
-        if (Math.hypot(n.pos.x-m.pos.x, n.pos.y-m.pos.y) < 4.6 && __obb({x:n.pos.x, z:n.pos.y, h:n.heading}, {x:m.pos.x, z:m.pos.y, h:m.heading})){ report.overlaps++; report.overlapPairs.add(i+'-'+k); (report.locs = report.locs || []).push([+n.pos.x.toFixed(0), +n.pos.y.toFixed(0), +n.heading.toFixed(1), +m.heading.toFixed(1)]); }
+        if (Math.abs((n.y || 0) - (m.y || 0)) < 2.5 && Math.hypot(n.pos.x-m.pos.x, n.pos.y-m.pos.y) < 4.6 && __obb({x:n.pos.x, z:n.pos.y, h:n.heading}, {x:m.pos.x, z:m.pos.y, h:m.heading})){ report.overlaps++; if ((n.y || 0) > 1) cnt.hwyOverlap = (cnt.hwyOverlap || 0) + 1; report.overlapPairs.add(i+'-'+k); (report.locs = report.locs || []).push([+n.pos.x.toFixed(0), +n.pos.y.toFixed(0), +n.heading.toFixed(1), +m.heading.toFixed(1)]); }
       }
     }
   }
@@ -245,7 +252,7 @@ console.log('Elementy poza murem:', st.outsideWall.length, st.outsideWall.slice(
 console.log('Świat:', JSON.stringify(st.world));
 console.log('Autostrady (statycznie):', JSON.stringify(st.hwy));
 const r = base.__sim(secs);
-console.log('Symulacja', secs, 's gry,', r.npcCount, 'aut NPC miejskich');
+console.log('Symulacja', secs, 's gry,', r.npcCount, 'aut NPC (miasto + trasy przez autostrady)');
 console.log('Najdłuższy postój jednego auta (v<0.3):', r.stuckMax.toFixed(1), 's', r.stuckAt ? '(auto #'+r.stuckId+' przy '+r.stuckAt+')' : '');
 console.log('Klatki z nakładaniem się nadwozi aut miejskich (test SAT):', r.overlaps, r.overlapPairs.slice(0,8));
 if (r.dump) console.log('ZAKLESZCZENIE — auta w pobliżu:', JSON.stringify(r.dump), '| przyczyny postoju (id:why):', r.whyStuck.join(' '));

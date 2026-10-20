@@ -8,10 +8,20 @@ function updateNpcs(dt){
 
     /* ciało kinematyczne jest źródłem prawdy — model i logika idą za nim */
     n.pos.set(n.body.position.x, n.body.position.z);
-    n.mesh.position.set(n.pos.x, 0, n.pos.y);
-    n.mesh.rotation.y = n.heading;
 
-    const tgt = n.path[n.wp];
+    const tgt = n.path[n.wp], prv = n.path[(n.wp - 1 + n.path.length) % n.path.length];
+    /* wysokość jezdni pod autem (estakady, łącznice): między poprzednim a bieżącym punktem trasy */
+    {
+      const sx = tgt.x - prv.x, sz = tgt.z - prv.z, sl2 = sx*sx + sz*sz || 1;
+      const t = clamp(((n.pos.x - prv.x)*sx + (n.pos.y - prv.z)*sz) / sl2, 0, 1);
+      n.y = lerp(prv.y || 0, tgt.y || 0, t);
+      n.slope = ((tgt.y || 0) - (prv.y || 0)) / Math.sqrt(sl2);
+    }
+    n.body.position.y = n.y + 0.72;
+    n.mesh.position.set(n.pos.x, n.y, n.pos.y);
+    n.mesh.rotation.order = 'YXZ';
+    n.mesh.rotation.set(-Math.atan(n.slope), n.heading, 0);                 // nos w górę pod górę
+    const low = n.y < 1;                                                     // auto na poziomie ulic (nie na estakadzie)
     /* rondo: 'approach' = cel to punkt trasy ronda, auto jeszcze przed pasem okrężnym; 'ring' = wlot, rondo, wylot */
     if (tgt.rb !== undefined){
       const rp = ROUNDABOUT_PTS[tgt.rb], rcx = L(rp[0]), rcz = L(rp[1]);
@@ -32,22 +42,24 @@ function updateNpcs(dt){
 
     /* detekcja przeszkody przed maską */
     let block = false, why = '';                  // why = przyczyna hamowania (diagnostyka: test/sim.js)
-    const checkPoint = (px, pz, radius) => {
+    const look = Math.max(11, n.speed * 1.2);
+    const checkPoint = (px, pz, radius, py) => {
+      if (py !== undefined && Math.abs(py - n.y) > 2.5) return false;       // inny poziom (pod / nad estakadą)
       const ox = px - n.pos.x, oz = pz - n.pos.y;
       const ahead = ox * dx + oz * dz;
-      if (ahead < 0.5 || ahead > 11) return false;
+      if (ahead < 0.5 || ahead > look) return false;
       const lat = Math.abs(ox * -dz + oz * dx);
       return lat < 2.0 + radius;
     };
-    if (checkPoint(chassisBody.position.x, chassisBody.position.z, 1.0)){ block = true; why = 'gracz-auto'; }
+    if (checkPoint(chassisBody.position.x, chassisBody.position.z, 1.0, chassisBody.position.y - 0.5)){ block = true; why = 'gracz-auto'; }
     if (!block && mode === 'foot' &&
-        checkPoint(player.body.position.x, player.body.position.z, 0.5)){ block = true; why = 'gracz'; }
+        checkPoint(player.body.position.x, player.body.position.z, 0.5, player.body.position.y - 0.9)){ block = true; why = 'gracz'; }
     if (!block && mainCarPlaceholder &&
-        checkPoint(mainCarPlaceholder.body.position.x, mainCarPlaceholder.body.position.z, 1.0)){ block = true; why = 'atrapa'; }   // zaparkowane główne auto
+        checkPoint(mainCarPlaceholder.body.position.x, mainCarPlaceholder.body.position.z, 1.0, mainCarPlaceholder.body.position.y)){ block = true; why = 'atrapa'; }   // zaparkowane główne auto
     /* piesi na jezdni (na przejściu albo leżący) — auto staje przed nimi */
-    if (!block) for (const p of Pedestrians.list){ if (pedOnRoad(p) && checkPoint(p.pos.x, p.pos.y, 0.7)){ block = true; why = 'pieszy'; break; } }
+    if (!block && low) for (const p of Pedestrians.list){ if (pedOnRoad(p) && checkPoint(p.pos.x, p.pos.y, 0.7)){ block = true; why = 'pieszy'; break; } }
     /* przejście, po którym ktoś właśnie idzie (także po drugiej połowie jezdni): nie wjeżdżam na pasy */
-    if (!block && zebraBusyAhead(n, dx, dz)){ block = true; why = 'zebra'; }
+    if (!block && low && zebraBusyAhead(n, dx, dz)){ block = true; why = 'zebra'; }
     /* auta NPC (npcConflict): jazda za autem w tym samym kierunku (cap), a przy ruchu poprzecznym
        punkt kolizji torów — auto, które już jest w strefie konfliktu, ma pierwszeństwo; gdy oba
        dopiero dojeżdżają, ustępuje to, które ma drugie po PRAWEJ (reguła prawej ręki). Bezpiecznik
@@ -66,23 +78,26 @@ function updateNpcs(dt){
     if (n.ignoreNpcT > 0) n.ignoreNpcT -= dt;
     n.waitT = (blockedByNpc && n.speed < 0.3) ? (n.waitT || 0) + dt : 0;
     if (n.waitT > 9){ n.ignoreNpcT = 2.5; n.waitT = 0; }
-    if (!block && redLightAhead(n.pos.x, n.pos.y, dx, dz)){ block = true; why = 'światło'; }
-    if (!block && stopSignAhead(n, dx, dz, dt)){ block = true; why = 'STOP'; }
-    if (!block && roundaboutYield(n)){ block = true; why = 'rondo'; }
+    if (!block && low && redLightAhead(n.pos.x, n.pos.y, dx, dz)){ block = true; why = 'światło'; }
+    if (!block && low && stopSignAhead(n, dx, dz, dt)){ block = true; why = 'STOP'; }
+    if (!block && low && roundaboutYield(n)){ block = true; why = 'rondo'; }
     n.blocked = block; n.why = why;
     /* rondo: ~23 km/h na pasie okrężnym, płynne zwalnianie od ~24 m przed środkiem */
     if (n.rb >= 0 && n.rbDist < 26) cap = Math.min(cap, 6.5 + Math.max(0, n.rbDist - 15) * 0.7);
-    if (tgt.vmax !== undefined) cap = Math.min(cap, tgt.vmax);                       // łuki, łącznice, zawrotki
-    /* limit strefy (B-33, B-43, obszar zabudowany): bieżący i ~22 m przed autem, żeby hamowało przed znakiem;
-       kierowcy trzymają się limitu z dokładnością n.obey (0.9–1.05) */
-    const lim0 = speedLimitAt(n.pos.x, n.pos.y), lim1 = speedLimitAt(n.pos.x + dx*22, n.pos.y + dz*22);
-    const lim = Math.min(lim0 || Infinity, lim1 || Infinity);
-    if (lim < Infinity) cap = Math.min(cap, lim * (n.obey || 1));
-    /* skrzyżowanie z drogą z pierwszeństwem przed nami, a my na podporządkowanej (A-7/STOP): dojazd ~30 km/h */
-    const pr = roadPriority(n.pos.x + dx*14, n.pos.y + dz*14);
-    if (pr && (pr === 'ew') !== (Math.abs(dx) > Math.abs(dz)) && roadPriority(n.pos.x, n.pos.y) === null) cap = Math.min(cap, 8.5);
+    /* autostrady, łącznice, łuki: limit z punktu trasy (vmax, wygładzony tak, by zdążyć zwolnić),
+       kierowcy trzymają się go z dokładnością n.obey */
+    if (tgt.vmax !== undefined) cap = Math.min(cap, tgt.vmax * (tgt.hwy ? (n.obey || 1) : 1));
+    if (!tgt.hwy){
+      /* limit strefy (B-33, B-43, obszar zabudowany): bieżący i ~22 m przed autem, żeby hamowało przed znakiem */
+      const lim0 = speedLimitAt(n.pos.x, n.pos.y), lim1 = speedLimitAt(n.pos.x + dx*22, n.pos.y + dz*22);
+      const lim = Math.min(lim0 || Infinity, lim1 || Infinity);
+      if (lim < Infinity) cap = Math.min(cap, lim * (n.obey || 1));
+      /* skrzyżowanie z drogą z pierwszeństwem przed nami, a my na podporządkowanej (A-7/STOP): dojazd ~30 km/h */
+      const pr = roadPriority(n.pos.x + dx*14, n.pos.y + dz*14);
+      if (pr && (pr === 'ew') !== (Math.abs(dx) > Math.abs(dz)) && roadPriority(n.pos.x, n.pos.y) === null) cap = Math.min(cap, 8.5);
+    }
 
-    const want = block ? 0 : Math.min(n.target, cap);
+    const want = block ? 0 : Math.min(tgt.hwy ? 99 : n.target, cap);
     n.speed = damp(n.speed, want, (block || want < n.speed - 1) ? 5.5 : 1.7, dt);
     n.heading = angleDamp(n.heading, Math.atan2(dx, dz), n.rbPhase === 'ring' ? 8 : 5.5, dt);
 
@@ -106,6 +121,7 @@ function npcTouchAhead(n, m, dx, dz, rx, rz, ahead){
   return lat < 0.93 + extL + 0.15 && ahead - extF < 2.05 + 1.6;
 }
 function npcConflict(n, m, dx, dz, onlyClose){
+  if (Math.abs((n.y || 0) - (m.y || 0)) > 2.5) return Infinity;             // inny poziom (estakada nad ulicą)
   const rx = m.pos.x - n.pos.x, rz = m.pos.y - n.pos.y, dist = Math.hypot(rx, rz);
   if (dist > 16) return Infinity;
   const ahead = rx*dx + rz*dz, lat = Math.abs(rx*-dz + rz*dx);
@@ -133,9 +149,12 @@ function npcConflict(n, m, dx, dz, onlyClose){
     return Infinity;
   }
   if (dot > 0.8){                                                  // ten sam kierunek: kolejka
-    if (ahead < 0.5 || ahead > 13 || lat > 2.6) return Infinity;
+    /* obok siebie przy włączaniu / zmianie pasa: jedno (wyższe id) zwalnia i wjeżdża za drugie */
+    if (lat < 3.0 && ahead > -1.5 && ahead < 0.5) return n.id > m.id ? m.speed * 0.75 : Infinity;
+    const look = Math.max(13, n.speed * 1.8);                      // przy 100 km/h ~50 m
+    if (ahead < 0.5 || ahead > look || lat > 2.6) return Infinity;
     if (ahead < 5.5) return true;
-    return ahead < 8 ? m.speed * 0.7 : m.speed;
+    return ahead < Math.max(8, n.speed * 0.9) ? m.speed * 0.7 : m.speed;
   }
   if (dot < -0.8){                                                 // z naprzeciwka: tylko gdy na moim pasie
     return (ahead > 0.5 && ahead < 10 && lat < 2.2) ? true : Infinity;

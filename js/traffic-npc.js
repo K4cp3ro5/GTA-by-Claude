@@ -67,6 +67,30 @@ const LOOPS = [
   npcLoop(2, 4, 10, 8),
   npcLoop(4, 2, 8, 10)
 ].map(routeThroughRoundabouts);
+/* --- trasy przez autostrady (zamknięte cykle): wjazd z przekątnej w narożniku k -> autostrada
+   (prosto 's', w lewo pętlą 'l', w prawo łącznicą 'r') -> zjazd w narożniku X -> prosta ulica miasta
+   (i=10, j=2, i=2 albo j=10) -> wjazd w następnym narożniku (X+3)%4. Narożniki: 0 SE, 1 SW, 2 NW, 3 NE. --- */
+function hwyRoute(startK, moves, lane){
+  const pts = []; let k = startK;
+  moves.forEach(mv => {
+    const T = HWY_TERM[k], X = mv === 's' ? (k + 2) % 4 : mv === 'l' ? (k + 1) % 4 : (k + 3) % 4;
+    pts.push(...termPoints(T.entry, { rk: 'enter' }), ...hwyTripPoints(T.entryCw, HWY_TERM[X].exitCw, lane), ...termPoints(HWY_TERM[X].exit));
+    const a = pts[pts.length - 1];
+    k = (X + 3) % 4;
+    const b = HWY_TERM[k].entry.pts[0], n = Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / 44);
+    for (let i = 1; i < n; i++) pts.push({ x: lerp(a.x, b.x, i / n), z: lerp(a.z, b.z, i / n), y: 0 });   // ulica miasta (bez vmax — limity strefy)
+  });
+  if (k !== startK) throw new Error('trasa autostradowa nie jest zamknięta');
+  pts.forEach(p => { if (p.hwy && p.y < 0.3) p.vmax = Math.min(p.vmax === undefined ? 99 : p.vmax, 50 / 3.6); });   // rampy w pasie podmiejskim: 50 km/h jak ulica
+  smoothVmax(pts, 2.5);
+  pts.hwyRoute = true;
+  return pts;
+}
+const HWY_LOOPS = [
+  [hwyRoute(0, ['s','s','s','s'], 0), 3], [hwyRoute(2, ['s','s','s','s'], 1), 3],
+  [hwyRoute(0, ['l'], 0), 1], [hwyRoute(1, ['l'], 0), 1], [hwyRoute(2, ['l'], 0), 1], [hwyRoute(3, ['l'], 0), 1],
+  [hwyRoute(0, ['r','r'], 0), 2], [hwyRoute(1, ['r','r'], 0), 2]
+];
 /* indeks i ułamek odcinka w miejscu f (0..1) długości pętli — na odcinku poza rondem */
 function pathSpot(path, f, tries){
   const segs = path.map((a, i) => { const b = path[(i + 1) % path.length]; return Math.hypot(b.x - a.x, b.z - a.z); });
@@ -128,6 +152,7 @@ function spawnNpcCar(path, colorHex, startIdx, frac){
     path: path,
     wp: (idx + 1) % path.length,
     pos: new THREE.Vector2(lerp(p0.x, p1.x, f), lerp(p0.z, p1.z, f)),
+    y: lerp(p0.y || 0, p1.y || 0, f),
     heading: Math.atan2(p1.x - p0.x, p1.z - p0.z),
     speed: 0,
     /* prędkość zależna od strefy (centrum wolniej, obrzeża szybciej) i od "charakteru" kierowcy 0.7–1.35x */
@@ -140,7 +165,7 @@ function spawnNpcCar(path, colorHex, startIdx, frac){
   };
   const b = new CANNON.Body({ mass: 0, type: CANNON.Body.KINEMATIC, material: matCar });
   b.addShape(new CANNON.Box(new CANNON.Vec3(0.95, 0.62, 2.1)));
-  b.position.set(n.pos.x, 0.72, n.pos.y);
+  b.position.set(n.pos.x, n.y + 0.72, n.pos.y);
   b.collisionFilterGroup = G_CAR;
   b.collisionFilterMask = -1;
   b.allowSleep = false;
@@ -172,19 +197,21 @@ function removeNpcCar(n){
   if (idx >= 0) npcs.splice(idx, 1);
 }
 
-/* dwa auta na każdej pętli, w przeciwległych miejscach (poza rondami) — gęstszy ruch; pętle dzielą
-   pasy, więc miejsce startu przesuwane, aż będzie co najmniej 12 m od każdego już postawionego auta */
-for (let i = 0; i < LOOPS.length; i++){
-  const f0 = rnd();
-  [f0, f0 + 0.5].forEach((f, k) => {
+/* dwa auta na każdej pętli miejskiej i 1–3 na trasie autostradowej, w równych odstępach (poza rondami
+   i autostradą); pętle dzielą pasy, więc miejsce startu przesuwane, aż będzie ≥ 12 m od każdego auta */
+const ALL_LOOPS = LOOPS.map(p => [p, 2]).concat(HWY_LOOPS);
+HWY_LOOPS.forEach(l => LOOPS.push(l[0]));
+for (let i = 0; i < ALL_LOOPS.length; i++){
+  const f0 = rnd(), cnt = ALL_LOOPS[i][1];
+  Array.from({ length: cnt }, (_, k) => f0 + k / cnt).forEach((f, k) => {
     let sp = null;
     for (let tries = 0; tries < 30; tries++, f += 0.017){
-      const q = pathSpot(LOOPS[i], f);
-      const a = LOOPS[i][q.idx], b = LOOPS[i][(q.idx + 1) % LOOPS[i].length];
+      const q = pathSpot(ALL_LOOPS[i][0], f);
+      const a = ALL_LOOPS[i][0][q.idx], b = ALL_LOOPS[i][0][(q.idx + 1) % ALL_LOOPS[i][0].length];
       const x = lerp(a.x, b.x, q.frac), z = lerp(a.z, b.z, q.frac);
       if (!npcs.some(m => Math.hypot(m.pos.x - x, m.pos.y - z) < 12)){ sp = q; break; }
     }
-    if (sp) spawnNpcCar(LOOPS[i], NPC_COLORS[(i + 3*k) % NPC_COLORS.length], sp.idx, sp.frac);   // brak wolnego miejsca: auto nie powstaje
+    if (sp) spawnNpcCar(ALL_LOOPS[i][0], NPC_COLORS[(i + 3*k) % NPC_COLORS.length], sp.idx, sp.frac);   // brak wolnego miejsca: auto nie powstaje
   });
 }
 
