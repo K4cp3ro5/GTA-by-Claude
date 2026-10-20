@@ -57,13 +57,13 @@ const Sound = {
   },
 
   /* rpm01: 0..1, load: 0..1 */
-  engine(on, rpm01, load){
+  engine(on, rpm01, load, tone){
     if (!this.ready) return;
-    const t = this.ctx.currentTime;
-    const f = 42 + rpm01 * 168;
+    const t = this.ctx.currentTime, pitch = tone ? tone.pitch : 1, bright = tone ? tone.bright : 1;
+    const f = (42 + rpm01 * 168) * pitch;
     this.eng.frequency.setTargetAtTime(f, t, 0.06);
     this.sub.frequency.setTargetAtTime(f * 0.5, t, 0.06);
-    this.engFilter.frequency.setTargetAtTime(280 + rpm01 * 1700 + load * 420, t, 0.08);
+    this.engFilter.frequency.setTargetAtTime((280 + rpm01 * 1700 + load * 420) * bright, t, 0.08);
     this.engGain.gain.setTargetAtTime(on ? (0.055 + rpm01 * 0.085 + load * 0.03) : 0, t, 0.12);
   },
 

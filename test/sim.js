@@ -268,16 +268,14 @@ function __static(){
 /* prawdziwe nakładanie nadwozi: test osi rozdzielającej (SAT) dla prostokątów 1.86 x 4.1 m
    obróconych wg kierunku jazdy (pomniejszone o 0.1 m — styk zderzaków to jeszcze nie kolizja) */
 function __obb(a, b){
-  const ha = [0.88, 2.0], ax = [[Math.cos(a.h), -Math.sin(a.h)], [Math.sin(a.h), Math.cos(a.h)]];
-  const bx = [[Math.cos(b.h), -Math.sin(b.h)], [Math.sin(b.h), Math.cos(b.h)]];
+  /* prostokąty nadwozi wg typów (hw, hl), lekko pomniejszone (0.05 m) — jak dawne 0.88 × 2.0 dla sedana */
+  const axes = [a.h, a.h + Math.PI/2, b.h, b.h + Math.PI/2].map(h => [Math.sin(h), Math.cos(h)]);
   const d = [b.x - a.x, b.z - a.z];
-  for (const axis of ax.concat(bx)){
-    const ra = ha[0]*Math.abs(ax[0][0]*axis[0] + ax[0][1]*axis[1]) + ha[1]*Math.abs(ax[1][0]*axis[0] + ax[1][1]*axis[1]);
-    const rb = ha[0]*Math.abs(bx[0][0]*axis[0] + bx[0][1]*axis[1]) + ha[1]*Math.abs(bx[1][0]*axis[0] + bx[1][1]*axis[1]);
-    if (Math.abs(d[0]*axis[0] + d[1]*axis[1]) > ra + rb) return false;
-  }
+  const ext = (o, ax) => { const f = [Math.sin(o.h), Math.cos(o.h)], r = [f[1], -f[0]]; return Math.abs(f[0]*ax[0] + f[1]*ax[1]) * (o.hl - 0.05) + Math.abs(r[0]*ax[0] + r[1]*ax[1]) * (o.hw - 0.05); };
+  for (const ax of axes){ if (Math.abs(d[0]*ax[0] + d[1]*ax[1]) > ext(a, ax) + ext(b, ax)) return false; }
   return true;
 }
+
 function __sim(seconds){
   const dt = 0.05, steps = Math.floor(seconds/dt);
   chassisBody.position.set(9999, 0.6, 9999);       // auto gracza poza trasami
@@ -330,7 +328,7 @@ function __sim(seconds){
       }
       for (let k = i+1; k < npcs.length; k++){
         const m = npcs[k];
-        if (Math.abs((n.y || 0) - (m.y || 0)) < 2.5 && Math.hypot(n.pos.x-m.pos.x, n.pos.y-m.pos.y) < 4.6 && __obb({x:n.pos.x, z:n.pos.y, h:n.heading}, {x:m.pos.x, z:m.pos.y, h:m.heading})){ report.overlaps++; if ((n.y || 0) > 1) cnt.hwyOverlap = (cnt.hwyOverlap || 0) + 1; report.overlapPairs.add(i+'-'+k); (report.locs = report.locs || []).push([+n.pos.x.toFixed(0), +n.pos.y.toFixed(0), +n.heading.toFixed(1), +m.heading.toFixed(1)]); }
+        if (Math.abs((n.y || 0) - (m.y || 0)) < 2.5 && Math.hypot(n.pos.x-m.pos.x, n.pos.y-m.pos.y) < 6 && __obb({x:n.pos.x, z:n.pos.y, h:n.heading, hw:n.halfW, hl:n.halfL}, {x:m.pos.x, z:m.pos.y, h:m.heading, hw:m.halfW, hl:m.halfL})){ report.overlaps++; if ((n.y || 0) > 1) cnt.hwyOverlap = (cnt.hwyOverlap || 0) + 1; report.overlapPairs.add(i+'-'+k); (report.locs = report.locs || []).push([+n.pos.x.toFixed(0), +n.pos.y.toFixed(0), +n.heading.toFixed(1), +m.heading.toFixed(1)]); }
       }
     }
   }

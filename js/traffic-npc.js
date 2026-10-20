@@ -114,28 +114,24 @@ const _npcGeoCache = {};
 const _npcMatBody  = new THREE.MeshPhongMaterial({ vertexColors: true, shininess: 60 });
 const _npcMatGlass = new THREE.MeshPhongMaterial({ color: 0x141d22, shininess: 100, transparent: true, opacity: 0.8 });
 const _npcMatLamp  = new THREE.MeshBasicMaterial({ vertexColors: true });
-function npcGeometries(color){
-  if (_npcGeoCache[color]) return _npcGeoCache[color];
-  const B = (w,h,d) => new THREE.BoxGeometry(w,h,d);
-  const tg = new THREE.CylinderGeometry(0.34, 0.34, 0.26, 12); tg.rotateZ(Math.PI/2);
-  const body = [
-    { geo: B(1.86, 0.52, 4.10), color: color, y: 0.62 },
-    { geo: B(1.48, 0.10, 1.70), color: color, y: 1.36, z: -0.22 },
-    { geo: B(1.88, 0.20, 0.28), color: 0x15171b, y: 0.50, z: 2.02 },
-    { geo: B(1.88, 0.20, 0.28), color: 0x15171b, y: 0.50, z: -2.02 }
-  ];
-  [[0.84,1.34],[-0.84,1.34],[0.84,-1.34],[-0.84,-1.34]].forEach(p => body.push({ geo: tg, color: 0x141518, x: p[0], y: 0.34, z: p[1] }));
-  const lamps = [
-    { geo: B(0.40, 0.12, 0.08), color: 0x5a1512, x:  0.62, y: 0.80, z: -2.06 },
-    { geo: B(0.40, 0.12, 0.08), color: 0x5a1512, x: -0.62, y: 0.80, z: -2.06 },
-    { geo: B(0.40, 0.12, 0.08), color: 0xfff3d0, x:  0.62, y: 0.78, z:  2.04 },
-    { geo: B(0.40, 0.12, 0.08), color: 0xfff3d0, x: -0.62, y: 0.78, z:  2.04 }
-  ];
-  const glass = new THREE.BoxGeometry(1.60, 0.52, 2.10); glass.translate(0, 1.10, -0.10);
-  return (_npcGeoCache[color] = { body: mergeColored(body), lamps: mergeColored(lamps), glass: glass });
+/* model NPC z tych samych brył co auto gracza (car-types.js: carParts) — trzy siatki: lakier+detale
+   (kolory wierzchołków), szyby, światła; koła wg typu. Cache na (typ, kolor). */
+function npcGeometries(color, type){
+  const key = (type || 'sedan') + color;
+  if (_npcGeoCache[key]) return _npcGeoCache[key];
+  const T = CAR_TYPES[type || 'sedan'], B = (w,h,d) => new THREE.BoxGeometry(w,h,d);
+  const tg = new THREE.CylinderGeometry(T.wheelR, T.wheelR, 0.26, 12); tg.rotateZ(Math.PI/2);
+  const COL = { paint: color, dark: 0x15171b, chrome: 0xb9bec6, lampF: 0xfff3d0, lampR: 0x5a1512 };
+  const body = [], lamps = [], glass = [];
+  carParts(T.id).forEach(q => {
+    const part = { geo: B(q[0], q[1], q[2]), color: COL[q[3]] || 0x141d22, x: q[4], y: q[5], z: q[6], rx: q[7] };
+    (q[3] === 'glass' ? glass : (q[3] === 'lampF' || q[3] === 'lampR') ? lamps : body).push(part);
+  });
+  [[T.track, -T.wbF], [-T.track, -T.wbF], [T.track, -T.wbR], [-T.track, -T.wbR]].forEach(p => body.push({ geo: tg, color: 0x141518, x: p[0], y: T.wheelR, z: p[1] }));
+  return (_npcGeoCache[key] = { body: mergeColored(body), lamps: mergeColored(lamps), glass: mergeColored(glass) });
 }
-function buildNpcModel(color){
-  const g = new THREE.Group(), G = npcGeometries(color);
+function buildNpcModel(color, type){
+  const g = new THREE.Group(), G = npcGeometries(color, type);
   const body = new THREE.Mesh(G.body, _npcMatBody); body.castShadow = true; g.add(body);
   g.add(new THREE.Mesh(G.glass, _npcMatGlass));
   g.add(new THREE.Mesh(G.lamps, _npcMatLamp));
@@ -144,7 +140,9 @@ function buildNpcModel(color){
 }
 
 /* frac = położenie na odcinku idx -> idx+1 (0 = w narożniku pętli) */
-function spawnNpcCar(path, colorHex, startIdx, frac){
+function spawnNpcCar(path, colorHex, startIdx, frac, type){
+  type = type || randomCarType();
+  const TN = CAR_TYPES[type].npc;
   const idx = (startIdx !== undefined) ? startIdx : randInt(0, path.length - 1);
   const p0 = path[idx], p1 = path[(idx + 1) % path.length], f = frac || 0;
   const n = {
@@ -156,16 +154,17 @@ function spawnNpcCar(path, colorHex, startIdx, frac){
     heading: Math.atan2(p1.x - p0.x, p1.z - p0.z),
     speed: 0,
     /* prędkość zależna od strefy (centrum wolniej, obrzeża szybciej) i od "charakteru" kierowcy 0.7–1.35x */
-    target: clamp(clamp(6.5 + Math.hypot(path[idx].x, path[idx].z) / 26, 6.5, 14) * rand(0.7, 1.35), 5, 18),
-    mesh: buildNpcModel(colorHex),
+    target: clamp(clamp(6.5 + Math.hypot(path[idx].x, path[idx].z) / 26, 6.5, 14) * rand(0.7, 1.35) * TN.speed, 5, 18),
+    mesh: buildNpcModel(colorHex, type),
     color: colorHex,
+    type: type, halfW: TN.hw, halfL: TN.hl, halfH: TN.hh, accel: TN.accel,   // wymiary nadwozia i przyspieszenie wg typu
     body: null,
     blocked: false,
     obey: rand(0.9, 1.05)              // jak dokładnie trzyma się limitów prędkości
   };
   const b = new CANNON.Body({ mass: 0, type: CANNON.Body.KINEMATIC, material: matCar });
-  b.addShape(new CANNON.Box(new CANNON.Vec3(0.95, 0.62, 2.1)));
-  b.position.set(n.pos.x, n.y + 0.72, n.pos.y);
+  b.addShape(new CANNON.Box(new CANNON.Vec3(TN.hw + 0.02, TN.hh, TN.hl + 0.05)));
+  b.position.set(n.pos.x, n.y + TN.hh + 0.1, n.pos.y);
   b.collisionFilterGroup = G_CAR;
   b.collisionFilterMask = -1;
   b.allowSleep = false;

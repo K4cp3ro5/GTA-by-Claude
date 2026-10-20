@@ -1,5 +1,6 @@
 core.js
 hwy-plan.js
+car-types.js
 textures.js
 geobuf.js
 physics-world.js

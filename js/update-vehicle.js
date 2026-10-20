@@ -5,13 +5,13 @@ let steer = 0, steerRaw = 0, engineRpm = 0, handbrakeOn = false, gearTxt = 'N';
 /* opór powietrza i stabilizacja odchylenia — co KROK fizyki (preStep), nie co klatkę:
    siła dodana w klatce bez kroku sumowała się z następną i prędkość "pulsowała" */
 world.addEventListener('preStep', () => {
-  const v = chassisBody.velocity, spd = Math.hypot(v.x, v.z), drag = 1.15;
+  const v = chassisBody.velocity, spd = Math.hypot(v.x, v.z), drag = CAR_TYPES[carType].drag;
   chassisBody.force.x -= v.x * spd * drag;
   chassisBody.force.z -= v.z * spd * drag;
   /* tłumienie obrotu wokół osi pionowej bez skrętu (mniej "pływania" tyłu po puszczeniu kierownicy), nie przy ręcznym */
   if (!handbrakeOn && Math.abs(steer) < 0.05) chassisBody.angularVelocity.y *= 0.985;
 });
-const MAX_STEER = 0.52, MAX_FORCE = 5200, BRAKE_F = 62, HAND_F = 190;
+const HAND_F = 190;                        // ręczny; reszta parametrów wg typu auta (car-types.js)
 
 const _fwdWorld = new CANNON.Vec3();
 function updateCar(dt){
@@ -23,6 +23,7 @@ function updateCar(dt){
   const spd = Math.hypot(vel.x, vel.z);
   const kmh = spd * 3.6;
 
+  const CT = CAR_TYPES[carType], MAX_STEER = CT.steer, MAX_FORCE = CT.force, BRAKE_F = CT.brake;
   if (driving){
     const throttle = (down('forward') || keys['ArrowUp']) ? 1 : 0;
     const reverse  = (down('back')    || keys['ArrowDown']) ? 1 : 0;
@@ -48,7 +49,7 @@ function updateCar(dt){
     if (throttle){
       if (alongF < -0.6){ brake = BRAKE_F; }                       // hamowanie przy cofaniu
       else {
-        const fade = 1 - clamp(kmh / 205, 0, 1);
+        const fade = 1 - clamp(kmh / CT.fadeKmh, 0, 1);
         force = MAX_FORCE * (0.35 + fade * 0.65) * carSpeedMult;
       }
     } else if (reverse){
@@ -73,8 +74,8 @@ function updateCar(dt){
       vehicle.wheelInfos[2].frictionSlip = 0.85;
       vehicle.wheelInfos[3].frictionSlip = 0.85;
     } else {
-      vehicle.wheelInfos[2].frictionSlip = REAR_GRIP;
-      vehicle.wheelInfos[3].frictionSlip = REAR_GRIP;
+      vehicle.wheelInfos[2].frictionSlip = CT.grip;
+      vehicle.wheelInfos[3].frictionSlip = CT.grip;
     }
 
     gearTxt = alongF < -0.8 ? 'R' : (spd < 0.4 ? 'N' : 'D');
@@ -83,7 +84,7 @@ function updateCar(dt){
     const load = throttle || reverse ? 1 : 0;
     const tRpm = clamp(0.14 + (kmh % 62) / 62 * 0.55 + clamp(kmh/200,0,1) * 0.42 + load * 0.12, 0, 1);
     engineRpm = damp(engineRpm, tRpm, 7, dt);
-    Sound.engine(true, engineRpm, load);
+    Sound.engine(true, engineRpm, load, CT);
 
     /* światła stopu */
     const braking = (brake > 20) || handbrakeOn;

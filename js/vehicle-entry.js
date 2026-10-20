@@ -9,9 +9,10 @@ const CAR_LEFT = new CANNON.Vec3(-1, 0, 0);  // lewa strona auta = -X lokalne
 
 function carDoorPoint(out){
   chassisBody.quaternion.vmult(CAR_LEFT, _v1);
-  out.set(chassisBody.position.x + _v1.x * 1.25,
-          chassisBody.position.y + _v1.y * 1.25 - 0.1,
-          chassisBody.position.z + _v1.z * 1.25);
+  const o = CAR_TYPES[carType].half[0] + 0.29;
+  out.set(chassisBody.position.x + _v1.x * o,
+          chassisBody.position.y + _v1.y * o - 0.1,
+          chassisBody.position.z + _v1.z * o);
   return out;
 }
 const _door = new CANNON.Vec3();
@@ -26,8 +27,9 @@ function distToDoor(){
    reflektory na z=+2.04), więc lewa strona to heading+PI/2, bez korekty +PI
    jaką wymaga RaycastVehicle gracza */
 function npcDoorPoint(n, out){
-  out.x = n.pos.x + Math.cos(n.heading) * 1.25;
-  out.z = n.pos.y - Math.sin(n.heading) * 1.25;
+  const o = (n.halfW || 0.93) + 0.32;
+  out.x = n.pos.x + Math.cos(n.heading) * o;
+  out.z = n.pos.y - Math.sin(n.heading) * o;
 }
 const _npcDoor = { x: 0, z: 0 };
 
@@ -100,15 +102,15 @@ function jackCar(n){
     showMainCarPlaceholder();
   }
 
-  const targetX = n.pos.x, targetZ = n.pos.y, targetHeading = n.heading, color = n.color;
+  const targetX = n.pos.x, targetZ = n.pos.y, targetHeading = n.heading, color = n.color, type = n.type || 'sedan';
   removeNpcCar(n);
   spawnRandomNpcCar();
 
-  chassisBody.position.set(targetX, (n.y || 0) + COM_H + 0.06, targetZ);
+  applyCarType(type, color);                                                  // auto przejmuje typ i kolor NPC
+  chassisBody.position.set(targetX, (n.y || 0) + CAR_TYPES[type].restY + 0.13, targetZ);
   chassisBody.quaternion.setFromAxisAngle(new CANNON.Vec3(0,1,0), targetHeading + Math.PI);
   chassisBody.velocity.set(0, 0, 0);
   chassisBody.angularVelocity.set(0, 0, 0);
-  carModel.paintMat.color.setHex(color);
   drivingIdentity = 'jacked';
 }
 

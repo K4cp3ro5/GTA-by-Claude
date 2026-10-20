@@ -4,11 +4,11 @@
 /* model auta gracza: części scalone wg materiału (7 siatek zamiast 23). staticWheels = koła
    przyczepione do modelu (atrapa zaparkowanego auta); bez tego koła są osobnymi obiektami
    ustawianymi z fizyki w syncCar */
-const TRACK = 0.86, WB_F = -1.45, WB_R = 1.45, CONN_Y = 0.11;
-function buildCarModel(paintHex, staticWheels){
+function buildCarModel(paintHex, staticWheels, type){
+  const T = CAR_TYPES[type || 'sedan'];
   const root  = new THREE.Group();
   const body  = new THREE.Group();
-  body.position.y = -COM_H;          // model liczony od podłoża, ciało od środka masy
+  body.position.y = -COM_H - T.dy;   // model liczony od podłoża, ciało od środka masy (wyżej zawieszone typy: o dy)
   body.rotation.y = Math.PI;         // nos siatki (+Z) na fizyczny przód nadwozia (-Z)
   root.add(body);
 
@@ -21,31 +21,9 @@ function buildCarModel(paintHex, staticWheels){
   const lampR  = new THREE.MeshBasicMaterial({ color: 0x5a1512 });
 
   const parts = new Map([[paint, []], [dark, []], [glass, []], [chrome, []], [lampF, []], [lampR, []]]);
-  function add(w,h,d, mat, x,y,z, rx){ parts.get(mat).push({ geo: new THREE.BoxGeometry(w,h,d), color: 0xffffff, x: x, y: y, z: z, rx: rx }); }
-
-  add(1.92, 0.44, 4.32, paint, 0, 0.66, 0);              // nadwozie
-  add(1.78, 0.30, 4.00, dark,  0, 0.38, 0);              // próg / podwozie
-  add(1.80, 0.16, 1.42, paint, 0, 0.90, 1.22, -0.055);   // maska
-  add(1.74, 0.14, 1.10, paint, 0, 0.90, -1.45, 0.045);   // klapa bagażnika
-  add(1.64, 0.50, 2.06, glass, 0, 1.12, -0.12);          // kabina (szyby)
-  add(1.50, 0.10, 1.52, paint, 0, 1.38, -0.30);          // dach
-  add(0.09, 0.50, 0.09, dark,  0.78, 1.12, -1.12);       // słupki C
-  add(0.09, 0.50, 0.09, dark, -0.78, 1.12, -1.12);
-  add(1.94, 0.22, 0.34, dark,  0, 0.50,  2.19);          // zderzaki
-  add(1.94, 0.22, 0.34, dark,  0, 0.50, -2.19);
-  add(1.30, 0.10, 0.22, chrome, 0, 0.66, 2.20);          // grill
-  add(0.16, 0.10, 0.34, chrome,  1.00, 1.03, 0.60);      // lusterka
-  add(0.16, 0.10, 0.34, chrome, -1.00, 1.03, 0.60);
-  add(1.46, 0.06, 0.34, paint, 0, 1.20, -2.00);          // spojler
-  add(0.10, 0.16, 0.10, dark,   0.62, 1.12, -2.00);
-  add(0.10, 0.16, 0.10, dark,  -0.62, 1.12, -2.00);
-  add(0.06, 0.34, 4.10, dark,   0.97, 0.56, 0);          // listwy boczne
-  add(0.06, 0.34, 4.10, dark,  -0.97, 0.56, 0);
-  add(0.44, 0.14, 0.10, lampF,  0.62, 0.82, 2.18);       // reflektory
-  add(0.44, 0.14, 0.10, lampF, -0.62, 0.82, 2.18);
-  add(0.42, 0.13, 0.08, lampR,  0.64, 0.84, -2.20);      // tylne światła
-  add(0.42, 0.13, 0.08, lampR, -0.64, 0.84, -2.20);
-  add(0.86, 0.05, 0.06, lampR, 0, 0.98, -2.20);          // listwa tylna
+  const MAT = { paint: paint, dark: dark, glass: glass, chrome: chrome, lampF: lampF, lampR: lampR };
+  /* bryły nadwozia wg typu (car-types.js) */
+  carParts(T.id).forEach(q => parts.get(MAT[q[3]]).push({ geo: new THREE.BoxGeometry(q[0], q[1], q[2]), color: 0xffffff, x: q[4], y: q[5], z: q[6], rx: q[7] }));
   parts.forEach((list, mat) => {
     const m = new THREE.Mesh(mergeColored(list), mat);
     m.castShadow = true; m.receiveShadow = true;
@@ -55,10 +33,11 @@ function buildCarModel(paintHex, staticWheels){
   /* reflektory — prawdziwe SpotLighty (tylko auto prowadzone; atrapa ich nie potrzebuje) */
   const spots = [];
   if (!staticWheels){
+    const lamp = carParts(T.id).find(q => q[3] === 'lampF');
     for (let i = 0; i < 2; i++){
       const sx = i ? -0.62 : 0.62;
       const sp = new THREE.SpotLight(0xfff0cf, 0, 52, 0.46, 0.55, 1.3);
-      sp.position.set(sx, 0.82, 2.2);
+      sp.position.set(sx, lamp[5], lamp[6] + 0.05);
       sp.castShadow = false;
       const tg = new THREE.Object3D();
       tg.position.set(sx * 1.6, -0.35, 26);
@@ -70,34 +49,46 @@ function buildCarModel(paintHex, staticWheels){
 
   /* koła: opona + felga ze szprychami (2 siatki na koło) */
   const wheels = [];
+  const WG = carWheelGeoFor(T.wheelR);
   for (let i = 0; i < 4; i++){
     const wg = new THREE.Group();
-    const tire = new THREE.Mesh(carWheelGeo.tire, carWheelMat.tire); tire.castShadow = true; wg.add(tire);
-    wg.add(new THREE.Mesh(carWheelGeo.rim, carWheelMat.rim));
+    const tire = new THREE.Mesh(WG.tire, carWheelMat.tire); tire.castShadow = true; wg.add(tire);
+    wg.add(new THREE.Mesh(WG.rim, carWheelMat.rim));
     if (staticWheels){
-      const p = [[ TRACK, WB_F], [-TRACK, WB_F], [ TRACK, WB_R], [-TRACK, WB_R]][i];
-      wg.position.set(p[0], WHEEL_R - 0.48, p[1]);          // oś koła w spoczynku: nadwozie stoi na y≈0.48 (test/drive.js)
+      const p = [[ T.track, T.wbF], [-T.track, T.wbF], [ T.track, T.wbR], [-T.track, T.wbR]][i];
+      wg.position.set(p[0], T.wheelR - T.restY, p[1]);      // oś koła w spoczynku: nadwozie stoi na y = restY (test/drive.js)
       root.add(wg);
     } else scene.add(wg);
     wheels.push(wg);
   }
 
   scene.add(root);
-  return { root: root, body: body, wheels: wheels, spots: spots,
-           tailMat: lampR, headMat: lampF, paintMat: paint };
+  return { root: root, body: body, wheels: wheels, spots: spots, type: T.id,
+           tailMat: lampR, headMat: lampF, paintMat: paint, mats: [paint, dark, glass, chrome, lampF, lampR] };
 }
-const carWheelGeo = (function(){
-  const tire = new THREE.CylinderGeometry(WHEEL_R, WHEEL_R, 0.30, 16); tire.rotateZ(Math.PI/2);
-  const rim = new THREE.CylinderGeometry(WHEEL_R*0.62, WHEEL_R*0.62, 0.32, 10); rim.rotateZ(Math.PI/2);
-  const sp = new THREE.BoxGeometry(0.33, 0.07, WHEEL_R*1.1);
+/* koła wg promienia (cache — wspólne dla modeli tego samego typu) */
+const _wheelGeo = {};
+function carWheelGeoFor(R){
+  if (_wheelGeo[R]) return _wheelGeo[R];
+  const tire = new THREE.CylinderGeometry(R, R, 0.30, 16); tire.rotateZ(Math.PI/2);
+  const rim = new THREE.CylinderGeometry(R*0.62, R*0.62, 0.32, 10); rim.rotateZ(Math.PI/2);
+  const sp = new THREE.BoxGeometry(0.33, 0.07, R*1.1);
   const rimParts = [{ geo: rim, color: 0xffffff }];
   for (let s = 0; s < 3; s++) rimParts.push({ geo: sp, color: 0xffffff, rx: s * Math.PI / 3 });
-  return { tire: tire, rim: mergeColored(rimParts) };
-})();
+  return (_wheelGeo[R] = { tire: tire, rim: mergeColored(rimParts) });
+}
+/* usunięcie modelu ze sceny i zwolnienie jego geometrii/materiałów (koła — wspólne, zostają) */
+function disposeCarModel(m){
+  scene.remove(m.root);
+  m.wheels.forEach(w => { if (w.parent) w.parent.remove(w); });
+  m.body.children.forEach(c => { if (c.geometry) c.geometry.dispose(); });
+  m.mats.forEach(mt => mt.dispose());
+}
 const carWheelMat = { tire: new THREE.MeshLambertMaterial({ color: 0x141518 }),
                       rim: new THREE.MeshPhongMaterial({ color: 0x9aa0a8, shininess: 110, specular: 0xffffff }) };
 
-const carModel = buildCarModel(0xb3272b);
+let carModel = buildCarModel(0xb3272b, false, 'sedan');
+let carType = 'sedan';                 // typ prowadzalnego auta (parametry jazdy w update-vehicle.js)
 
 const CAR_SPAWN = new CANNON.Vec3(L(CENTER_I) - 3.5, COM_H + 0.06, L(CENTER_I) + 13);
 const chassisBody = new CANNON.Body({ mass: 1250, material: matCar });
@@ -134,9 +125,33 @@ const WHEEL_OPT = {
   customSlidingRotationalSpeed: -32,
   useCustomSlidingRotationalSpeed: true
 };
-[[ TRACK, WB_F], [-TRACK, WB_F], [ TRACK, WB_R], [-TRACK, WB_R]].forEach(p => {
-  WHEEL_OPT.chassisConnectionPointLocal.set(p[0], CONN_Y, p[1]);
+[[ 0.86, -1.45], [-0.86, -1.45], [ 0.86, 1.45], [-0.86, 1.45]].forEach(p => {
+  WHEEL_OPT.chassisConnectionPointLocal.set(p[0], 0.11, p[1]);
   vehicle.addWheel(WHEEL_OPT);
 });
 vehicle.addToWorld(world);
-const REAR_GRIP = 3.4;
+
+/* zmiana typu prowadzalnego auta w locie (to samo ciało i ten sam RaycastVehicle): bryła nadwozia,
+   masa i bezwładność (liczone przy obrocie zerowym — cannon bierze AABB w układzie świata), koła
+   i zawieszenie, model. paintHex = kolor lakieru nowego modelu. */
+function applyCarType(type, paintHex){
+  const T = CAR_TYPES[type];
+  carType = type;
+  const sh = chassisBody.shapes[0];
+  sh.halfExtents.set(T.half[0], T.half[1], T.half[2]);
+  sh.updateConvexPolyhedronRepresentation(); sh.updateBoundingSphereRadius();
+  chassisBody.shapeOffsets[0].set(0, T.boxY, 0);
+  const q = chassisBody.quaternion.clone();
+  chassisBody.quaternion.set(0, 0, 0, 1);
+  chassisBody.mass = T.mass; chassisBody.updateMassProperties();
+  chassisBody.quaternion.copy(q);
+  chassisBody.updateBoundingRadius(); chassisBody.aabbNeedsUpdate = true;
+  const P = [[ T.track, T.wbF], [-T.track, T.wbF], [ T.track, T.wbR], [-T.track, T.wbR]];
+  vehicle.wheelInfos.forEach((w, i) => {
+    w.radius = T.wheelR; w.suspensionStiffness = T.stiff; w.suspensionRestLength = T.rest; w.maxSuspensionTravel = T.travel;
+    w.frictionSlip = T.grip; w.dampingRelaxation = T.damp[0]; w.dampingCompression = T.damp[1];
+    w.chassisConnectionPointLocal.set(P[i][0], T.connY, P[i][1]);
+  });
+  if (carModel.type !== type){ disposeCarModel(carModel); carModel = buildCarModel(paintHex, false, type); }
+  carModel.paintMat.color.setHex(paintHex);
+}

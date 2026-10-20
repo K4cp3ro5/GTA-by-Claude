@@ -17,7 +17,7 @@ function updateNpcs(dt){
       n.y = lerp(prv.y || 0, tgt.y || 0, t);
       n.slope = ((tgt.y || 0) - (prv.y || 0)) / Math.sqrt(sl2);
     }
-    n.body.position.y = n.y + 0.72;
+    n.body.position.y = n.y + n.halfH + 0.1;
     n.mesh.position.set(n.pos.x, n.y, n.pos.y);
     n.mesh.rotation.order = 'YXZ';
     n.mesh.rotation.set(-Math.atan(n.slope), n.heading, 0);                 // nos w górę pod górę
@@ -98,7 +98,7 @@ function updateNpcs(dt){
     }
 
     const want = block ? 0 : Math.min(tgt.hwy ? 99 : n.target, cap);
-    n.speed = damp(n.speed, want, (block || want < n.speed - 1) ? 5.5 : 1.7, dt);
+    n.speed = damp(n.speed, want, (block || want < n.speed - 1) ? 5.5 : n.accel, dt);
     n.heading = angleDamp(n.heading, Math.atan2(dx, dz), n.rbPhase === 'ring' ? 8 : 5.5, dt);
 
     n.dirX = dx; n.dirZ = dz;
@@ -112,18 +112,20 @@ function updateNpcs(dt){
    (jazda za m), Infinity = brak wpływu. Kierunek m to jego faktyczny kierunek jazdy (dirX/dirZ),
    nie wygładzony heading — w zakręcie heading spóźnia się za ruchem. */
 /* czy nadwozie m (obrócone wg jego kierunku) zajmuje pas 1.6 m przed naszym przodem
-   (prostokąty 1.86 x 4.1 m; dla auta stojącego w poprzek liczy się jego długość, nie szerokość) */
+   (prostokąty wg typu auta; dla auta stojącego w poprzek liczy się jego długość, nie szerokość) */
 function npcTouchAhead(n, m, dx, dz, rx, rz, ahead){
   const lat = Math.abs(rx*-dz + rz*dx);
   const mdx = m.dirX !== undefined ? m.dirX : Math.sin(m.heading), mdz = m.dirZ !== undefined ? m.dirZ : Math.cos(m.heading);
   const c = Math.abs(dx*mdx + dz*mdz), sn = Math.sqrt(Math.max(0, 1 - c*c));
-  const extF = 2.05*c + 0.93*sn, extL = 0.93*c + 2.05*sn;        // zasięg m wzdłuż naszego kierunku / w bok
-  return lat < 0.93 + extL + 0.15 && ahead - extF < 2.05 + 1.6;
+  const mL = m.halfL || 2.05, mW = m.halfW || 0.93;
+  const extF = mL*c + mW*sn, extL = mW*c + mL*sn;                 // zasięg m wzdłuż naszego kierunku / w bok
+  return lat < (n.halfW || 0.93) + extL + 0.15 && ahead - extF < (n.halfL || 2.05) + 1.6;
 }
 function npcConflict(n, m, dx, dz, onlyClose){
   if (Math.abs((n.y || 0) - (m.y || 0)) > 2.5) return Infinity;             // inny poziom (estakada nad ulicą)
   const rx = m.pos.x - n.pos.x, rz = m.pos.y - n.pos.y, dist = Math.hypot(rx, rz);
   if (dist > 16) return Infinity;
+  const gapL = (n.halfL || 2.05) + (m.halfL || 2.05);              // suma półdługości (4.1 dla dwóch sedanów)
   const ahead = rx*dx + rz*dz, lat = Math.abs(rx*-dz + rz*dx);
   if (ahead > 0 && npcTouchAhead(n, m, dx, dz, rx, rz, ahead)){  // nadwozie m tuż przed naszym przodem — stop...
     const mdx0 = m.dirX !== undefined ? m.dirX : Math.sin(m.heading), mdz0 = m.dirZ !== undefined ? m.dirZ : Math.cos(m.heading);
@@ -139,13 +141,13 @@ function npcConflict(n, m, dx, dz, onlyClose){
     if (n.rbPhase === 'ring' && m.rbPhase === 'ring'){
       const p = ROUNDABOUT_PTS[n.rb], cx = L(p[0]), cz = L(p[1]);
       const an = Math.atan2(n.pos.x - cx, n.pos.y - cz), am = Math.atan2(m.pos.x - cx, m.pos.y - cz);
-      const gap = ((am - an) % TAU + TAU) % TAU * RB.ringR - 4.4;  // m przed nami po torze (zderzak–zderzak)
+      const gap = ((am - an) % TAU + TAU) % TAU * RB.ringR - gapL - 0.3;  // m przed nami po torze (zderzak–zderzak)
       if (gap < 1.8) return true;
       if (gap < 10) return gap < 5 ? m.speed * 0.6 : m.speed;
       return Infinity;
     }
     if (n.rbPhase === 'ring') return Infinity;
-    if (dot > 0.8 && ahead > 0.5 && ahead < 13 && lat < 2.6) return ahead < 5.5 ? true : (ahead < 8 ? m.speed * 0.7 : m.speed);
+    if (dot > 0.8 && ahead > 0.5 && ahead < 13 && lat < 2.6) return ahead < gapL + 1.4 ? true : (ahead < gapL + 3.9 ? m.speed * 0.7 : m.speed);
     return Infinity;
   }
   if (dot > 0.8){                                                  // ten sam kierunek: kolejka
@@ -153,8 +155,8 @@ function npcConflict(n, m, dx, dz, onlyClose){
     if (lat < 3.0 && ahead > -1.5 && ahead < 0.5) return n.id > m.id ? m.speed * 0.75 : Infinity;
     const look = Math.max(13, n.speed * 1.8);                      // przy 100 km/h ~50 m
     if (ahead < 0.5 || ahead > look || lat > 2.6) return Infinity;
-    if (ahead < 5.5) return true;
-    return ahead < Math.max(8, n.speed * 0.9) ? m.speed * 0.7 : m.speed;
+    if (ahead < gapL + 1.4) return true;
+    return ahead < Math.max(gapL + 3.9, n.speed * 0.9) ? m.speed * 0.7 : m.speed;
   }
   if (dot < -0.8){                                                 // z naprzeciwka: tylko gdy na moim pasie
     return (ahead > 0.5 && ahead < 10 && lat < 2.2) ? true : Infinity;
@@ -164,8 +166,9 @@ function npcConflict(n, m, dx, dz, onlyClose){
   const cr = dx*mdz - dz*mdx;
   const t = (rx*mdz - rz*mdx) / cr, s = (rx*dz - rz*dx) / cr;
   const vn = Math.max(n.speed, 1), vm = Math.max(m.speed, 0.1);
-  if (t < -2.6 || t > Math.max(14, vn*3) || s < -2.6 || s > Math.max(14, vm*3)) return Infinity;   // minięte (z tyłem auta) albo daleko
-  const mIn = s < 3.2, nIn = t < 3.2;                              // w strefie konfliktu (lub tuż przed nią)
+  const nL = n.halfL || 2.05, mL = m.halfL || 2.05;               // półdługości (sedan 2.05: progi 2.6 / 3.2 jak dawniej)
+  if (t < -(nL + 0.55) || t > Math.max(14, vn*3) || s < -(mL + 0.55) || s > Math.max(14, vm*3)) return Infinity;   // minięte (z tyłem auta) albo daleko
+  const mIn = s < mL + 1.15, nIn = t < nL + 1.15;                  // w strefie konfliktu (lub tuż przed nią)
   if (nIn && !mIn) return Infinity;                                // jestem już w środku — jadę dalej
   if (mIn && !nIn) return true;                                    // ono jest w środku — czekam
   if (mIn && nIn) return t > s ? true : Infinity;                  // oba w środku: dalsze od punktu ustępuje
