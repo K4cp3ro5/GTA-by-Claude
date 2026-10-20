@@ -183,6 +183,8 @@ function updateNpc(n, i, dt, honk){
     }
 
     if (n.ovtSlow) cap = Math.min(cap, n.speed * 0.85);
+    /* strefa włączania (z pasa zbierającego / włączania na prawy pas): auto na pasie obok albo dojeżdżające z tyłu — czekam */
+    if (tgt.merge && !block){ const r = npcMergeGap(n, dx, dz); if (r === true){ block = true; why = 'włączanie'; n.blocked = true; n.why = why; } else if (r < cap) cap = r; }
     if (n.bypCreep) cap = Math.min(cap, 2.5);                     // lewy pas przed końcem odcinka: przepuść prawy
     /* strzały w pobliżu: kierowcy przyspieszają do limitu */
     if (n.panicT > 0) n.panicT -= dt;
@@ -231,6 +233,17 @@ function __rectsOverlap(ax, az, ah, aw, al, bx, bz, bh, bw, bl){
     if (Math.abs(dx * ux + dz * uz) > ext(ah, aw, al) + ext(bh, bw, bl)) return false;
   }
   return true;
+}
+/* luka na pasie, na który się włączam (po lewej, 1.2–6 m): true = stój, liczba = maks. prędkość, Infinity = wolne */
+function npcMergeGap(n, dx, dz){
+  let r = Infinity;
+  for (const m of npcs){
+    if (m === n || Math.abs((m.y || 0) - n.y) > 2.5 || (m.dirX || 0) * dx + (m.dirZ || 0) * dz < 0.8) continue;
+    const rx = m.pos.x - n.pos.x, rz = m.pos.y - n.pos.y, a = rx * dx + rz * dz, l = rx * dz - rz * dx, len = (m.halfL || 2.05) + (n.halfL || 2.05);
+    if (l < 1.2 || l > 6) continue;
+    if (a > -(len + Math.max(5, m.speed * 1.4)) && a < len + 1.5){ if (a > -(len + 1) && m.speed > 0.5) return true; r = Math.min(r, Math.max(2, m.speed * 0.6)); }
+  }
+  return r;
 }
 /* punkt celowania: La m wzdłuż trasy od rzutu auta (przez kolejne punkty), przesunięty w lewo o n.lat */
 function npcAim(n, prv, tgt, along, La){

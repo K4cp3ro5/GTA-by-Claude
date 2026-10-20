@@ -361,7 +361,7 @@ function wayLane(w, d0, d1, off, step, vmax, tag){
   for (let i = 0; i <= n; i++){
     const d = d0 + (d1 - d0) * i / n, q = wayAt(w, d), o = off(d, q);
     const vm = vmax !== undefined ? vmax : (q.a.vmax !== undefined ? lerp(q.a.vmax, q.b.vmax !== undefined ? q.b.vmax : q.a.vmax, q.t) : w.vmax);
-    out.push(Object.assign({ x: q.x - q.hz * o, z: q.z + q.hx * o, y: q.y, vmax: vm, hwy: true }, tag || {}));
+    out.push(Object.assign({ x: q.x - q.hz * o, z: q.z + q.hx * o, y: q.y, vmax: vm, hwy: true }, (typeof tag === 'function' ? tag(d) : tag) || {}));
   }
   return out;
 }
@@ -384,14 +384,14 @@ function hwyTripPoints(cwInName, cwOutName, lane){
     out.push(...wayLane(cin, 0, dEnd, d => d < dEnd - 40 ? HP.laneR : ease(d, dEnd - 40, dEnd - 8, HP.laneR, aux), step, v));
     out.push(...wayLane(w, 2, w.len - 2, () => 0, 3, undefined, { rk: 'loop' }));
     const dSt = cwD(cout, -cout.sg * HP.colS);
-    out.push(...wayLane(cout, dSt, cout.len, d => d > dSt + 40 ? HP.laneR : ease(d, dSt + 8, dSt + 40, aux, HP.laneR), step, v));
+    out.push(...wayLane(cout, dSt, cout.len, d => d > dSt + 40 ? HP.laneR : ease(d, dSt + 8, dSt + 40, aux, HP.laneR), step, v, d => d < dSt + 34 ? { merge: true } : null));   // strefa włączania: czekaj na lukę
   } else {
     /* łącznica: pas wyłączenia (pierwsze 50 m drogi łącznicy biegnie wzdłuż jezdni) */
     const dA = cwD(cin, cin.sg * -HP.connS) - HP.auxLen;
     out.push(...wayLane(cin, 0, dA + 40, d => d < dA ? HP.laneR : ease(d, dA, dA + 36, HP.laneR, aux), step, v));
     out.push(...wayLane(w, 42, w.len - 42, () => 0, 3, undefined, { rk: 'conn' }));
     const dB = cwD(cout, cout.sg * HP.connS);
-    out.push(...wayLane(cout, dB + 40, cout.len, d => d > dB + HP.auxLen ? HP.laneR : ease(d, dB + 14, dB + HP.auxLen, aux, HP.laneR), step, v));
+    out.push(...wayLane(cout, dB + 40, cout.len, d => d > dB + HP.auxLen ? HP.laneR : ease(d, dB + 14, dB + HP.auxLen, aux, HP.laneR), step, v, d => d < dB + HP.auxLen - 4 ? { merge: true } : null));
   }
   return out;
 }

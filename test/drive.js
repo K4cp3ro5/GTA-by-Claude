@@ -125,7 +125,7 @@ function __consts(){ return { wall: WALL_X, rbApron: RB.apron,
   tree: (() => { const free = t => ![signGeomLog, lampSpots, binSpots, hydSpots, HWY_PIERS].some(l => l.some(o => Math.abs(o.x - t.x) < 2.2 && o.z > t.z + 0.5 && o.z < t.z + 17)) && !treeSpots.some(o => o !== t && Math.abs(o.x - t.x) < 2.2 && o.z > t.z + 0.5 && o.z < t.z + 17) && !buildings.some(b => Math.abs(b.x - t.x) < b.w/2 + 1.2 && b.z - b.d/2 < t.z + 17 && b.z + b.d/2 > t.z);
     const s = treeSpots.find(q => q.y === undefined && Math.abs(q.z) < 200 && free(q)); return s ? [s.x, s.z] : null; })(),
   /* tor do muru północnego: x bez drzew pasa podmiejskiego i bez dróg */
-  wallX: (() => { for (let x = 3.5; x < 250; x += 7) if (!treeSpots.some(t => Math.abs(t.x - x) < 2.5 && t.z < -CITY_EDGE) && !hwyQuery(x, -330, 3).length) return x; return 3.5; })(),
+  wallX: (() => { for (let x = 3.5; x < 250; x += 7) if (!treeSpots.some(t => Math.abs(t.x - x) < 2.5 && t.z > CITY_EDGE) && !hwyQuery(x, 330, 3).length) return x; return 3.5; })(),   // mur południowy (na północy lotnisko)
   /* słupek znaku STOP; start z chodnika 7 m przed nim, wzdłuż ulicy (od strony nadjeżdżających — tam jest front znaku) */
   sign: (() => {
     const clear = g => { const f = [Math.sin(g.rot), Math.cos(g.rot)];
@@ -164,7 +164,7 @@ console.log('=== 5) bariera na pomoście: A1+ przy s=-200, prostopadle w barier�
 { const p = base.__hwyPt('A1', -200, 9.0), q = base.__hwyPt('A1', -200, 30), hd = Math.atan2(q.x - p.x, q.z - p.z);
   r = base.__run(p.x, p.z, hd, 5, () => false, 40, p.y);
   rep(' bariera:', r, '| auto zostało na pomoście: ' + (r.minY > p.y - 1 ? 'tak' : 'NIE') + ' (pomost ' + p.y.toFixed(1) + ')'); }
-console.log('=== 6) kolizje: drzewo, słupek znaku, mur przy 150 km/h ===');
+console.log('=== 6) kolizje: drzewo, słupek znaku, mur południowy przy 150 km/h ===');
 const hit = (name, tx, tz, fromDx, fromDz, kmh) => {
   const d = Math.hypot(fromDx, fromDz), ux = -fromDx/d, uz = -fromDz/d;      // kierunek jazdy: na cel
   const hd = Math.atan2(ux, uz);
@@ -178,7 +178,7 @@ if (K.sign){
   const pass = (rr.end[0] - s[0])*(-s[2]) + (rr.end[2] - s[1])*(-s[3]), d = Math.hypot(rr.end[0] - s[0], rr.end[2] - s[1]);
   console.log(' słupek znaku STOP: koniec ' + JSON.stringify(rr.end) + ' | za słupkiem o ' + pass.toFixed(2) + ' m (ma być < 0) | od słupka ' + d.toFixed(2) + ' m (ok. 2.2 = przód auta oparty o słupek) | przewrócone: ' + rr.flipped);
 }
-hit('mur północny', K.wallX, -K.wall, 0, K.wall - CITY_EDGE_T - 5, 150);
+hit('mur południowy', K.wallX, K.wall, 0, -(K.wall - CITY_EDGE_T - 5), 150);
 console.log('=== 8) TYPY AUT: 0–100 km/h, v maks. na prostej A1+ (790 m), droga hamowania 100 -> 0, rondo ===');
 ['sedan', 'pickup', 'sport', 'bike'].forEach(t => {
   const r = base.__perf(t);
