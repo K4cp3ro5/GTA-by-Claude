@@ -247,15 +247,57 @@ HWY_TERM.forEach(t => [t.exit, t.entry].forEach(w => {
 
 /* --- znaki autostrad --- */
 const HWY_CORNER_NAMES = ['PŁD.-WSCH.', 'PŁD.-ZACH.', 'PŁN.-ZACH.', 'PŁN.-WSCH.'];
-/* znak przy prawej krawędzi drogi w odległości d (na wiadukcie: na poboczu przy barierze, na terenie: obok jezdni) */
+/* miejsce na drodze w ≈ d (szukane do ±60 m), gdzie po stronie sd stoi bariera (segment i oba sąsiednie) */
+function barrierSpot(w, d, sd){
+  for (let k = 0; k <= 60; k++){
+    const dd = d + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 2;
+    if (dd < 2 || dd > w.len - 2) continue;
+    const q = wayAt(w, dd), i = w.pts.indexOf(q.a);
+    if (i >= 0 && [i - 1, i, i + 1].every(j => j < 0 || j > w.pts.length - 2 || wayBarrier(w, j, sd))) return dd;
+  }
+  return null;
+}
+/* znak przy krawędzi drogi w odległości d:
+   - na pomoście / wysokim nasypie (y ≥ 0.6): na koronie bariery (słupek nad barierą, podstawa = góra bariery),
+     przy jezdni głównej po lewej — na pasie rozdziału; nigdy nad szczeliną ani poza płytą;
+   - na niskim nasypie (0.05 < y < 0.6, bez barier): na poboczu przy krawędzi;
+   - na terenie: 1.4 m od krawędzi jezdni.
+   side −1 przy drodze jednojezdniowej = znak dla jadących pod prąd (zwrócony w drugą stronę).
+   Na autostradzie (pomost) tarcze „duże” (×1.3). */
 function hwySignAt(w, d, faces, opt, side){
-  const q = wayAt(w, d), up = q.y > 0.05, hw = lerp(q.a.hw, q.b.hw, q.t), sd = side || 1;
+  const sd = side || 1;
+  let q = wayAt(w, d);
+  if (q.y >= 0.6){
+    const med = w.kind === 'cw' && sd < 0;
+    if (!med){ const dd = barrierSpot(w, d, sd); if (dd === null) return; q = wayAt(w, dd); }
+    const hw = lerp(q.a.hw, q.b.hw, q.t), o = med ? -(hw + 1.0) : sd * (hw + 0.2);
+    const rot = (sd > 0 || med) ? Math.atan2(-q.hx, -q.hz) : Math.atan2(q.hx, q.hz);
+    const big = faces.map(f => f.kind === 'autostrada' ? f : scaleFace(f, 1.3));
+    placeSign(q.x - q.hz * o, q.z + q.hx * o, rot, big, Object.assign({ base: q.y + (med ? 0.9 : 1.0), bottom: 1.3 }, opt || {}));
+    return;
+  }
+  const up = q.y > 0.05, hw = lerp(q.a.hw, q.b.hw, q.t);
   const o = sd * (up ? hw - 0.35 : hw + 1.4);
   const rot = sd > 0 ? Math.atan2(-q.hx, -q.hz) : Math.atan2(q.hx, q.hz);
   placeSign(q.x - q.hz * o, q.z + q.hx * o, rot, faces, Object.assign({ base: up ? q.y : 0 }, opt || {}));
 }
+/* tablica kierunkowa na bramownicy nad jezdnią główną: słup na barierze zewnętrznej i słup na pasie rozdziału,
+   rygiel nad pasami, tablica nad środkiem pasów z prześwitem 5.6 m */
 function hwyBoard(w, d, lines, num){
-  hwySignAt(w, d, [signFace('autostrada', texHwySign(lines, num), shapeRect(3.4, 2.1))], { bottom: 2.2, poleR: 0.08, poleX: [-1.2, 1.2] });
+  const dd = barrierSpot(w, d, 1); if (dd === null) return;
+  const q = wayAt(w, dd), hw = lerp(q.a.hw, q.b.hw, q.t), rot = Math.atan2(-q.hx, -q.hz);
+  const at = o => [q.x - q.hz * o, q.z + q.hx * o];
+  const R = at(hw + 0.2), Lp = at(-(hw + 1.0)), B = at((HP.laneR + HP.laneL) / 2);
+  const face = signFace('autostrada', texHwySign(lines, num), shapeRect(3.4, 2.1));
+  const yTop = q.y + 5.6 + 2.1 + 0.25, cy = q.y + 5.6 + 1.05;
+  signPole(R[0], R[1], q.y + 1.0, yTop + 0.2, 0.16);
+  signPole(Lp[0], Lp[1], q.y + 0.9, yTop + 0.2, 0.16);
+  const mx = (R[0] + Lp[0]) / 2, mz = (R[1] + Lp[1]) / 2, span = Math.hypot(R[0] - Lp[0], R[1] - Lp[1]);
+  signPoleBuf.boxRot(mx, yTop, mz, span + 0.3, 0.35, 0.3, rot, 1, true);
+  signPanel(signXf(B[0], B[1], rot), face, cy, 0.18);
+  signLog.push({ kind: 'autostrada', x: B[0], z: B[1], rot: rot });
+  signGeomLog.push({ x: B[0], z: B[1], poleTop: cy, faceBottom: cy - 1.05, faceTop: cy + 1.05, poleFront: 0, backZ: 0.17, kind: 'bramownica',
+                     poles: [{ x: R[0], z: R[1], base: q.y + 1.0 }, { x: Lp[0], z: Lp[1], base: q.y + 0.9 }] });
 }
 const exitCornerOf = cw => HWY_TERM.find(t => t.exitCw === cw).k;
 HWY_TERM.forEach(t => {
@@ -264,6 +306,7 @@ HWY_TERM.forEach(t => {
   hwySignAt(en, 10, [FACE.D43()]);
   hwySignAt(en, en.len - arcLen - 18, [FACE.D9()]);
   hwySignAt(CW[t.entryCw], 40, [FACE.B33(100)]);
+  hwySignAt(CW[t.entryCw], 40, [FACE.B33(100)], null, -1);                 // B-33 po obu stronach jezdni
   /* zjazd do miasta: D-10 (koniec autostrady) na dole łuku, B-33 50, B-33 40 przed łukiem R=25, D-42 przed miastem */
   hwySignAt(ex, arcLen + 3, [FACE.D10()]);
   hwySignAt(ex, arcLen + 16, [FACE.B33(50)]);
@@ -284,7 +327,16 @@ Object.keys(CW).forEach(cwName => {
   hwyBoard(cw, dConn - 110, [HWY_CORNER_NAMES[exitCornerOf(conn.to)]], conn.to.slice(0, 2));
   hwyBoard(cw, dCol - 60, [HWY_CORNER_NAMES[exitCornerOf(loop.to)]], loop.to.slice(0, 2));
   hwySignAt(conn.way, HP.auxLen + 8, [FACE.B33(60)]);
-  hwySignAt(loop.way, 6, [FACE.B33(50)]);
+  hwySignAt(loop.way, 12, [FACE.B33(50)]);
+});
+/* drogowskaz w rozwidleniu: na nosie (przed amortyzatorem) — kierunek pętli / łącznicy */
+HWY_GORES.forEach(g => {
+  const r = HWY_RAMPS.find(x => x.way.idx === g.wi); if (!r || r.from !== g.cw) return;          // tylko rozdzielenia
+  const e = g.pts[g.pts.length - 1], f = g.pts[Math.max(0, g.pts.length - 4)];
+  const x = (e.ex + e.lx) / 2 * 0.0 + (f.ex + f.lx) / 2, z = (f.ez + f.lz) / 2;
+  const hx = e.ex - f.ex, hz = e.ez - f.ez, l = Math.hypot(hx, hz) || 1;
+  const face = signFace('drogowskaz', texHwySign([HWY_CORNER_NAMES[exitCornerOf(r.to)]], r.to.slice(0, 2)), shapeRect(1.6, 1.0));
+  placeSign(x, z, Math.atan2(-hx / l, -hz / l), [face], { base: f.y, bottom: 1.0, poleR: 0.05 });
 });
 
 /* minimapa: wszystkie drogi autostrad (jaśniej = wiadukt) */

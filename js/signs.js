@@ -182,11 +182,16 @@ function placeSign(x, z, rotY, faces, opt){
     signLog.push({ kind: f.kind, x: x, z: z, rot: rotY });
   });
   /* słupek kończy się w połowie najwyższej tarczy — od przodu zawsze schowany za licem */
-  poleX.forEach(px => { const p = xf(px, 0, 0); signPole(p[0], p[2], base, topCenter, r); });
-  signGeomLog.push({ x: x, z: z, poleTop: topCenter, faceBottom: base + bottom, faceTop: cur - SIGN_GAP, poleFront: r, backZ: zf - 0.01 });
+  const poles = poleX.map(px => { const p = xf(px, 0, 0); signPole(p[0], p[2], base, topCenter, r); return { x: p[0], z: p[2], base: base }; });
+  signGeomLog.push({ x: x, z: z, poleTop: topCenter, faceBottom: base + bottom, faceTop: cur - SIGN_GAP, poleFront: r, backZ: zf - 0.01, poles: poles, kind: faces[0].kind });
   return { top: cur - SIGN_GAP, xf: xf };
 }
 
+/* tarcza powiększona k razy (znaki „duże” na autostradzie) */
+function scaleFace(f, k){
+  const sh = { pts: f.shape.pts.map(p => [p[0] * k, p[1] * k]), tw: f.shape.tw * k, th: f.shape.th * k };
+  return signFace(f.kind, f.tex, sh);
+}
 /* --- gotowe tarcze --- */
 const SIGN_TEX = {
   C12: texC12(), A7: texA7(), STOP: texStop(), C9: texC9()

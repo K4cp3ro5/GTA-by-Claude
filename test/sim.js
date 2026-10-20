@@ -75,6 +75,24 @@ function __insideWay(x, z, y, wi, tol){
   }
   return null;
 }
+/* wysokości powierzchni pod punktem: nawierzchnie dróg, góra pasa rozdziału, korony barier, nosy */
+function __surfacesAt(x, z){
+  const ys = [];
+  HWY_WAYS.forEach(w => { for (let i = 0; i < w.pts.length - 1; i++){ const a = w.pts[i], b = w.pts[i+1];
+    const dx = b.x - a.x, dz = b.z - a.z, l2 = dx*dx + dz*dz || 1, t = ((x - a.x)*dx + (z - a.z)*dz) / l2;
+    if (t < -0.01 || t > 1.01) continue;
+    const px = a.x + dx*t, pz = a.z + dz*t, hw = a.hw + (b.hw - a.hw)*t, y = a.y + (b.y - a.y)*t, l = Math.sqrt(l2);
+    const lat = ((x - px) * -dz + (z - pz) * dx) / l;                 // + w prawo
+    if (Math.abs(lat) <= hw) ys.push(w.kind === 'med' ? y + 0.9 : y);
+    else if (Math.abs(lat) <= hw + 0.4 && wayBarrier(w, i, Math.sign(lat))) ys.push(y + 1.0);
+  } });
+  HWY_GORES.forEach(g => { for (let i = 0; i < g.pts.length - 1; i++){ const a = g.pts[i], b = g.pts[i+1];
+    const poly = [[a.ex, a.ez], [b.ex, b.ez], [b.lx, b.lz], [a.lx, a.lz]];
+    let inside = false; for (let k = 0, m = 3; k < 4; m = k++){ const [xi, zi] = poly[k], [xj, zj] = poly[m]; if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) inside = !inside; }
+    if (inside) ys.push((a.y + b.y) / 2);
+  } });
+  return ys;
+}
 /* nakładanie górnych powierzchni dróg i nosów na tym samym poziomie: próbki co 0.5 m */
 function hwyOverlapCheck(){
   const pairs = {};
@@ -131,6 +149,29 @@ function __static(){
     if (g.kind === 'C-9' || Math.abs(g.x) > CITY_EDGE || Math.abs(g.z) > CITY_EDGE || hwyCovered(g.x, g.z, 0.5)) return;   // znaki na/pod autostradą osobno
     if (!['C-12','A-7','STOP','sygnalizator'].includes(g.kind) && (nearAxis(g.x) < ROAD_H - 0.01 || nearAxis(g.z) < ROAD_H - 0.01)) bad.push(g.kind + ' NA JEZDNI ' + g.x.toFixed(1) + ',' + g.z.toFixed(1));
   });
+  /* słupki: podstawa na nawierzchni / koronie bariery / pasie rozdziału / nosie / chodniku / gruncie (≤ 5 cm) */
+  const float = [];
+  signGeomLog.forEach(g => (g.poles || []).forEach(p => {
+    if (p.base < 0.3) return;                                   // chodnik / grunt (kontrola „na jezdni” osobno)
+    const ys = __surfacesAt(p.x, p.z);
+    if (!ys.some(y => Math.abs(y - p.base) < 0.05)) float.push((g.kind || '?') + ' @' + p.x.toFixed(1) + ',' + p.z.toFixed(1) + ' podstawa ' + p.base.toFixed(2) + ' pod: [' + ys.map(y => y.toFixed(2)).join(',') + ']');
+  }));
+  /* duplikaty: ten sam znak, ten sam kierunek, < 3 m */
+  let dups = 0; const dupEx = [];
+  signLog.forEach((a, i) => { for (let k = i + 1; k < signLog.length; k++){ const b = signLog[k];
+    if (a.kind === b.kind && Math.abs(wrapAngle(a.rot - b.rot)) < 0.3 && Math.hypot(a.x - b.x, a.z - b.z) < 3){ dups++; if (dupEx.length < 3) dupEx.push(a.kind + ' @' + a.x.toFixed(0) + ',' + a.z.toFixed(0)); } } });
+  /* aleja z pierwszeństwem: każdy wlot poprzeczny ma A-7 albo STOP, każdy wylot alei D-1 */
+  const prioMiss = [];
+  const signNear = (kinds, x, z, r) => signLog.some(s => kinds.includes(s.kind) && Math.hypot(s.x - x, s.z - z) < r);
+  PRIO.forEach((axis, key) => {
+    const [i, j] = key.split(',').map(Number), cx = L(i), cz = L(j);
+    if (TL_PTS.some(t => t[0] === i && t[1] === j)) return;
+    [-1, 1].forEach(sz => { if (j + sz < 0 || j + sz > GRID) return; if (!legalTravel(i, j, {x:0, z:sz}, {x:0, z:-sz})) return;
+      if (!signNear(['A-7', 'STOP'], cx, cz + sz * STOP_AT, 9)) prioMiss.push('A-7/STOP ' + i + ',' + j + (sz > 0 ? ' S' : ' N')); });
+    [-1, 1].forEach(sx => { if (i + sx < 1 || i + sx > GRID) return;
+      if (!signNear(['D-1'], cx + sx * (ROAD_H + 5), cz, 9)) prioMiss.push('D-1 ' + i + ',' + j + (sx > 0 ? ' E' : ' W')); });
+  });
+  out.signChecks = { float: float.length, dups: dups, prioMissing: prioMiss.length, examples: float.slice(0, 4).concat(dupEx, prioMiss.slice(0, 3)) };
   const kinds = {}; signLog.forEach(g => kinds[g.kind] = (kinds[g.kind] || 0) + 1);
   out.signKinds = kinds;
   out.signProblems = bad;
@@ -317,6 +358,7 @@ console.log('Elementy poza murem:', st.outsideWall.length, st.outsideWall.slice(
 console.log('Świat:', JSON.stringify(st.world));
 console.log('Autostrady (statycznie):', JSON.stringify(st.hwy));
 console.log('Teren węzła:', JSON.stringify(st.terrain));
+console.log('Znaki (kontrola):', JSON.stringify(st.signChecks));
 const r = base.__sim(secs);
 console.log('Symulacja', secs, 's gry,', r.npcCount, 'aut NPC (miasto + trasy przez autostrady)');
 console.log('Najdłuższy postój jednego auta (v<0.3):', r.stuckMax.toFixed(1), 's', r.stuckAt ? '(auto #'+r.stuckId+' przy '+r.stuckAt+')' : '');
