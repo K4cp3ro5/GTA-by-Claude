@@ -181,10 +181,15 @@ function spawnNpcCar(path, colorHex, startIdx, frac, type){
   };
   /* profil kierowcy: ostrożny (30%), zwykły (50%), dynamiczny (20%) — trzymanie się limitu, odstęp,
      czas reakcji na zielone, przyspieszenie, prędkość docelowa */
-  const pr = rnd(), P = pr < 0.3 ? { k: 'ostrożny', obey: [0.88, 0.96], v: 0.92, a: 0.85, gap: 1.0, react: 0.9 }
+  const pr = rnd(), P = pr < 0.08 ? { k: 'pirat', obey: [1.18, 1.32], v: 1.2, a: 1.3, gap: -0.5, react: 0 }      // pirat drogowy (rzadko)
+                   : pr < 0.32 ? { k: 'ostrożny', obey: [0.88, 0.96], v: 0.92, a: 0.85, gap: 1.0, react: 0.9 }
                    : pr < 0.8 ? { k: 'zwykły', obey: [0.95, 1.02], v: 1.0, a: 1.0, gap: 0, react: 0.45 }
                    : { k: 'dynamiczny', obey: [1.0, 1.05], v: 1.06, a: 1.15, gap: -0.3, react: 0.15 };
-  n.profile = P.k; n.obey = rand(P.obey[0], P.obey[1]); n.target *= P.v; n.hwyF = P.v; n.accel *= P.a; n.gapX = P.gap; n.react = P.react;
+  n.profile = P.k; n.obey = rand(P.obey[0], P.obey[1]); n.target *= P.v; n.hwyF = P.v;
+  if (P.k === 'pirat') n.target = Math.max(n.target, 12);                     // pirat: szybko także w centrum (ograniczają go limity × obey)
+  if (type !== 'bike' && !path.hwyRoute && n.id % 11 === 4 && n.profile !== 'pirat'){                  // kilku stałych piratów w mieście
+    n.profile = 'pirat'; n.obey = rand(1.18, 1.32); n.target = Math.max(n.target * 1.2, 12); n.hwyF = 1.2; n.accel *= 1.3; n.gapX = -0.5; n.react = 0;
+  } n.accel *= P.a; n.gapX = P.gap; n.react = P.react;
   const b = new CANNON.Body({ mass: 0, type: CANNON.Body.KINEMATIC, material: matCar });
   b.addShape(new CANNON.Box(new CANNON.Vec3(TN.hw + 0.02, TN.hh, TN.hl + 0.05)));
   b.position.set(n.pos.x, n.y + TN.hh + 0.1, n.pos.y);
@@ -213,12 +218,27 @@ function spawnRandomNpcCar(){
   }
   return spawnNpcCar(path, NPC_COLORS[randInt(0, NPC_COLORS.length - 1)], idx, frac);
 }
-/* rowerzyści NPC: na pętlach miejskich, 16–20 km/h, przy prawej krawędzi jezdni (n.latT < 0) */
+/* rowerzyści NPC: 16–20 km/h na własnej kopii pętli miejskiej przesuniętej 2.3 m w prawo (przy krawędzi jezdni),
+   tylko pętle bez rond (logika ronda opiera się na osi toru); narożniki przesunięte po dwusiecznej */
 const NPC_BIKE_COUNT = 8;
+function offsetLoop(P, off){
+  const Q = P.filter((p, i) => { const q = P[(i + 1) % P.length]; return Math.hypot(q.x - p.x, q.z - p.z) > 0.05; }), n = Q.length;
+  return Q.map((b, i) => {
+    const a = Q[(i - 1 + n) % n], c = Q[(i + 1) % n];
+    const l1 = Math.hypot(b.x - a.x, b.z - a.z), l2 = Math.hypot(c.x - b.x, c.z - b.z);
+    const r1x = -(b.z - a.z) / l1, r1z = (b.x - a.x) / l1, r2x = -(c.z - b.z) / l2, r2z = (c.x - b.x) / l2;
+    let mx = r1x + r2x, mz = r1z + r2z; const ml = Math.hypot(mx, mz) || 1; mx /= ml; mz /= ml;
+    const k = off / Math.max(0.4, mx * r1x + mz * r1z);
+    return Object.assign({}, b, { x: b.x + mx * k, z: b.z + mz * k });
+  });
+}
+const _bikeLoops = new Map();
+function bikeLoopOf(P){ if (!_bikeLoops.has(P)) _bikeLoops.set(P, offsetLoop(P, 2.3)); return _bikeLoops.get(P); }
 function spawnNpcBikes(){
-  const city = LOOPS.filter(p => !p.hwyRoute);
+  const noRb = P => !P.hwyRoute && !P.some(p => p.rb !== undefined);
+  const city = LOOPS.filter(noRb), pirLoops = npcs.filter(n => n.profile === 'pirat' && noRb(n.path)).map(n => n.path);
   for (let k = 0; k < NPC_BIKE_COUNT; k++){
-    const P = city[(k * 5 + 2) % city.length];
+    const P = bikeLoopOf(k < pirLoops.length && k < 3 ? pirLoops[k] : city[(k * 5 + 2) % city.length]);
     for (let t = 0; t < 30; t++){
       const sp = pathSpot(P, rnd()), a = P[sp.idx], b = P[(sp.idx + 1) % P.length];
       const x = lerp(a.x, b.x, sp.frac), z = lerp(a.z, b.z, sp.frac);
