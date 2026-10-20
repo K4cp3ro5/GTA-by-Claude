@@ -33,6 +33,23 @@ Object.keys(CAR_TYPES).forEach(k => {
   T.dy = (T.wheelR - 0.36) + (T.rest - g / (4 * T.stiff)) - (0.36 - g / 160) - (T.connY - 0.11);
   T.restY = 0.48 + T.dy;
 });
+/* kierunkowskazy: jedna geometria na stronę (przód + tył), wspólny migający materiał */
+const IND_Y = { sedan: 0.8, pickup: 1.05, sport: 0.66 };
+const _indGeo = {};
+function indicatorGeo(type, side){                     // side +1 lewy, −1 prawy
+  const key = type + side; if (_indGeo[key]) return _indGeo[key];
+  /* z obrysu brył modelu: przód / tył (zderzaki) i szerokość — lampy na narożnikach, wystające 2 cm */
+  const P = carParts(type), front = Math.max(...P.map(q => q[6] + q[2] / 2)), rear = Math.min(...P.map(q => q[6] - q[2] / 2));
+  const half = Math.max(...P.map(q => Math.abs(q[4]) + q[0] / 2)), x = side * (half - 0.14), y = IND_Y[type] || 0.8;
+  const B = () => new THREE.BoxGeometry(0.24, 0.12, 0.08);
+  return (_indGeo[key] = mergeColored([{ geo: B(), color: 0xffffff, x: x, y: y, z: front - 0.02 }, { geo: B(), color: 0xffffff, x: x, y: y, z: rear + 0.02 }]));
+}
+const indMat = new THREE.MeshBasicMaterial({ color: 0xffa21a });
+let indBlinkOn = false;                                // faza migania (main-loop: ~1.4 Hz)
+function addIndicators(group, type){
+  if (CAR_TYPES[type].bike) return null;
+  return [1, -1].map(sd => { const m = new THREE.Mesh(indicatorGeo(type, sd), indMat); m.visible = false; group.add(m); return m; });
+}
 /* rozkład typów w ruchu ulicznym: 65% zwykłe, 22% pickupy, 13% sportowe */
 function randomCarType(){ const r = rnd(); return r < 0.65 ? 'sedan' : r < 0.87 ? 'pickup' : 'sport'; }
 

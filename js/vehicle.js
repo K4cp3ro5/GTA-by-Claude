@@ -70,8 +70,9 @@ function buildCarModel(paintHex, staticWheels, type){
     rider.armL.rotation.x = rider.armR.rotation.x = -1.05;
     body.add(rider.group);
   }
+  const ind = staticWheels ? null : addIndicators(body, T.id);
   scene.add(root);
-  return { root: root, body: body, wheels: wheels, spots: spots, type: T.id, rider: rider,
+  return { root: root, body: body, wheels: wheels, spots: spots, type: T.id, rider: rider, ind: ind,
            tailMat: lampR, headMat: lampF, paintMat: paint, mats: [paint, dark, glass, chrome, lampF, lampR] };
 }
 /* koła wg promienia (cache — wspólne dla modeli tego samego typu) */

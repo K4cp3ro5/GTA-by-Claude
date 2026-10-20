@@ -23,6 +23,9 @@ const el = {
   hurtFlash:   document.getElementById('hurtFlash'),
   deadScreen:  document.getElementById('deadScreen'),
   carlbl:      document.getElementById('carlbl'),
+  carlblTxt:   document.getElementById('carlblTxt'),
+  indLh:       document.getElementById('indLh'),
+  indRh:       document.getElementById('indRh'),
   stick:       document.getElementById('stick'),
   stickDot:    document.getElementById('stickDot'),
   toast:       document.getElementById('toast')
@@ -240,7 +243,7 @@ function updateHud(dt, kmh){
   el.stick.classList.toggle('on', mode === 'plane');
   if (mode === 'plane' && curPlane){
     const p = curPlane, lbl = 'Samolot · ' + p.T.name;
-    if (el.carlbl.textContent !== lbl){ el.carlbl.textContent = lbl; el.carlbl.classList.remove('stolen'); }
+    if (el.carlblTxt.textContent !== lbl){ el.carlblTxt.textContent = lbl; el.carlbl.classList.remove('stolen'); }
     drawSpeedo(kmh, p.T.gauge, p.thr);
     el.gval.textContent = Math.round(p.thr * 100) + '% · WYS ' + Math.max(0, Math.round(p.pos.y - p.T.gear - planeGroundY(p.pos.x, p.pos.z, p.pos.y))) + ' m';
     el.ghand.textContent = 'GAZ'; el.ghand.className = '';
@@ -249,8 +252,9 @@ function updateHud(dt, kmh){
   if (_toastT > 0){ _toastT -= dt; if (_toastT <= 0) el.toast.classList.remove('on'); }
   if (mode === 'car'){
     const lbl = (driving.owner === 'player' ? (CAR_TYPES[carType].bike ? 'Twój rower' : 'Twój samochód') : 'Skradziony') + ' · ' + CAR_TYPES[carType].name;
-    if (el.carlbl.textContent !== lbl){ el.carlbl.textContent = lbl; el.carlbl.classList.toggle('stolen', driving.owner !== 'player'); }
+    if (el.carlblTxt.textContent !== lbl){ el.carlblTxt.textContent = lbl; el.carlbl.classList.toggle('stolen', driving.owner !== 'player'); }
     drawSpeedo(kmh);
+    el.indLh.classList.toggle('on', playerInd === 'L' && indBlinkOn); el.indRh.classList.toggle('on', playerInd === 'R' && indBlinkOn);
     el.gval.textContent = gearTxt;
     el.ghand.className = handbrakeOn ? 'hot' : '';
   }

@@ -16,7 +16,7 @@ const promptEl = document.getElementById('prompt');
 const DEFAULT_BINDS = {
   forward:'KeyW', back:'KeyS', left:'KeyA', right:'KeyD',
   sprint:'ShiftLeft', jump:'Space',
-  enter:'KeyF', horn:'KeyH', reload:'KeyR', wheel:'KeyQ', vehicleWheel:'KeyV',
+  enter:'KeyF', horn:'KeyH', reload:'KeyR', wheel:'KeyQ', vehicleWheel:'KeyV', indLeft:'KeyQ', indRight:'KeyE',
   slot1:'Digit1', slot2:'Digit2', slot3:'Digit3',
   daytime:'KeyT', mute:'KeyM'
 };
@@ -27,6 +27,7 @@ const BIND_ROWS = [
   ['reload','Przeładuj / postaw auto na kołach'],
   ['wheel','Koło broni (przytrzymaj)'],
   ['vehicleWheel','Menu pojazdów (przytrzymaj)'],
+  ['indLeft','Kierunkowskaz lewy (w aucie)'], ['indRight','Kierunkowskaz prawy (w aucie)'],
   ['slot1','Broń — slot 1'], ['slot2','Broń — slot 2'], ['slot3','Broń — slot 3'],
   ['horn','Klakson'], ['daytime','Przyspiesz dobę'], ['mute','Wycisz dźwięk']
 ];
@@ -166,7 +167,8 @@ document.addEventListener('keydown', e => {
 
   if (keys[k]) return;
   keys[k] = true;
-  if (k === BIND.enter || k === 'KeyE') toggleVehicle();
+  if (mode === 'car' && (k === BIND.indLeft || k === BIND.indRight)){ togglePlayerInd(k === BIND.indLeft ? 'L' : 'R'); return; }
+  if (k === BIND.enter || (k === 'KeyE' && mode !== 'car')) toggleVehicle();
   if (k === BIND.horn && mode === 'car') Sound.horn(true);
   if (k === BIND.reload){ if (mode === 'car') resetCar(); else Weapons.reload(); }
   if (k === BIND.mute){ muted = !muted; Sound.setMuted(muted); }

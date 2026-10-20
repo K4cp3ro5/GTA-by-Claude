@@ -96,6 +96,8 @@
   #carlbl{font-size:10px;letter-spacing:.1em;color:#a9a7a1;margin-bottom:2px;white-space:nowrap;text-transform:uppercase}
   #speedCv{display:block;margin:0 auto}
   #carlbl.stolen{color:#e8a35a}
+  #carlbl .ind{color:#3a3d42;font-size:11px}
+  #carlbl .ind.on{color:#3fd06b}
   #toast{position:fixed;left:50%;top:18%;transform:translateX(-50%);padding:8px 16px;border-radius:8px;background:rgba(20,22,27,.82);
     color:#f2f0ea;font:600 15px Inter,system-ui,sans-serif;opacity:0;transition:opacity .25s;pointer-events:none;z-index:30}
   #toast.on{opacity:1}
@@ -301,7 +303,7 @@
   </section>
 
   <section class="panel" id="speedo">
-    <div id="carlbl">Twój samochód · Zwykły</div>
+    <div id="carlbl"><span class="ind" id="indLh">◀</span> <span id="carlblTxt">Twój samochód · Zwykły</span> <span class="ind" id="indRh">▶</span></div>
     <canvas id="speedCv" width="200" height="124"></canvas>
     <div id="gear">
       <span id="ghand">RĘCZNY</span>

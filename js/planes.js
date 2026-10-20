@@ -91,7 +91,8 @@ function resetPlane(p){
 }
 function syncPlane(p){
   p.group.position.copy(p.pos); p.group.quaternion.copy(p.quat);
-  p.body.position.set(p.pos.x, p.pos.y, p.pos.z); p.body.quaternion.set(p.quat.x, p.quat.y, p.quat.z, p.quat.w);
+  p.body.position.set(p.pos.x, p.pos.y, p.pos.z);
+  const bq = p.body.quaternion; bq.x = p.quat.x; bq.y = p.quat.y; bq.z = p.quat.z; bq.w = p.quat.w;
 }
 (function spawnPlanes(){
   AIRPORT_PLANES.forEach(s => {

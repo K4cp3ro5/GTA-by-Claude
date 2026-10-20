@@ -2,6 +2,9 @@
    17. AKTUALIZACJA POJAZDU
    --------------------------------------------------------------- */
 let steer = 0, steerRaw = 0, engineRpm = 0, handbrakeOn = false, gearTxt = 'N';
+/* kierunkowskazy gracza: 'L' | 'R' | null; gasną same, gdy po skręcie w tę stronę kierownica wróci do środka */
+let playerInd = null, _indTurned = false, _indPrev = false;
+function togglePlayerInd(side){ playerInd = playerInd === side ? null : side; _indTurned = false; }
 /* opór powietrza i stabilizacja odchylenia — co KROK fizyki (preStep), nie co klatkę:
    siła dodana w klatce bez kroku sumowała się z następną i prędkość "pulsowała" */
 world.addEventListener('preStep', () => {
@@ -87,6 +90,11 @@ function updateCar(dt){
     }
 
     gearTxt = alongF < -0.8 ? 'R' : (spd < 0.4 ? 'N' : 'D');
+    if (playerInd){
+      const into = playerInd === 'L' ? steer > 0.22 : steer < -0.22;            // setSteeringValue(+) = w lewo
+      if (into) _indTurned = true;
+      else if (_indTurned && Math.abs(steer) < 0.05) playerInd = null;
+    }
 
     /* obroty silnika */
     const load = throttle || reverse ? 1 : 0;
@@ -137,6 +145,13 @@ function syncCar(alpha){
     _scW.compose(_scV, _scQ, _scS).premultiply(_scInv).premultiply(_scRen);
     _scW.decompose(carModel.wheels[i].position, carModel.wheels[i].quaternion, _scV);
   }
+  /* kierunkowskazy (miganie wspólne, dźwięk przy zmianie fazy) */
+  if (carModel.ind){
+    carModel.ind[0].visible = mode === 'car' && playerInd === 'L' && indBlinkOn;
+    carModel.ind[1].visible = mode === 'car' && playerInd === 'R' && indBlinkOn;
+    if (mode === 'car' && playerInd && indBlinkOn !== _indPrev) Sound.tick(indBlinkOn);
+  }
+  _indPrev = indBlinkOn;
   /* rower: koła w osi ramy (fizycznie rozstaw 0.12 m), przechył w zakręcie, rowerzysta pedałuje */
   if (CAR_TYPES[carType].bike){
     carModel.wheels[1].visible = carModel.wheels[3].visible = false;

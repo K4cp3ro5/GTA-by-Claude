@@ -39,6 +39,7 @@ function frame(now){
   last = now;
   if (dt > 0.1) dt = 0.1;
   clock += dt;
+  indBlinkOn = (clock * 1.4) % 1 < 0.5;
 
   updateSky(dt);
   updateTrafficLights(dt);

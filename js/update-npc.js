@@ -162,6 +162,7 @@ function updateNpc(n, i, dt, honk){
       else if (n.latT){ n.latT = 0; n.ovtSlow = false; }
     }
     n.blocked = block; n.why = why;
+    if (n.indMeshes) npcIndicators(n, tgt, prv);
     /* rondo: ~23 km/h na pasie okrężnym, płynne zwalnianie od ~24 m przed środkiem */
     if (n.rb >= 0 && n.rbDist < 26) cap = Math.min(cap, 6.5 + Math.max(0, n.rbDist - 15) * 0.7);
     /* autostrady, łącznice, łuki: limit z punktu trasy (vmax, wygładzony tak, by zdążyć zwolnić),
@@ -244,6 +245,22 @@ function npcMergeGap(n, dx, dz){
     if (a > -(len + Math.max(5, m.speed * 1.4)) && a < len + 1.5){ if (a > -(len + 1) && m.speed > 0.5) return true; r = Math.min(r, Math.max(2, m.speed * 0.6)); }
   }
   return r;
+}
+/* kierunkowskaz NPC: skręt na najbliższym narożniku trasy (≤ 28 m), zmiana pasa / objazd (n.latT), bez ronda */
+function npcIndicators(n, tgt, prv){
+  let ind = null;
+  if (n.profile !== 'pirat' && !(n.hitT > 0)){
+    if (n.latT > 0.5 && n.lat < n.latT - 0.3) ind = 'L';
+    else if (n.lat > 0.3 && !n.latT) ind = 'R';
+    else if (tgt.rb === undefined && Math.hypot(tgt.x - n.pos.x, tgt.z - n.pos.y) < 28){
+      const nx = n.path[(n.wp + 1) % n.path.length], ux = tgt.x - prv.x, uz = tgt.z - prv.z, vx = nx.x - tgt.x, vz = nx.z - tgt.z;
+      const lu = Math.hypot(ux, uz) || 1, lv = Math.hypot(vx, vz) || 1, cr = (ux * vz - uz * vx) / (lu * lv), dt2 = (ux * vx + uz * vz) / (lu * lv);
+      if (Math.abs(cr) > 0.45 && dt2 < 0.9 && !nx.rb && lv > 6) ind = cr < 0 ? 'L' : 'R';
+    }
+  }
+  n.ind = ind;
+  n.indMeshes[0].visible = ind === 'L' && indBlinkOn;
+  n.indMeshes[1].visible = ind === 'R' && indBlinkOn;
 }
 /* punkt celowania: La m wzdłuż trasy od rzutu auta (przez kolejne punkty), przesunięty w lewo o n.lat */
 function npcAim(n, prv, tgt, along, La){

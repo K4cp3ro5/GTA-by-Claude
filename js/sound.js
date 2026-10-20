@@ -127,6 +127,13 @@ const Sound = {
     o.start(t); o.stop(t + 0.13);
   },
 
+  tick(on){
+    if (!this.ready) return;
+    const ctx = this.ctx, t = ctx.currentTime, o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = 'square'; o.frequency.setValueAtTime(on ? 1900 : 1400, t);
+    g.gain.setValueAtTime(0.025, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.025);
+    o.connect(g); g.connect(this.master); o.start(t); o.stop(t + 0.03);
+  },
   thud(strength){
     if (!this.ready) return;
     const ctx = this.ctx, t = ctx.currentTime;

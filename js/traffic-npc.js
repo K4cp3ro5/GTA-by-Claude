@@ -194,6 +194,7 @@ function spawnNpcCar(path, colorHex, startIdx, frac, type){
   b.addShape(new CANNON.Box(new CANNON.Vec3(TN.hw + 0.02, TN.hh, TN.hl + 0.05)));
   b.position.set(n.pos.x, n.y + TN.hh + 0.1, n.pos.y);
   b.npcRef = n;                              // zderzenie z autem gracza (sound.js) -> npcHitByPlayer
+  n.indMeshes = addIndicators(n.mesh, type);
   b.collisionFilterGroup = G_CAR;
   b.collisionFilterMask = -1;
   b.allowSleep = false;
