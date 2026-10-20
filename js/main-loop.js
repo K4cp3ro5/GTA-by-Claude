@@ -43,7 +43,6 @@ function frame(now){
   updateSky(dt);
   updateTrafficLights(dt);
   updateNpcs(dt);
-  updateHighwayTraffic(dt);
   updatePedestrians(dt);
   const carState = updateCar(dt);
   if (mode === 'foot' && pointerLocked) updatePlayer(dt);
@@ -63,7 +62,7 @@ function frame(now){
   }
   for (const n of npcs){                       // auta NPC: model między dwoma ostatnimi krokami fizyki
     const b = n.body;
-    if (b._hasPrev === true) n.mesh.position.set(lerp(b._p0.x, b.position.x, alpha), 0, lerp(b._p0.z, b.position.z, alpha));
+    if (b._hasPrev === true) n.mesh.position.set(lerp(b._p0.x, b.position.x, alpha), n.y || 0, lerp(b._p0.z, b.position.z, alpha));
   }
   syncCar(alpha);
   updateCamera(dt, carState.kmh);

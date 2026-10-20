@@ -21,12 +21,11 @@ base.window = base; base.globalThis = base; base.self = base;
 const order = fs.readFileSync(__dirname+'/../loadorder.txt','utf8').trim().split('\n').map(s=>s.trim());
 let code = order.map(f => fs.readFileSync(__dirname+'/../js/'+f,'utf8')).join('\n');
 code += `
-function __run(x0, z0, heading, secs, stopFn, maxKmh){
+function __run(x0, z0, heading, secs, stopFn, maxKmh, y0){
   npcs.slice().forEach(removeNpcCar);
-  hwyTraffic.forEach(c => delBody(c.body)); hwyTraffic.length = 0;
   Pedestrians.list.slice().forEach(removePed);
   delBody(player.body);
-  chassisBody.position.set(x0, 0.9, z0);
+  chassisBody.position.set(x0, (y0 || 0) + 0.9, z0);
   chassisBody.velocity.set(0,0,0); chassisBody.angularVelocity.set(0,0,0);
   chassisBody.quaternion.setFromAxisAngle(new CANNON.Vec3(0,1,0), heading + Math.PI);
   const out = { maxY:0, minY:9, flipped:false, tr:[] };
@@ -47,13 +46,12 @@ function __run(x0, z0, heading, secs, stopFn, maxKmh){
   return out;
 }
 /* autopilot "pure pursuit" po łamanej wps (szuka punktu w odległości lookahead przed autem) */
-function __follow(x0, z0, heading, wps, secs, kmhMax, doneFn, look){
+function __follow(x0, z0, heading, wps, secs, kmhMax, doneFn, look, y0){
   look = look || [6, 0.35];                              // punkt celowania: look[0] + look[1]*v metrów przed autem
   npcs.slice().forEach(removeNpcCar);
-  hwyTraffic.forEach(c => delBody(c.body)); hwyTraffic.length = 0;
   Pedestrians.list.slice().forEach(removePed);
   delBody(player.body);
-  chassisBody.position.set(x0, 0.9, z0);
+  chassisBody.position.set(x0, (y0 || 0) + 0.9, z0);
   chassisBody.velocity.set(0,0,0); chassisBody.angularVelocity.set(0,0,0);
   chassisBody.quaternion.setFromAxisAngle(new CANNON.Vec3(0,1,0), heading + Math.PI);
   const out = { maxDev:0, minY:9, maxY:0, flipped:false, tr:[] };
@@ -88,39 +86,51 @@ function __follow(x0, z0, heading, wps, secs, kmhMax, doneFn, look){
 }
 function __rbCenter(i){ return [L(ROUNDABOUT_PTS[i][0]), L(ROUNDABOUT_PTS[i][1])]; }
 function __rbRoute(i, a, b){ return roundaboutRoute(i, a, b).map(p => [p.x, p.z]); }
-function __bez(R, n){ const a = []; for (let k = 0; k <= n; k++){ const q = bezPt(R, k/n); a.push([q.x, q.z]); } return a; }
-function __consts(){ return { laneA0: hwyLaneX('A',0), laneA1: hwyLaneX('A',1), laneB0: hwyLaneX('B',0), laneB1: hwyLaneX('B',1),
-  tree: (() => { const s = treeSpots.find(q => Math.abs(q.x - L(5) - ROAD_H - 3) < 12 && q.z > -200 && q.z < 200); return s ? [s.x, s.z] : null; })(),
+function __lane(nm, lane){ const w = CW[nm]; return wayLane(w, 0, w.len, () => lane ? HP.laneL : HP.laneR, 6).map(p => [p.x, p.z, p.y]); }
+function __trip(a, b){ return hwyTripPoints(a, b, 0).map(p => [p.x, p.z, p.y]); }
+function __term(k, which){ return termPoints(HWY_TERM[k][which]).map(p => [p.x, p.z, p.y]); }
+function __hwyPt(id, s, off){ return hwyPt(id, s, off); }
+function __consts(){ return { wall: WALL_X, rbApron: RB.apron,
+  /* drzewo na chodniku, do którego da się podjechać 16 m od +Z bez innych przeszkód po drodze */
+  tree: (() => { const free = t => ![signGeomLog, lampSpots, binSpots, hydSpots, HWY_PIERS].some(l => l.some(o => Math.abs(o.x - t.x) < 2.2 && o.z > t.z + 0.5 && o.z < t.z + 17)) && !treeSpots.some(o => o !== t && Math.abs(o.x - t.x) < 2.2 && o.z > t.z + 0.5 && o.z < t.z + 17) && !buildings.some(b => Math.abs(b.x - t.x) < b.w/2 + 1.2 && b.z - b.d/2 < t.z + 17 && b.z + b.d/2 > t.z);
+    const s = treeSpots.find(q => q.y === undefined && Math.abs(q.z) < 200 && free(q)); return s ? [s.x, s.z] : null; })(),
+  /* tor do muru północnego: x bez drzew pasa podmiejskiego i bez dróg */
+  wallX: (() => { for (let x = 3.5; x < 250; x += 7) if (!treeSpots.some(t => Math.abs(t.x - x) < 2.5 && t.z < -CITY_EDGE) && !hwyQuery(x, -330, 3).length) return x; return 3.5; })(),
   /* słupek znaku STOP; start z chodnika 7 m przed nim, wzdłuż ulicy (od strony nadjeżdżających — tam jest front znaku) */
   sign: (() => {
     const clear = g => { const f = [Math.sin(g.rot), Math.cos(g.rot)];
       return ![signGeomLog, lampSpots, treeSpots, binSpots, hydSpots].some(l => l.some(o => { const rx = o.x - g.x, rz = o.z - g.z, al = rx*f[0] + rz*f[1], la = Math.abs(rx*f[1] - rz*f[0]); return al > 0.3 && al < 8 && la < 1.8; })); };
-    const g = signLog.find(q => q.kind === 'STOP' && clear(q)); return g ? [g.x, g.z, Math.sin(g.rot), Math.cos(g.rot)] : null; })(),
-  zc: HWY_BR.zc, h: HWY_BR.h, z0: HWY_Z0, z1: HWY_Z1, ic: HWY_IC_Z, x2: HWY2_Z, yard: YARD_X, offs: __bez(HWY_OFF_RAMP, 20), ons: __bez(HWY_ON_RAMP, 20), wall: WALL_X, a0: HWY_A_OUT, rbApron: RB.apron }; }
+    const g = signLog.find(q => q.kind === 'STOP' && clear(q)); return g ? [g.x, g.z, Math.sin(g.rot), Math.cos(g.rot)] : null; })() }; }
 `;
 const ctx = vm.createContext(base);
 new vm.Script(code,{filename:'game-drive.js'}).runInContext(ctx);
 
-const K = base.__consts();
+const K = base.__consts(); const CITY_EDGE_T = 271;
 const rep = (name, r, extra) => console.log(name, '|', 'czas:', r.done !== undefined ? r.done : (r.stopped !== undefined ? r.stopped : 'NIE DOJECHAŁ'), 's | koniec:', JSON.stringify(r.end), '| min/max y:', r.minY.toFixed(2), '/', r.maxY.toFixed(2), '| przewrócone:', r.flipped, extra || '');
 const mode = process.argv[2] || 'all';
 let r;
-console.log('=== 1) jezdnia B (na -Z, prawy pas): z=+235 -> z=-262, przez węzeł i estakadę ===');
-r = base.__run(K.laneB0, 235, Math.PI, 60, p => p.z < -262, 100);
-console.log(' ślad:', JSON.stringify(r.tr)); rep(' B:', r, '(pomost ma dać ok. ' + (K.h + 0.55).toFixed(2) + ' m)');
-console.log('=== 2) jezdnia A (na +Z, prawy pas): z=-262 -> z=+235 ===');
-r = base.__run(K.laneA0, -262, 0, 60, p => p.z > 235, 100);
-console.log(' ślad:', JSON.stringify(r.tr)); rep(' A:', r);
-console.log('=== 3) ulica pod estakadą: x=250 -> plac (z=' + K.x2 + ') ===');
-r = base.__run(250, K.x2, Math.PI/2, 60, p => p.x > K.yard - 15, 60);
-console.log(' ślad:', JSON.stringify(r.tr)); rep(' pod:', r, '(ma być ok. 0.55 — bez uderzenia w filary/płytę)');
-console.log('=== 4) ZJAZD: jezdnia A (prawy pas, z=-84) -> łącznica -> skrzyżowanie miasta ===');
-r = base.__follow(K.laneA0, -84, 0, [[K.laneA0,-70]].concat(K.offs, [[255,K.ic]]), 60, 60, p => p.x < 266 && Math.abs(p.z - K.ic) < 4);
-console.log(' ślad:', JSON.stringify(r.tr)); rep(' zjazd:', r, '| maks. odchylenie od osi: ' + r.maxDev.toFixed(2) + ' m');
-console.log('=== 5) WJAZD: skrzyżowanie miasta -> łącznica -> prawy pas jezdni A ===');
-r = base.__follow(245, K.ic, Math.PI/2, K.ons.concat([[K.laneA0, K.ic+90],[K.laneA0, K.ic+160]]), 60, 60, p => p.z > K.ic + 120 && Math.abs(p.x - K.laneA0) < 2.5);
-console.log(' ślad:', JSON.stringify(r.tr)); rep(' wjazd:', r, '| maks. odchylenie od osi: ' + r.maxDev.toFixed(2) + ' m');
-
+const follow3 = (name, pts, kmh, look) => {
+  const st = pts[1], nx = pts[4], hd = Math.atan2(nx[0] - st[0], nx[1] - st[1]), end = pts[pts.length - 2];
+  let minY = 1e9, maxY = -1e9;
+  const r = base.__follow(st[0], st[1], hd, pts.slice(2).map(p => [p[0], p[1]]), 120, kmh, p => { minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y); return Math.hypot(p.x - end[0], p.z - end[1]) < 7; }, look || [8, 0.3], st[2]);
+  if (process.env.TRACE) console.log('  ślad', JSON.stringify(r.tr));
+  rep(' ' + name + ':', r, '| maks. odchylenie: ' + r.maxDev.toFixed(2) + ' m | y trasy ' + Math.min(...pts.map(p => p[2])).toFixed(1) + '–' + Math.max(...pts.map(p => p[2])).toFixed(1));
+};
+console.log('=== 1) A1 i A2: cała jezdnia prawym pasem (estakada 7 m, A2 nad węzłem 14 m) ===');
+['A1+', 'A1-', 'A2+', 'A2-'].forEach(nm => follow3(nm, base.__lane(nm, 0), 90));
+console.log('=== 2) węzeł: pętla (w lewo) i łącznica (w prawo) od początku do końca autostrady ===');
+follow3('pętla A1+ > A2+', base.__trip('A1+', 'A2+'), 70, [5, 0.2]);
+follow3('łącznica A2+ > A1+', base.__trip('A2+', 'A1+'), 70, [5, 0.2]);
+console.log('=== 3) końce: zjazd do miasta (SE) i wjazd z miasta (NW) ===');
+follow3('zjazd SE', base.__term(0, 'exit'), 50, [4, 0.2]);
+follow3('wjazd NW', base.__term(2, 'entry'), 50, [4, 0.2]);
+console.log('=== 4) ulica pod estakadami i węzłem: aleja j=6 od x=-200 do x=200 ===');
+r = base.__run(-200, 3.5, Math.PI / 2, 30, p => p.x > 200, 60);
+rep(' pod:', r, '(y ma zostać ~0.5 — bez uderzenia w filar)');
+console.log('=== 5) bariera na pomoście: A1+ przy s=-200, prostopadle w barierę zewnętrzną 40 km/h ===');
+{ const p = base.__hwyPt('A1', -200, 9.0), q = base.__hwyPt('A1', -200, 30), hd = Math.atan2(q.x - p.x, q.z - p.z);
+  r = base.__run(p.x, p.z, hd, 5, () => false, 40, p.y);
+  rep(' bariera:', r, '| auto zostało na pomoście: ' + (r.minY > p.y - 1 ? 'tak' : 'NIE') + ' (pomost ' + p.y.toFixed(1) + ')'); }
 console.log('=== 6) kolizje: drzewo, słupek znaku, mur przy 150 km/h ===');
 const hit = (name, tx, tz, fromDx, fromDz, kmh) => {
   const d = Math.hypot(fromDx, fromDz), ux = -fromDx/d, uz = -fromDz/d;      // kierunek jazdy: na cel
@@ -135,7 +145,7 @@ if (K.sign){
   const pass = (rr.end[0] - s[0])*(-s[2]) + (rr.end[2] - s[1])*(-s[3]), d = Math.hypot(rr.end[0] - s[0], rr.end[2] - s[1]);
   console.log(' słupek znaku STOP: koniec ' + JSON.stringify(rr.end) + ' | za słupkiem o ' + pass.toFixed(2) + ' m (ma być < 0) | od słupka ' + d.toFixed(2) + ' m (ok. 2.2 = przód auta oparty o słupek) | przewrócone: ' + rr.flipped);
 }
-hit('mur północny', 3.5, -K.wall, 0, 160, 150);
+hit('mur północny', K.wallX, -K.wall, 0, K.wall - CITY_EDGE_T - 5, 150);
 console.log('=== 7) RONDO (4,4): auto gracza wjeżdża z południa, objeżdża i zjeżdża — na wprost, w lewo, zawrotka po 3/4 ===');
 [['na wprost (płn.)', {x:0,z:-1}], ['w lewo (zach.)', {x:-1,z:0}], ['w prawo (wsch.)', {x:1,z:0}]].forEach(([nm, uOut]) => {
   const c = base.__rbCenter(0), route = base.__rbRoute(0, {x:0,z:1}, uOut);

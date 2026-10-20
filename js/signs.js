@@ -294,9 +294,21 @@ function texB43(n, end){
   if (end){ g.strokeStyle = '#111'; g.lineWidth = 3; for (let k = -3; k <= 3; k++){ g.beginPath(); g.moveTo(W/2 - 60 + k*10, H - 10); g.lineTo(W/2 + 60 + k*10, 10); g.stroke(); } }
   return toTex(c);
 }
+/* D-9 autostrada / D-10 koniec autostrady: niebieski kwadrat, piktogram wiaduktu nad dwiema jezdniami */
+function texD9(end){
+  const S = 128, c = mkCanvas(S,S), g = c.getContext('2d');
+  blueSquare(g, S, S);
+  g.fillStyle = '#fff';
+  g.fillRect(S*0.14, S*0.30, S*0.72, S*0.09);                                   // wiadukt
+  g.fillRect(S*0.20, S*0.39, S*0.07, S*0.10); g.fillRect(S*0.73, S*0.39, S*0.07, S*0.10);
+  g.beginPath(); g.moveTo(S*0.40, S*0.42); g.lineTo(S*0.46, S*0.42); g.lineTo(S*0.36, S*0.88); g.lineTo(S*0.22, S*0.88); g.closePath(); g.fill();
+  g.beginPath(); g.moveTo(S*0.54, S*0.42); g.lineTo(S*0.60, S*0.42); g.lineTo(S*0.78, S*0.88); g.lineTo(S*0.64, S*0.88); g.closePath(); g.fill();
+  if (end){ g.strokeStyle = '#c5161d'; g.lineWidth = 12; g.beginPath(); g.moveTo(S*0.12, S*0.88); g.lineTo(S*0.88, S*0.12); g.stroke(); }
+  return toTex(c);
+}
 function shapeDiamond(r){ return { pts: [[0,-r],[r,0],[0,r],[-r,0]], tw: 2*r, th: 2*r }; }
 const SIGN_TEX2 = { B2: texB2(), C2: texCArrow('C-2'), C4: texCArrow('C-4'), C5: texCArrow('C-5'), C6: texCArrow('C-6'), D1: texD1(), D3: texD3(), D6: texD6(),
-                    D42: texD42(false), D43: texD42(true), B43: texB43(30, false), B44: texB43(30, true) };
+                    D42: texD42(false), D43: texD42(true), D9: texD9(false), D10: texD9(true), B43: texB43(30, false), B44: texB43(30, true) };
 Object.assign(FACE, {
   B2:  () => signFace('B-2', SIGN_TEX2.B2, shapeCircle(0.35)),
   C2:  () => signFace('C-2', SIGN_TEX2.C2, shapeCircle(0.35)),
@@ -307,6 +319,8 @@ Object.assign(FACE, {
   D3:  () => signFace('D-3', SIGN_TEX2.D3, shapeRect(0.6, 0.6)),
   D6:  () => signFace('D-6', SIGN_TEX2.D6, shapeRect(0.6, 0.6)),
   D42: () => signFace('D-42', SIGN_TEX2.D42, shapeRect(1.2, 0.8)),
+  D9:  () => signFace('D-9', SIGN_TEX2.D9, shapeRect(0.7, 0.7)),
+  D10: () => signFace('D-10', SIGN_TEX2.D10, shapeRect(0.7, 0.7)),
   D43: () => signFace('D-43', SIGN_TEX2.D43, shapeRect(1.2, 0.8)),
   B43: () => signFace('B-43', SIGN_TEX2.B43, shapeRect(0.64, 0.8)),
   B44: () => signFace('B-44', SIGN_TEX2.B44, shapeRect(0.64, 0.8))

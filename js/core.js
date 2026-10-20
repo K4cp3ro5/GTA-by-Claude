@@ -68,7 +68,9 @@ const LOT        = BLOCK - ROAD_W;        // 30 — bok podestu chodnika
 const HALF       = GRID * BLOCK / 2;      // 264
 const WALK_H     = 0.25;                  // wysokość krawężnika
 const ROAD_TILE  = 15;                    // jednostek na kafel jezdni
-const WALL_X     = HALF + ROAD_H + 1.5;   // bariera betonowa
+const CITY_EDGE  = HALF + ROAD_H;         // 271 — zewnętrzna krawędź obwodnicy miasta
+const BELT       = 125;                   // pas podmiejski między miastem a murem (końce autostrad)
+const WALL_X     = CITY_EDGE + 1.5 + BELT; // mur dookoła świata (±397.5)
 const DAY_LENGTH = 300;                   // sekund na dobę
 
 /* rejestr postawionych znaków/sygnalizatorów (diagnostyka: test/sim.js sprawdza, czy żaden nie stoi w budynku) */
@@ -84,19 +86,8 @@ const blockCenter = i => -HALF + i * BLOCK + BLOCK / 2;
 function approachSpot(cx, cz, d, along, lateral){
   return { x: cx + d.x*along + d.z*lateral, z: cz + d.z*along - d.x*lateral, rot: Math.atan2(d.x, d.z) };
 }
-/* dodatki do minimapy spoza siatki miasta (autostrada, łącznice, plac, hale) — rysuje je hud.js */
+/* dodatki do minimapy spoza siatki miasta (autostrady, łącznice, drogi pasa podmiejskiego) — rysuje je hud.js */
 const mapExtras = [];
-
-/* węzeł autostradowy — współrzędne współdzielone przez barierę miasta
-   (city-generation.js, wycina w niej przerwę) i samą autostradę (highway.js).
-   HWY_IC_Z pokrywa się celowo z istniejącym skrzyżowaniem siatki, żeby
-   łącznica miała się do czego podłączyć bez budowania nowej drogi dojazdowej. */
-const HWY_X     = WALL_X + 45;            // oś autostrady, na wschód od miasta
-const HWY_IC_Z  = L(Math.floor(GRID / 2));
-const HWY2_Z    = L(2);                   // ulica z miasta, która przechodzi pod estakadą autostrady
-/* wschodnia granica CAŁEGO świata: jeden mur dookoła miasta + autostrady + placu + hal
-   (miasto nie ma już wewnętrznej ściany od strony autostrady — ciągłość terenu) */
-const WORLD_X1  = HWY_X + 135;
 
 const COM_H      = 0.55;                  // wysokość środka ciężkości auta
 const WHEEL_R    = 0.36;

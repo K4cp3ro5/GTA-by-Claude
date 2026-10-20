@@ -67,54 +67,30 @@ const LOOPS = [
   npcLoop(2, 4, 10, 8),
   npcLoop(4, 2, 8, 10)
 ].map(routeThroughRoundabouts);
-/* --- pętla z wyjazdem na autostradę: miasto -> skrzyżowanie (12,6) -> łącznica wjazdowa ->
-   jezdnia A (na południe) -> tunel (zawinięcie) -> jezdnia A od północy -> łącznica zjazdowa ->
-   miasto. Na łącznicach auta jadą prawym pasem (1.55 m w prawo od osi łącznicy), bo przy mieście
-   obie łącznice biegną jednym korytarzem w dwóch kierunkach. Na autostradzie auto przechodzi do
-   systemu hwyTraffic (punkt hwyMerge), a przed zjazdem wraca do ruchu miejskiego (npcFromHighway). --- */
-const RAMP_LANE = 1.55;
-function rampLanePts(R, t0, t1, n, wFn, vmax, tag){
-  const pts = [];
-  for (let k = 0; k <= n; k++){
-    const t = t0 + (t1 - t0) * k/n, p = bezPt(R, t), d = bezTan(R, t), w = RAMP_LANE * wFn(t);
-    pts.push({ x: p.x - d.z*w, z: p.z + d.x*w, vmax: vmax, ramp: tag });       // prawa strona kierunku jazdy = (-d.z, d.x)
-  }
+/* --- trasy przez autostrady (zamknięte cykle): wjazd z przekątnej w narożniku k -> autostrada
+   (prosto 's', w lewo pętlą 'l', w prawo łącznicą 'r') -> zjazd w narożniku X -> prosta ulica miasta
+   (i=10, j=2, i=2 albo j=10) -> wjazd w następnym narożniku (X+3)%4. Narożniki: 0 SE, 1 SW, 2 NW, 3 NE. --- */
+function hwyRoute(startK, moves, lane){
+  const pts = []; let k = startK;
+  moves.forEach(mv => {
+    const T = HWY_TERM[k], X = mv === 's' ? (k + 2) % 4 : mv === 'l' ? (k + 1) % 4 : (k + 3) % 4;
+    pts.push(...termPoints(T.entry, { rk: 'enter' }), ...hwyTripPoints(T.entryCw, HWY_TERM[X].exitCw, lane), ...termPoints(HWY_TERM[X].exit));
+    const a = pts[pts.length - 1];
+    k = (X + 3) % 4;
+    const b = HWY_TERM[k].entry.pts[0], n = Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / 44);
+    for (let i = 1; i < n; i++) pts.push({ x: lerp(a.x, b.x, i / n), z: lerp(a.z, b.z, i / n), y: 0 });   // ulica miasta (bez vmax — limity strefy)
+  });
+  if (k !== startK) throw new Error('trasa autostradowa nie jest zamknięta');
+  pts.forEach(p => { if (p.hwy && p.y < 0.3) p.vmax = Math.min(p.vmax === undefined ? 99 : p.vmax, 50 / 3.6); });   // rampy w pasie podmiejskim: 50 km/h jak ulica
+  smoothVmax(pts, 2.5);
+  pts.hwyRoute = true;
   return pts;
 }
-function hwyExcursionLoop(){
-  const o = 3.5, z6 = L(6);
-  const off = rampLanePts(HWY_OFF_RAMP, 0.12, 1, 14, t => Math.min(1, t / 0.3), 13.9, 'off');
-  const city = [ { x: L(10) + o, z: z6 - o }, { x: L(10) + o, z: L(5) + o }, { x: L(11) - o, z: L(5) + o }, { x: L(11) - o, z: z6 + o } ];
-  const on = rampLanePts(HWY_ON_RAMP, 0, 0.9, 14, t => Math.min(1, (1 - t) / 0.3), 15, 'on');
-  const merge = { x: HWY_A_OUT + 1.2, z: HWY_IC_Z + 62 + 16, hwyMerge: true, vmax: 17 };
-  return off.concat(city, on, [merge]);
-}
-/* strefa wschodnia: ulica pod estakadą -> zawrotka na placu -> z powrotem -> droga serwisowa na
-   południe -> zawrotka -> na północ (przez skrzyżowanie) -> zawrotka -> na południe -> plac */
-function circlePts(cx, cz, r, a0, a1, vmax){
-  const pts = [], n = Math.max(2, Math.ceil(Math.abs(a1 - a0) * r / 2.2));
-  for (let k = 0; k <= n; k++){ const a = a0 + (a1 - a0) * k/n; pts.push({ x: cx + Math.sin(a)*r, z: cz + Math.cos(a)*r, vmax: vmax }); }
-  return pts;
-}
-function eastZoneLoop(){
-  const J = EAST_ROAD_X, zU = HWY2_Z, ln = 2, yr = 6.5, tr = EAST_TURN_R;
-  const ccw = (cx, cz, r, x0, z0, x1, z1, v) => {           // łuk przeciwnie do wskazówek zegara od (x0,z0) do (x1,z1)
-    const a0 = Math.atan2(x0 - cx, z0 - cz); let a1 = Math.atan2(x1 - cx, z1 - cz);
-    while (a1 <= a0) a1 += TAU;
-    return circlePts(cx, cz, r, a0, a1, v);
-  };
-  const ye = Math.sqrt(yr*yr - 3.5*3.5), te = Math.sqrt(tr*tr - ln*ln);
-  return [
-    { x: J + 6, z: zU + 3.5 },
-    ...ccw(YARD_X, zU, yr, YARD_X - ye, zU + 3.5, YARD_X - ye, zU - 3.5, 5.5),
-    { x: J - ln, z: zU - 3.5 },
-    ...ccw(J, EAST_TURN_Z, tr, J - ln, EAST_TURN_Z - te, J + ln, EAST_TURN_Z - te, 4.5),
-    ...ccw(J, -EAST_TURN_Z, tr, J + ln, -EAST_TURN_Z + te, J - ln, -EAST_TURN_Z + te, 4.5),
-    { x: J - ln, z: zU + 3.5 }
-  ];
-}
-LOOPS.push(hwyExcursionLoop(), hwyExcursionLoop(), eastZoneLoop());
-
+const HWY_LOOPS = [
+  [hwyRoute(0, ['s','s','s','s'], 0), 3], [hwyRoute(2, ['s','s','s','s'], 1), 3],
+  [hwyRoute(0, ['l'], 0), 1], [hwyRoute(1, ['l'], 0), 1], [hwyRoute(2, ['l'], 0), 1], [hwyRoute(3, ['l'], 0), 1],
+  [hwyRoute(0, ['r','r'], 0), 2], [hwyRoute(1, ['r','r'], 0), 2]
+];
 /* indeks i ułamek odcinka w miejscu f (0..1) długości pętli — na odcinku poza rondem */
 function pathSpot(path, f, tries){
   const segs = path.map((a, i) => { const b = path[(i + 1) % path.length]; return Math.hypot(b.x - a.x, b.z - a.z); });
@@ -123,7 +99,7 @@ function pathSpot(path, f, tries){
   for (let i = 0; i < path.length; i++){
     if (d <= segs[i]){
       const p = path[i], q = path[(i + 1) % path.length];
-      const inside = (p.rb !== undefined && q.rb === p.rb && !q.first) || p.hwyMerge || p.ramp;   // rondo, odcinek "autostradowy", łącznica
+      const inside = (p.rb !== undefined && q.rb === p.rb && !q.first) || p.hwy || q.hwy;   // rondo albo autostrada (start tylko w mieście)
       if (inside && (tries || 0) < 40) return pathSpot(path, f + 0.03, (tries || 0) + 1);
       return { idx: i, frac: segs[i] ? d / segs[i] : 0 };
     }
@@ -176,6 +152,7 @@ function spawnNpcCar(path, colorHex, startIdx, frac){
     path: path,
     wp: (idx + 1) % path.length,
     pos: new THREE.Vector2(lerp(p0.x, p1.x, f), lerp(p0.z, p1.z, f)),
+    y: lerp(p0.y || 0, p1.y || 0, f),
     heading: Math.atan2(p1.x - p0.x, p1.z - p0.z),
     speed: 0,
     /* prędkość zależna od strefy (centrum wolniej, obrzeża szybciej) i od "charakteru" kierowcy 0.7–1.35x */
@@ -188,7 +165,7 @@ function spawnNpcCar(path, colorHex, startIdx, frac){
   };
   const b = new CANNON.Body({ mass: 0, type: CANNON.Body.KINEMATIC, material: matCar });
   b.addShape(new CANNON.Box(new CANNON.Vec3(0.95, 0.62, 2.1)));
-  b.position.set(n.pos.x, 0.72, n.pos.y);
+  b.position.set(n.pos.x, n.y + 0.72, n.pos.y);
   b.collisionFilterGroup = G_CAR;
   b.collisionFilterMask = -1;
   b.allowSleep = false;
@@ -213,14 +190,6 @@ function spawnRandomNpcCar(){
   }
   return spawnNpcCar(path, NPC_COLORS[randInt(0, NPC_COLORS.length - 1)], idx, frac);
 }
-/* auto wraca z autostrady do ruchu miejskiego tuż przed łącznicą zjazdową (pierwszy punkt pętli) */
-function npcFromHighway(c){
-  const n = { id: c.city.id, path: c.city.path, wp: 0, pos: new THREE.Vector2(c.x, c.z), heading: 0, speed: c.v,
-              target: c.city.target, mesh: c.mesh, color: c.city.color, body: c.body, blocked: false, dirX: 0, dirZ: 1, obey: c.obey };
-  c.body.position.set(c.x, 0.72, c.z);
-  npcs.push(n);
-  return n;
-}
 function removeNpcCar(n){
   delBody(n.body);
   scene.remove(n.mesh);
@@ -228,22 +197,21 @@ function removeNpcCar(n){
   if (idx >= 0) npcs.splice(idx, 1);
 }
 
-/* dwa auta na każdej pętli, w przeciwległych miejscach (poza rondami) — gęstszy ruch; pętle dzielą
-   pasy, więc miejsce startu przesuwane, aż będzie co najmniej 12 m od każdego już postawionego auta */
-for (let i = 0; i < LOOPS.length; i++){
-  const f0 = rnd();
-  [f0, f0 + 0.5].forEach((f, k) => {
+/* dwa auta na każdej pętli miejskiej i 1–3 na trasie autostradowej, w równych odstępach (poza rondami
+   i autostradą); pętle dzielą pasy, więc miejsce startu przesuwane, aż będzie ≥ 12 m od każdego auta */
+const ALL_LOOPS = LOOPS.map(p => [p, 2]).concat(HWY_LOOPS);
+HWY_LOOPS.forEach(l => LOOPS.push(l[0]));
+for (let i = 0; i < ALL_LOOPS.length; i++){
+  const f0 = rnd(), cnt = ALL_LOOPS[i][1];
+  Array.from({ length: cnt }, (_, k) => f0 + k / cnt).forEach((f, k) => {
     let sp = null;
     for (let tries = 0; tries < 30; tries++, f += 0.017){
-      const q = pathSpot(LOOPS[i], f);
-      const a = LOOPS[i][q.idx], b = LOOPS[i][(q.idx + 1) % LOOPS[i].length];
+      const q = pathSpot(ALL_LOOPS[i][0], f);
+      const a = ALL_LOOPS[i][0][q.idx], b = ALL_LOOPS[i][0][(q.idx + 1) % ALL_LOOPS[i][0].length];
       const x = lerp(a.x, b.x, q.frac), z = lerp(a.z, b.z, q.frac);
       if (!npcs.some(m => Math.hypot(m.pos.x - x, m.pos.y - z) < 12)){ sp = q; break; }
     }
-    if (sp) spawnNpcCar(LOOPS[i], NPC_COLORS[(i + 3*k) % NPC_COLORS.length], sp.idx, sp.frac);   // brak wolnego miejsca: auto nie powstaje
+    if (sp) spawnNpcCar(ALL_LOOPS[i][0], NPC_COLORS[(i + 3*k) % NPC_COLORS.length], sp.idx, sp.frac);   // brak wolnego miejsca: auto nie powstaje
   });
 }
 
-/* ruch na autostradzie: dedykowany system, patrz highway.js (buduje się
-   po tym pliku — potrzebuje buildNpcModel i G_CAR stąd) */
-initHighwayTraffic();

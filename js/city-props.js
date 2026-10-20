@@ -70,7 +70,7 @@ const glowAt = (s, along, y) => (s2, m) => {
   SC.set(1,1,1); m.compose(V3, QT, SC);
 };
 const lampGlows = new THREE.Group();
-[ instance(glowGeo, matGlow, otherLamps, glowAt(null, 1.15, s => lampY(s) + 0.035), false, false),
+[ instance(glowGeo, matGlow, otherLamps, glowAt(null, 1.15, s => (s.gy !== undefined ? s.gy : lampY(s)) + 0.035), false, false),
   instance(glowRoadGeo, matGlow, streetLamps, glowAt(null, 0.6, () => 0.035), false, false),
   instance(glowWalkGeo, matGlow, streetLamps, glowAt(null, 0.6, s => lampY(s) + 0.035), false, false)
 ].forEach(im => { scene.remove(im); im.renderOrder = 2; lampGlows.add(im); });
@@ -87,13 +87,14 @@ lampSpots.forEach(s => staticBox(s.x, lampY(s) + 1.4, s.z, 0.26, 2.8, 0.26));
 /* drzewa */
 const treesA = treeSpots.filter(t => t.type === 0);
 const treesB = treeSpots.filter(t => t.type === 1);
+const treeY = t => (t.y !== undefined ? t.y : WALK_H);   // poziom podłoża pod drzewem
 instance(new THREE.CylinderGeometry(0.16, 0.26, 2.3, 6), matBark, treeSpots,
-  (t,m) => setTRS(m, t.x, WALK_H + 1.15*t.scale, t.z, t.rot, t.scale, t.scale, t.scale), true, false);
+  (t,m) => setTRS(m, t.x, treeY(t) + 1.15*t.scale, t.z, t.rot, t.scale, t.scale, t.scale), true, false);
 if (treesA.length) instance(faceted(new THREE.ConeGeometry(1.75, 3.9, 7)), matLeafA, treesA,
-  (t,m) => setTRS(m, t.x, WALK_H + (2.3 + 1.95)*t.scale - 0.4*t.scale, t.z, t.rot, t.scale, t.scale, t.scale), true, false);
+  (t,m) => setTRS(m, t.x, treeY(t) + (2.3 + 1.95)*t.scale - 0.4*t.scale, t.z, t.rot, t.scale, t.scale, t.scale), true, false);
 if (treesB.length) instance(faceted(new THREE.IcosahedronGeometry(1.7, 0)), matLeafB,  treesB,
-  (t,m) => setTRS(m, t.x, WALK_H + (2.3 + 1.35)*t.scale, t.z, t.rot, t.scale, t.scale*0.92, t.scale), true, false);
-treeSpots.forEach(t => staticBox(t.x, WALK_H + 1.15*t.scale, t.z, 0.45*t.scale, 2.3*t.scale, 0.45*t.scale));
+  (t,m) => setTRS(m, t.x, treeY(t) + (2.3 + 1.35)*t.scale, t.z, t.rot, t.scale, t.scale*0.92, t.scale), true, false);
+treeSpots.forEach(t => staticBox(t.x, treeY(t) + 1.15*t.scale, t.z, 0.45*t.scale, 2.3*t.scale, 0.45*t.scale));
 
 /* kosze */
 if (binSpots.length){

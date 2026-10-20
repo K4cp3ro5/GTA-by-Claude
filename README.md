@@ -1,10 +1,10 @@
 # GTA by Claude
 
-Przeglądarkowa gra 3D w stylu mini-GTA: miasto z dzielnicami, ruchem ulicznym, autostradą i estakadą, cyklem dnia i nocy, bronią i kradzieżą aut. Działa w przeglądarce, bez instalacji i bez serwera. Cała oprawa (tekstury, modele, dźwięk) jest generowana proceduralnie w JavaScripcie, bez zewnętrznych plików graficznych i dźwiękowych.
+Przeglądarkowa gra 3D w stylu mini-GTA: miasto z dzielnicami, ruchem ulicznym, autostradami na estakadach z węzłem koniczynowym, cyklem dnia i nocy, bronią i kradzieżą aut. Działa w przeglądarce, bez instalacji i bez serwera. Cała oprawa (tekstury, modele, dźwięk) jest generowana proceduralnie w JavaScripcie, bez zewnętrznych plików graficznych i dźwiękowych.
 
 ![Miasto z lotu ptaka](screenshots/miasto-z-gory.jpg)
 
-| Rondo | Estakada | Węzeł autostradowy |
+| Rondo | Ulica pod estakadami | Węzeł koniczynowy |
 |---|---|---|
 | ![Rondo](screenshots/rondo.jpg) | ![Estakada](screenshots/estakada.jpg) | ![Węzeł](screenshots/wezel.jpg) |
 
@@ -39,12 +39,12 @@ Menu debug pozwala m.in. zmieniać liczbę aut i pieszych, ustawić i zatrzymać
 
 ## Co jest w grze
 
-- **Miasto** 12×12 kwartałów z dzielnicami (centrum z wieżowcami, handlowa, przemysłowa, mieszkalna), placami, parkami, parkingami i przystankami.
+- **Miasto** 12×12 kwartałów z dzielnicami (centrum z wieżowcami, handlowa, przemysłowa, mieszkalna z domkami na obrzeżach), placami, parkami, parkingami i przystankami, otoczone pasem podmiejskim z trawą i drzewami.
 - **Ruch uliczny**: auta NPC jeżdżą prawostronnie, stają na czerwonym (sygnalizatory trzykomorowe z fazą żółtą), zatrzymują się na STOP, ustępują wg reguły prawej ręki, a przy alei z pierwszeństwem — autom na niej. Konflikty na skrzyżowaniach rozstrzygają wg czasu dojazdu, więc auta się nie przenikają.
-- **Przepisy i znaki**: limity są egzekwowane (miasto 50 km/h, strefa 30 w Starym Mieście, droga serwisowa 40, autostrada 140, a przy węźle i tunelach 100). Jednokierunkowa obwodnica przy murze, aleja z pierwszeństwem, ponad 900 znaków (A-7, B-2, B-20, B-33, B-43/B-44, C-2, C-6, C-9, C-12, D-1, D-3, D-6, D-42/D-43) na słupkach, które nie przebijają tarcz.
+- **Przepisy i znaki**: limity są egzekwowane (miasto i pas podmiejski 50 km/h, strefa 30 w Starym Mieście, autostrady 100 km/h, łącznice i pętle węzła mniej). Jednokierunkowa obwodnica przy murze, aleja z pierwszeństwem, ponad 900 znaków (A-7, B-2, B-20, B-33, B-43/B-44, C-2, C-6, C-9, C-12, D-1, D-3, D-6, D-9/D-10, D-42/D-43, tablice kierunkowe) na słupkach, które nie przebijają tarcz.
 - **Ronda** o jednolitych parametrach: wyspa z opaską (R 4,5 m), pas okrężny 4,5 m, wloty i wyloty łukami z wysepkami rozdzielającymi, linie P-13. Auta NPC objeżdżają wyspę przeciwnie do ruchu wskazówek zegara i ustępują jadącym po rondzie.
 - **Piesi** spacerują po chodnikach i przechodzą przez jezdnię po przejściach (na światłach w swojej fazie), a auta im ustępują.
-- **Autostrada** dwujezdniowa z wyprzedzaniem lewym pasem, węzłem, estakadą, drogą pod nią, tunelami z oświetleniem i latarniami. Część aut miejskich wjeżdża na nią i zjeżdża łącznicami. W strefie wschodniej jeździ ruch po drodze serwisowej z zawrotkami.
+- **Autostrady A1 i A2** biegną estakadami po przekątnych miasta (pomost 7 m, A2 nad węzłem 14 m), z ulicami pod wiaduktami (prześwit ≥ 5,8 m, filary tylko w kwartałach). W centrum jest węzeł koniczynowy (4 pętle, 4 łącznice, jezdnie zbierające), a na końcach przekątnych zjazdy i wjazdy schodzą w pasie podmiejskim do poziomu ulic. Auta NPC jeżdżą trasami przez autostrady: wjeżdżają z przekątnych, przejeżdżają węzeł prosto, pętlą lub łącznicą i wracają ulicami.
 - **Gracz**: tryb pieszy i jazda autem z fizyką zawieszenia (RaycastVehicle), kradzież aut NPC, ekwipunek (pięści, kij, pistolet), pasek zdrowia i kondycji.
 - **Świat**: cykl dnia i nocy (słońce, księżyc, mgła, latarnie z plamami światła na jezdni), minimapa całego świata, dźwięk syntezowany (Web Audio).
 
@@ -53,7 +53,7 @@ Menu debug pozwala m.in. zmieniać liczbę aut i pieszych, ustawić i zatrzymać
 ```
 index.html        strona, style i HUD
 loadorder.txt     kolejność ładowania skryptów (ważna!)
-js/               kod gry (25 plików ładowanych kolejno z index.html)
+js/               kod gry (26 plików ładowanych kolejno z index.html; hwy-plan.js — geometria autostrad, highways.js — ich budowa)
 test/             testy: harness, symulacja ruchu, jazda autem, skrypt bundle
 ```
 
@@ -64,15 +64,16 @@ Skrypty to zwykłe pliki (bez bundlera) ze wspólnym zakresem globalnym, więc i
 ```
 npm install          # instaluje cannon@0.6.2 potrzebny testowi jazdy
 npm test             # harness + symulacja ruchu NPC (nakładanie aut, zakleszczenia, ronda, piesi, przepisy)
-npm run test:drive   # jazda prawdziwym autem: autostrada, łącznice, rondo, kolizje (ok. 3 min)
+npm run test:drive   # jazda prawdziwym autem: A1/A2, pętla, łącznica, zjazd/wjazd, ulica pod estakadą, rondo, kolizje (ok. 4 min)
 npm run bundle       # skleja grę w jeden plik gta-by-claude-single.html
 ```
 
 ## Plany i ograniczenia
 
 - Wnętrze miasta to nadal siatka ortogonalna, bez nieregularnych ulic (trasy NPC to stałe pętle, nie graf).
-- Węzeł autostradowy jest jednopoziomowy (jedna estakada), łącznice są tylko po stronie jezdni A.
-- Auta autostradowe nie dają się ukraść, a w tunelu auta „zawijają się” na drugi koniec.
+- Auta NPC na autostradach nie wyprzedzają ani nie zmieniają pasa (każda trasa ma stały pas), a na zjazdach i wjazdach jeżdżą stałymi trasami, nie grafem dróg.
+- Pas podmiejski ma 125 m (zjazdy potrzebują tyle na zejście z 7 m do poziomu gruntu), a przęsła łącznic mają do ok. 64 m.
+- Auto NPC na estakadzie można ukraść tylko z pomostu (gracz musi stać na tym samym poziomie).
 - AI NPC działa w całym mieście naraz (bez ograniczania obliczeń daleko od gracza i bez LOD).
 - Auta NPC nie omijają przeszkody na pasie (np. zaparkowanego auta gracza), tylko przed nią czekają.
 

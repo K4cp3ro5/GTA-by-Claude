@@ -123,3 +123,10 @@ function mergeColored(parts){
   out.computeBoundingSphere();
   return out;
 }
+/* trójkąt z normalną zwróconą w stronę "out" */
+function triOut(buf, a, b, c, out){
+  const e1 = [b[0]-a[0], b[1]-a[1], b[2]-a[2]], e2 = [c[0]-a[0], c[1]-a[1], c[2]-a[2]];
+  const nx = e1[1]*e2[2]-e1[2]*e2[1], ny = e1[2]*e2[0]-e1[0]*e2[2], nz = e1[0]*e2[1]-e1[1]*e2[0];
+  if (nx*out[0] + ny*out[1] + nz*out[2] < 0) buf.tri(a, c, b, [0,0],[0.5,0.4],[1,0]);
+  else buf.tri(a, b, c, [0,0],[1,0],[0.5,0.4]);
+}

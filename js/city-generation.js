@@ -40,6 +40,41 @@ const walkBuf  = new GeoBuf();
 const curbBuf  = new GeoBuf();
 const roofBuf  = new GeoBuf();
 const facadeBufs = FACADES.map(() => new GeoBuf());
+const lawnBuf  = new GeoBuf();      // trawa: ogródki domków, kwartały pod estakadą, pas podmiejski
+
+/* domki jednorodzinne (obrzeża): elewacja z oknami (4 kolory), dach dwuspadowy (3 kolory) */
+function texHouse(wall){
+  const S = 128, c = mkCanvas(S, S), g = c.getContext('2d');
+  g.fillStyle = wall; g.fillRect(0, 0, S, S);
+  noiseOver(g, S, S, 10);
+  g.fillStyle = '#3b4650';
+  [[18, 30], [74, 30], [18, 84], [74, 84]].forEach(p => { g.fillRect(p[0], p[1], 36, 26); });
+  g.strokeStyle = '#f4f1ea'; g.lineWidth = 3;
+  [[18, 30], [74, 30], [18, 84], [74, 84]].forEach(p => { g.strokeRect(p[0], p[1], 36, 26); g.beginPath(); g.moveTo(p[0] + 18, p[1]); g.lineTo(p[0] + 18, p[1] + 26); g.stroke(); });
+  return toTex(c);
+}
+const HOUSE_WALLS = ['#e6dcc8', '#d8c6a4', '#c8d0d4', '#e2c8b2'].map(texHouse);
+const HOUSE_ROOFS = [0x9a4a32, 0x4a4d52, 0x6b4a36];
+const houseWallBufs = HOUSE_WALLS.map(() => new GeoBuf()), houseRoofBufs = HOUSE_ROOFS.map(() => new GeoBuf());
+function addHouse(cx, cz, w, d, h){
+  if (hwyRectCovered(cx, cz, w, d, 3.5)) return;
+  const y0 = WALK_H, wb = houseWallBufs[randInt(0, 3)], rb = houseRoofBufs[randInt(0, 2)];
+  const ridgeX = w >= d, rh = Math.min(w, d) * 0.36, ov = 0.35, top = y0 + h;
+  wb.box(cx, y0 + h/2, cz, w, h, d, 3.2, false);
+  if (ridgeX){
+    const x0 = cx - w/2 - ov, x1 = cx + w/2 + ov, za = cz - d/2 - ov, zb = cz + d/2 + ov;
+    quadOut(rb, [x0, top, za], [x1, top, za], [x1, top + rh, cz], [x0, top + rh, cz], [0, 1, -1]);
+    quadOut(rb, [x0, top, zb], [x1, top, zb], [x1, top + rh, cz], [x0, top + rh, cz], [0, 1, 1]);
+    [-1, 1].forEach(sx => { const x = cx + sx * w/2; triOut(wb, [x, top, cz - d/2], [x, top, cz + d/2], [x, top + rh * (d/2) / (d/2 + ov), cz], [sx, 0, 0]); });
+  } else {
+    const z0 = cz - d/2 - ov, z1 = cz + d/2 + ov, xa = cx - w/2 - ov, xb = cx + w/2 + ov;
+    quadOut(rb, [xa, top, z0], [xa, top, z1], [cx, top + rh, z1], [cx, top + rh, z0], [-1, 1, 0]);
+    quadOut(rb, [xb, top, z0], [xb, top, z1], [cx, top + rh, z1], [cx, top + rh, z0], [1, 1, 0]);
+    [-1, 1].forEach(sz => { const z = cz + sz * d/2; triOut(wb, [cx - w/2, top, z], [cx + w/2, top, z], [cx, top + rh * (w/2) / (w/2 + ov), z], [0, 0, sz]); });
+  }
+  staticBox(cx, y0 + h/2, cz, w, h, d);
+  buildings.push({ x: cx, z: cz, w: w, d: d });
+}
 
 /* --- podłoże poza miastem --- */
 (function ground(){
@@ -128,6 +163,7 @@ const buildings = [];   // do minimapy
 const pedBlockCandidates = [];   // {bi,bj} kwartały z chodnikiem — baza pętli spacerowych pieszych
 
 function addBuilding(cx, cz, w, d, h, pool, yBase){
+  if (hwyRectCovered(cx, cz, w, d, 3.5)) return;             // pas zakazu zabudowy wzdłuż autostrad (hwy-plan.js)
   const v = pool ? pool[randInt(0, pool.length - 1)] : randInt(0, FACADES.length - 1);
   const y0 = (yBase === undefined) ? WALK_H : yBase;
   facadeBufs[v].box(cx, y0 + h/2, cz, w, h, d, 8, false);
@@ -155,6 +191,7 @@ function buildBusStop(cx, cz, side){
   const alongX = side >= 2;
   const px = side === 0 ? cx + e : side === 1 ? cx - e : cx + rand(-5, 5);
   const pz = side === 2 ? cz + e : side === 3 ? cz - e : cz + rand(-5, 5);
+  if (hwyCovered(px, pz, 2)) return;
   const L1 = 3.2, T1 = 1.3;
   const w = alongX ? L1 : T1, d = alongX ? T1 : L1;
   busBuf.box(px, y + 2.35, pz, w, 0.14, d, 2, true);                     // dach
@@ -251,9 +288,23 @@ function buildCornerPlaza(cx, cz, kind){
   }
 }
 
+/* kwartał w większości pod autostradą (lub plac narożny, którego pomnik nie zmieści się pod płytą):
+   podest z trawą i drzewami poza śladem jezdni, bez budynków i bez pętli pieszych */
+function buildUnderpassBlock(cx, cz){
+  walkBuf.plane(cx, WALK_H, cz, LOT, LOT, LOT/4, LOT/4);
+  curbBuf.box(cx, WALK_H/2, cz, LOT, WALK_H, LOT, 2, false);
+  staticBox(cx, WALK_H/2, cz, LOT, WALK_H, LOT);
+  lawnBuf.plane(cx, WALK_H + 0.012, cz, LOT - 5, LOT - 5, 4, 4);
+  for (let t = 0; t < 8; t++){
+    const x = cx + rand(-11, 11), z = cz + rand(-11, 11);
+    treeSpots.push({ x: x, z: z, type: randInt(0, 1), scale: rand(0.8, 1.2), rot: rnd() * TAU });
+  }
+}
 for (let bi = 0; bi < GRID; bi++){
   for (let bj = 0; bj < GRID; bj++){
     const cx = blockCenter(bi), cz = blockCenter(bj);
+    const hwFrac = hwyBlockFrac(bi, bj);
+    if (hwFrac > 0.5 || (hwFrac > 0 && specialCornerAt(bi, bj) && specialCornerAt(bi, bj).kind !== 'park')){ buildUnderpassBlock(cx, cz); continue; }
 
     if (PARKING_BLOCKS.some(p => p[0] === bi && p[1] === bj)){ buildParkingBlock(cx, cz); continue; }
     const special = specialCornerAt(bi, bj);
@@ -267,12 +318,14 @@ for (let bi = 0; bi < GRID; bi++){
     walkBuf.plane(cx, WALK_H, cz, LOT, LOT, LOT/4, LOT/4);
     curbBuf.box(cx, WALK_H/2, cz, LOT, WALK_H, LOT, 2, false);
     staticBox(cx, WALK_H/2, cz, LOT, WALK_H, LOT);
-    pedBlockCandidates.push({ bi: bi, bj: bj });
+    /* pętla spacerowa pieszych (2 m od krawędzi) tylko tam, gdzie nie biegnie pod estakadą */
+    const pi = LOT/2 - 2;
+    if (![[1,1],[-1,1],[1,-1],[-1,-1],[1,0],[-1,0],[0,1],[0,-1]].some(q => hwyCovered(cx + q[0]*pi, cz + q[1]*pi, 1))) pedBlockCandidates.push({ bi: bi, bj: bj });
 
     /* dzielnice: centrum (wieżowce), handlowa (wzdłuż głównych arterii),
-       przemysłowa (zachód/południowy zachód: niskie, duże hale), mieszkalna (reszta) */
+       przemysłowa (zachód/południowy zachód: niskie, duże hale), mieszkalna (reszta, na obrzeżach domki) */
     const dist = Math.hypot(cx, cz);
-    const district = dist < 105 ? 'center'
+    const district = dist < 165 ? 'center'
                    : (cx < -115 && cz < 45) ? 'industrial'
                    : (Math.abs(cz) < 56 || Math.abs(cx) < 56) ? 'commercial'
                    : 'residential';
@@ -281,15 +334,21 @@ for (let bi = 0; bi < GRID; bi++){
     const r = rnd();
     const g = 1.6, s = (area - g) / 2;
     const H = {
-      center:      () => rand(34, 92),
+      center:      () => rand(60, 130),
       commercial:  () => rand(16, 38),
       industrial:  () => rand(6, 13),
       residential: () => rand(9, 21)
     }[district];
-    const pSingle = { center: 0.62, commercial: 0.30, industrial: 0.70, residential: 0.10 }[district];
-    const pPair   = { center: 0.22, commercial: 0.40, industrial: 0.25, residential: 0.25 }[district];
+    const pSingle = { center: 0.60, commercial: 0.30, industrial: 0.70, residential: 0.10 }[district];
+    const pPair   = { center: 0.40, commercial: 0.40, industrial: 0.25, residential: 0.25 }[district];
 
-    if (r < pSingle){
+    if (district === 'residential' && dist > 190){
+      /* obrzeża: 4 albo 6 domków z ogródkami */
+      lawnBuf.plane(cx, WALK_H + 0.012, cz, LOT - 5, LOT - 5, 4, 4);
+      const six = r < 0.45, floors = () => (rnd() < 0.5 ? 3.6 : 6.4);
+      if (six){ for (const ox of [-8, 0, 8]) for (const oz of [-6, 6]) addHouse(cx + ox + rand(-0.3, 0.3), cz + oz + rand(-0.4, 0.4), rand(6.4, 7.2), rand(8, 10), floors()); }
+      else { for (const ox of [-6, 6]) for (const oz of [-6, 6]) addHouse(cx + ox + rand(-0.4, 0.4), cz + oz + rand(-0.4, 0.4), rand(8, 10), rand(8.5, 10.5), floors()); }
+    } else if (r < pSingle){
       const w = area - rand(0,3), d = area - rand(0,3);
       addBuilding(cx, cz, w, d, H(), POOL);
     } else if (r < pSingle + pPair){
@@ -348,14 +407,33 @@ for (let bi = 0; bi < GRID; bi++){
   }
 }
 
-/* --- bariera betonowa: JEDEN obwód dookoła całego świata ---
-   od zachodniej krawędzi miasta (-WALL_X) do WORLD_X1 (za placem/halami za autostradą),
-   N/S na z=±WALL_X. Autostrada kończy się w tunelach przy północnej i południowej ścianie
-   (highway.js). Wewnątrz nie ma już ściany między miastem a autostradą. */
+/* detale (latarnie, drzewa, kosze, hydranty) nie pod autostradą i nie przy filarach */
+(function clearUnderHighways(){
+  const nearPier = (s, r) => HWY_PIERS.some(p => Math.hypot(p.x - s.x, p.z - s.z) < r + p.size/2);
+  const keep = (list, margin, r) => { const k = list.filter(s => !hwyCovered(s.x, s.z, margin) && !nearPier(s, r)); list.length = 0; k.forEach(s => list.push(s)); };
+  keep(lampSpots, 1.0, 1.2); keep(treeSpots, 2.2, 1.8); keep(binSpots, 0.4, 1.0); keep(hydSpots, 0.4, 1.0);
+})();
+
+/* --- pas podmiejski (między obwodnicą a murem): trawa i drzewa (poza drogami) --- */
+(function suburbanBelt(){
+  const e = CITY_EDGE, W = WALL_X - 0.6, y = -0.008;
+  lawnBuf.plane(0, y, (e + W) / 2, 2 * W, W - e, 40, 6);
+  lawnBuf.plane(0, y, -(e + W) / 2, 2 * W, W - e, 40, 6);
+  lawnBuf.plane((e + W) / 2, y, 0, W - e, 2 * e, 6, 30);
+  lawnBuf.plane(-(e + W) / 2, y, 0, W - e, 2 * e, 6, 30);
+  for (let t = 0; t < 260; t++){
+    const side = randInt(0, 3), along = rand(-W + 4, W - 4), depth = rand(e + 6, W - 4);
+    const x = side < 2 ? along : (side === 2 ? depth : -depth), z = side < 2 ? (side === 0 ? depth : -depth) : along;
+    if (hwyQuery(x, z, 4).length) continue;
+    treeSpots.push({ x: x, z: z, y: 0, type: randInt(0, 1), scale: rand(0.9, 1.5), rot: rnd() * TAU });
+  }
+})();
+
+/* --- bariera betonowa: JEDEN obwód dookoła świata (miasto + pas podmiejski), x, z = ±WALL_X --- */
 (function barrier(){
-  const H = 3.2, T = 1.2, cxm = (WORLD_X1 - WALL_X) / 2, Lx = WORLD_X1 + WALL_X + T, Lz = WALL_X * 2 + T;
+  const H = 3.2, T = 1.2, Lx = WALL_X * 2 + T, Lz = WALL_X * 2 + T;
   const b = new GeoBuf();
-  [[cxm, WALL_X, Lx, T], [cxm, -WALL_X, Lx, T], [-WALL_X, 0, T, Lz], [WORLD_X1, 0, T, Lz]].forEach(w => {
+  [[0, WALL_X, Lx, T], [0, -WALL_X, Lx, T], [-WALL_X, 0, T, Lz], [WALL_X, 0, T, Lz]].forEach(w => {
     b.box(w[0], H/2, w[1], w[2], H, w[3], 3, true);
     staticBox(w[0], H/2, w[1], w[2], H, w[3]);
   });
@@ -534,6 +612,9 @@ const curbMesh  = addMerged(curbBuf,  new THREE.MeshLambertMaterial({ map: texs.
 const roofMesh  = addMerged(roofBuf,  new THREE.MeshLambertMaterial({ map: texs.roof }), true, true);
 const grassMesh = addMerged(grassBuf, new THREE.MeshLambertMaterial({ color: 0x3e6a31 }), false, true);
 const apronMesh = addMerged(apronBuf, new THREE.MeshLambertMaterial({ color: 0x6b5a54 }), false, true);
+const lawnMesh  = addMerged(lawnBuf, new THREE.MeshLambertMaterial({ color: 0x4a7339 }), false, true);
+HOUSE_WALLS.forEach((t, i) => addMerged(houseWallBufs[i], new THREE.MeshLambertMaterial({ map: t }), true, true));
+HOUSE_ROOFS.forEach((c, i) => addMerged(houseRoofBufs[i], new THREE.MeshLambertMaterial({ color: c }), true, true));
 const facadeMeshes = facadeBufs.map((b, i) => addMerged(b, facadeMats[i], true, true)).filter(Boolean);
 
 /* obiekty do sprawdzania kolizji kamery */

@@ -25,19 +25,19 @@ const el = {
   deadScreen:  document.getElementById('deadScreen')
 };
 
-/* statyczna mapa CAŁEGO świata (miasto + autostrada + plac/hale) rysowana raz */
+/* statyczna mapa CAŁEGO świata (miasto + pas podmiejski + autostrady) rysowana raz */
 const MAP_SCALE = 1.35;
 const MAP_X0 = -WALL_X - 6, MAP_Z0 = -WALL_X - 6;
-const MAP_W = WORLD_X1 + WALL_X + 12, MAP_H = (WALL_X + 6) * 2;
+const MAP_W = (WALL_X + 6) * 2, MAP_H = (WALL_X + 6) * 2;
 const mapStatic = mkCanvas(Math.ceil(MAP_W * MAP_SCALE), Math.ceil(MAP_H * MAP_SCALE));
 (function drawStaticMap(){
   const g = mapStatic.getContext('2d');
   const wx = v => (v - MAP_X0) * MAP_SCALE, wz = v => (v - MAP_Z0) * MAP_SCALE;
   g.fillStyle = '#0d0f13'; g.fillRect(0, 0, mapStatic.width, mapStatic.height);
   g.fillStyle = '#171a20';                                            // teren wewnątrz muru
-  g.fillRect(wx(-WALL_X), wz(-WALL_X), (WORLD_X1 + WALL_X) * MAP_SCALE, WALL_X * 2 * MAP_SCALE);
-  g.fillStyle = '#23262c';                                            // jezdnie miasta
   g.fillRect(wx(-WALL_X), wz(-WALL_X), WALL_X * 2 * MAP_SCALE, WALL_X * 2 * MAP_SCALE);
+  g.fillStyle = '#23262c';                                            // jezdnie miasta
+  g.fillRect(wx(-CITY_EDGE), wz(-CITY_EDGE), CITY_EDGE * 2 * MAP_SCALE, CITY_EDGE * 2 * MAP_SCALE);
   for (let i = 0; i < GRID; i++){
     for (let j = 0; j < GRID; j++){
       g.fillStyle = '#31353d';
@@ -51,11 +51,11 @@ const mapStatic = mkCanvas(Math.ceil(MAP_W * MAP_SCALE), Math.ceil(MAP_H * MAP_S
   }
   g.strokeStyle = 'rgba(232,230,220,.16)'; g.setLineDash([5,7]); g.lineWidth = 1;   // osie ulic
   for (let i = 0; i <= GRID; i++){
-    g.beginPath(); g.moveTo(wx(L(i)), wz(-WALL_X)); g.lineTo(wx(L(i)), wz(WALL_X)); g.stroke();
-    g.beginPath(); g.moveTo(wx(-WALL_X), wz(L(i))); g.lineTo(wx(WALL_X), wz(L(i))); g.stroke();
+    g.beginPath(); g.moveTo(wx(L(i)), wz(-CITY_EDGE)); g.lineTo(wx(L(i)), wz(CITY_EDGE)); g.stroke();
+    g.beginPath(); g.moveTo(wx(-CITY_EDGE), wz(L(i))); g.lineTo(wx(CITY_EDGE), wz(L(i))); g.stroke();
   }
   g.setLineDash([]);
-  /* autostrada, łącznice, ulica pod estakadą, droga serwisowa, plac i hale (highway.js) */
+  /* autostrady A1/A2, koniczyna, łącznice i zjazdy w pasie podmiejskim (highways.js) */
   mapExtras.forEach(e => {
     g.fillStyle = e.c; g.strokeStyle = e.c;
     if (e.t === 'rect') g.fillRect(wx(e.x0), wz(e.z0), (e.x1 - e.x0) * MAP_SCALE, (e.z1 - e.z0) * MAP_SCALE);
@@ -67,7 +67,7 @@ const mapStatic = mkCanvas(Math.ceil(MAP_W * MAP_SCALE), Math.ceil(MAP_H * MAP_S
     }
   });
   g.strokeStyle = 'rgba(255,176,58,.30)'; g.lineWidth = 2;            // mur dookoła całości
-  g.strokeRect(wx(-WALL_X), wz(-WALL_X), (WORLD_X1 + WALL_X) * MAP_SCALE, WALL_X * 2 * MAP_SCALE);
+  g.strokeRect(wx(-WALL_X), wz(-WALL_X), WALL_X * 2 * MAP_SCALE, WALL_X * 2 * MAP_SCALE);
 })();
 
 const mm = document.getElementById('minimap');
