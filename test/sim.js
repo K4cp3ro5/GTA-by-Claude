@@ -55,11 +55,47 @@ if (process.env.SEED) base.GAME_SEED = parseInt(process.env.SEED, 10);
 const order = fs.readFileSync(__dirname+'/../loadorder.txt','utf8').trim().split('\n').map(s=>s.trim());
 let code = order.map(f => fs.readFileSync(__dirname+'/../js/'+f,'utf8')).join('\n');
 code += `
+/* --- węzeł: czy punkt (x,z) na wysokości y leży ≥ tol wewnątrz innej drogi (|Δy| < 0.3) — indeks drogi albo null --- */
+let __segGrid = null;
+function __insideWay(x, z, y, wi, tol){
+  const CS = 16;
+  if (!__segGrid){
+    __segGrid = new Map();
+    HWY_WAYS.forEach(w => { for (let i = 0; i < w.pts.length - 1; i++){ const a = w.pts[i], b = w.pts[i+1], s = { w: w.idx, a: a, b: b };
+      const x0 = Math.floor((Math.min(a.x, b.x) - 12) / CS), x1 = Math.floor((Math.max(a.x, b.x) + 12) / CS);
+      const z0 = Math.floor((Math.min(a.z, b.z) - 12) / CS), z1 = Math.floor((Math.max(a.z, b.z) + 12) / CS);
+      for (let gx = x0; gx <= x1; gx++) for (let gz = z0; gz <= z1; gz++){ const k = gx + ',' + gz; if (!__segGrid.has(k)) __segGrid.set(k, []); __segGrid.get(k).push(s); } } });
+  }
+  const c = __segGrid.get(Math.floor(x / CS) + ',' + Math.floor(z / CS)); if (!c) return null;
+  for (const s of c){ if (s.w === wi) continue;
+    const dx = s.b.x - s.a.x, dz = s.b.z - s.a.z, l2 = dx*dx + dz*dz || 1, t = ((x - s.a.x)*dx + (z - s.a.z)*dz) / l2;
+    if (t < 0 || t > 1) continue;
+    const px = s.a.x + dx*t, pz = s.a.z + dz*t, hw = s.a.hw + (s.b.hw - s.a.hw)*t, yy = s.a.y + (s.b.y - s.a.y)*t;
+    if (Math.abs(yy - y) < 0.3 && Math.hypot(x - px, z - pz) < hw - tol) return s.w;
+  }
+  return null;
+}
+/* nakładanie górnych powierzchni dróg i nosów na tym samym poziomie: próbki co 0.5 m */
+function hwyOverlapCheck(){
+  const pairs = {};
+  const hit = (k, x, z) => { const p = pairs[k] || (pairs[k] = { n: 0, at: [x.toFixed(0), z.toFixed(0)] }); p.n++; };
+  HWY_WAYS.forEach(w => { for (let i = 0; i < w.pts.length - 1; i++){ const a = w.pts[i], b = w.pts[i+1];
+    const l = Math.hypot(b.x - a.x, b.z - a.z); if (l < 0.01) continue; const hx = (b.x - a.x)/l, hz = (b.z - a.z)/l;
+    for (let d = 0.25; d < l; d += 0.5){ const t = d / l, hw = a.hw + (b.hw - a.hw)*t, y = a.y + (b.y - a.y)*t;
+      for (let o = -hw + 0.35; o < hw - 0.1; o += 0.5){
+        const x = a.x + hx*d - hz*o, z = a.z + hz*d + hx*o, o2 = __insideWay(x, z, y, w.idx, 0.1);
+        if (o2 !== null) hit(w.name + ' | ' + HWY_WAYS[o2].name, x, z);
+      } } } });
+  (typeof HWY_GORES !== 'undefined' ? HWY_GORES : []).forEach(g => g.pts.forEach((p, i) => { if (!i) return; const q = g.pts[i - 1];
+    for (let t = 0.2; t < 0.9; t += 0.3){ const x = lerp(lerp(q.ex, p.ex, 0.5), lerp(q.lx, p.lx, 0.5), t), z = lerp(lerp(q.ez, p.ez, 0.5), lerp(q.lz, p.lz, 0.5), t);
+      const o2 = __insideWay(x, z, p.y, -1, 0.1); if (o2 !== null) hit('nos ' + g.cw + ' | ' + HWY_WAYS[o2].name, x, z); } }));
+  return { pairs: Object.keys(pairs).length, area: +Object.values(pairs).reduce((s, p) => s + p.n * 0.25, 0).toFixed(1), list: Object.entries(pairs).slice(0, 10).map(e => e[0] + ': ' + (e[1].n*0.25).toFixed(1) + ' m² @' + e[1].at) };
+}
 function __static(){
   const out = {};
   /* normalne: poziome trójkąty muszą patrzeć W GÓRĘ (inaczej z góry niewidoczne) */
   const down = {};
-  [['roadBuf',roadBuf],['crossBuf',crossBuf],['crosswalkBuf',crosswalkBuf],['roundaboutPaintBuf',roundaboutPaintBuf],['hwTopBuf',hwTopBuf],['hwRampBuf',hwRampBuf],['lawnBuf',lawnBuf],['walkBuf',walkBuf]].forEach(([nm,b]) => {
+  [['roadBuf',roadBuf],['crossBuf',crossBuf],['crosswalkBuf',crosswalkBuf],['roundaboutPaintBuf',roundaboutPaintBuf],['hwTopBuf',hwTopBuf],['hwTopAuxBuf',hwTopAuxBuf],['hwRampBuf',hwRampBuf],['hwRampAuxBuf',hwRampAuxBuf],['hwGoreBuf',hwGoreBuf],['lawnBuf',lawnBuf],['walkBuf',walkBuf]].forEach(([nm,b]) => {
     let flatUp = 0, flatDown = 0;
     for (let i = 0; i < b.n.length; i += 3){
       const ny = b.n[i+1];
@@ -150,8 +186,27 @@ function __static(){
     }
   }));
   hb.buildings = buildings.filter(b => hwyRectCovered(b.x, b.z, b.w, b.d, 0)).length;
+  /* węzeł: nakładanie nawierzchni (ta sama wysokość), bariery na jezdni sąsiedniej drogi, nosy, sekwencja ćwiartek */
+  const ov = hwyOverlapCheck();
+  const onRoad = [];
+  HWY_WAYS.forEach(w => { for (let i = 0; i < w.pts.length - 1; i++) [1, -1].forEach(sd => {
+    if (!wayBarrier(w, i, sd)) return;
+    const a = w.pts[i], b = w.pts[i + 1], l = Math.hypot(b.x - a.x, b.z - a.z) || 1, rx = -(b.z - a.z) / l, rz = (b.x - a.x) / l;
+    [0.25, 0.5, 0.75].forEach(t => { const hw = lerp(a.hw, b.hw, t) + 0.2, x = lerp(a.x, b.x, t) + rx * sd * hw, z = lerp(a.z, b.z, t) + rz * sd * hw, y = lerp(a.y, b.y, t);
+      const o = __insideWay(x, z, y, w.idx, 0.05); if (o !== null) onRoad.push(w.name + ' na ' + HWY_WAYS[o].name + ' @' + x.toFixed(0) + ',' + z.toFixed(0)); });
+  }); });
+  const seq = ['A1+', 'A1-', 'A2+', 'A2-'].map(cw => {
+    const ex = HWY_RAMPS.find(r => r.kind === 'conn' && r.from === cw), en = HWY_RAMPS.find(r => r.kind === 'conn' && r.to === cw);
+    const sOf = p => Math.abs(hwyAxisOf(p.x, p.z).s);
+    return [sOf(ex.way.pts[0]), sOf(ex.way.pts[ex.way.auxIn - 1]), HP.colS, HP.colS, sOf(en.way.pts[en.way.pts.length - en.way.auxOut]), sOf(en.way.pts[en.way.pts.length - 1])].map(v => v.toFixed(1)).join('/');
+  });
+  hb.overlap = ov; hb.barrierOnRoad = onRoad; hb.seq = seq;
+  hb.gores = HWY_GORES.length; hb.goreMinGap = Math.min(...HWY_GORES.map(g => g.gap));
   out.hwy = { ways: HWY_WAYS.length, piers: HWY_PIERS.length, maxSpan: +HWY_MAX_SPAN.toFixed(1), pierRoad: hb.pierRoad.length, pierWalk: hb.pierWalk.length,
-              lowClearance: hb.clearance.length, minClearance: +hb.minClear.toFixed(2), buildingsInBand: hb.buildings, examples: hb.pierRoad.concat(hb.pierWalk, hb.clearance).slice(0, 5) };
+              lowClearance: hb.clearance.length, minClearance: +hb.minClear.toFixed(2), buildingsInBand: hb.buildings,
+              overlapArea: hb.overlap.area, barrierOnRoad: hb.barrierOnRoad.length, gores: hb.gores, goreMinGap: +hb.goreMinGap.toFixed(2),
+              seqSame: hb.seq.every(q => q === hb.seq[0]), seq: hb.seq[0],
+              examples: hb.pierRoad.concat(hb.pierWalk, hb.clearance, hb.overlap.list, hb.barrierOnRoad).slice(0, 6) };
   out.world = { wall: WALL_X, cityEdge: CITY_EDGE };
   return out;
 }

@@ -88,6 +88,7 @@ function __rbCenter(i){ return [L(ROUNDABOUT_PTS[i][0]), L(ROUNDABOUT_PTS[i][1])
 function __rbRoute(i, a, b){ return roundaboutRoute(i, a, b).map(p => [p.x, p.z]); }
 function __lane(nm, lane){ const w = CW[nm]; return wayLane(w, 0, w.len, () => lane ? HP.laneL : HP.laneR, 6).map(p => [p.x, p.z, p.y]); }
 function __trip(a, b){ return hwyTripPoints(a, b, 0).map(p => [p.x, p.z, p.y]); }
+function __ramp(cw, kind){ return HWY_RAMPS.find(r => r.from === cw && r.kind === kind).to; }
 function __term(k, which){ return termPoints(HWY_TERM[k][which]).map(p => [p.x, p.z, p.y]); }
 function __hwyPt(id, s, off){ return hwyPt(id, s, off); }
 function __consts(){ return { wall: WALL_X, rbApron: RB.apron,
@@ -118,12 +119,15 @@ const follow3 = (name, pts, kmh, look) => {
 };
 console.log('=== 1) A1 i A2: cała jezdnia prawym pasem (estakada 7 m, A2 nad węzłem 14 m) ===');
 ['A1+', 'A1-', 'A2+', 'A2-'].forEach(nm => follow3(nm, base.__lane(nm, 0), 90));
-console.log('=== 2) węzeł: pętla (w lewo) i łącznica (w prawo) od początku do końca autostrady ===');
-follow3('pętla A1+ > A2+', base.__trip('A1+', 'A2+'), 70, [5, 0.2]);
-follow3('łącznica A2+ > A1+', base.__trip('A2+', 'A1+'), 70, [5, 0.2]);
-console.log('=== 3) końce: zjazd do miasta (SE) i wjazd z miasta (NW) ===');
-follow3('zjazd SE', base.__term(0, 'exit'), 50, [4, 0.2]);
-follow3('wjazd NW', base.__term(2, 'entry'), 50, [4, 0.2]);
+console.log('=== 2) węzeł: wszystkie 8 skrętów (4 pętle w lewo, 4 łącznice w prawo) od początku do końca autostrady ===');
+/* (4 przejazdy prosto to test 1) */
+['A1+','A1-','A2+','A2-'].forEach(cw => {
+  const lp = base.__ramp(cw, 'loop'), cn = base.__ramp(cw, 'conn');
+  follow3('pętla ' + cw + ' > ' + lp, base.__trip(cw, lp), 70, [5, 0.2]);
+  follow3('łącznica ' + cw + ' > ' + cn, base.__trip(cw, cn), 70, [5, 0.2]);
+});
+console.log('=== 3) końce: zjazd do miasta i wjazd z miasta we wszystkich 4 narożnikach ===');
+['SE','SW','NW','NE'].forEach((nm, k) => { follow3('zjazd ' + nm, base.__term(k, 'exit'), 50, [4, 0.2]); follow3('wjazd ' + nm, base.__term(k, 'entry'), 50, [4, 0.2]); });
 console.log('=== 4) ulica pod estakadami i węzłem: aleja j=6 od x=-200 do x=200 ===');
 r = base.__run(-200, 3.5, Math.PI / 2, 30, p => p.x > 200, 60);
 rep(' pod:', r, '(y ma zostać ~0.5 — bez uderzenia w filar)');

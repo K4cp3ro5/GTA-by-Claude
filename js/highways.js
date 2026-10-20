@@ -8,7 +8,7 @@
    - pas rozdziału: betonowy blok 4 × 0.9 m z latarniami.
    Kolizje: pochylone bryły (staticBoxQ) — płyta, bariery, nasyp, pas rozdziału, filary.
    --------------------------------------------------------------- */
-function texHighway(){
+function texHighway(aux){
   const W = 160, H = 384, c = mkCanvas(W,H), g = c.getContext('2d');
   g.fillStyle = '#2f3136'; g.fillRect(0,0,W,H);
   for (let i = 0; i < 170; i++){
@@ -18,8 +18,13 @@ function texHighway(){
   noiseOver(g, W, H, 20);
   const edge = 8, shoulderEnd = 38;
   g.fillStyle = 'rgba(226,224,214,.85)';
-  g.fillRect(edge, 0, 3, H);                 // krawędź zewnętrzna (pobocze) — u = 0 to prawa krawędź jezdni
-  g.fillRect(shoulderEnd, 0, 3, H);          // granica pobocza / pasa ruchu
+  if (!aux){
+    g.fillRect(edge, 0, 3, H);               // krawędź zewnętrzna (pobocze) — u = 0 to prawa krawędź jezdni
+    g.fillRect(shoulderEnd, 0, 3, H);        // granica pobocza / pasa ruchu
+  } else {
+    /* obok pas zbierający / wyłączenia: zamiast krawędzi — szeroka linia przerywana (P-6), pobocze staje się pasem */
+    for (let k = 0; k < 8; k++) g.fillRect(shoulderEnd - 1, k * H / 8, 5, H / 16);
+  }
   g.fillRect(W-6, 0, 3, H);                  // krawędź wewnętrzna (pas rozdziału)
   const laneDivX = shoulderEnd + (W-6-shoulderEnd)/2 - 1.5, period = H/4, dash = period*0.55;
   g.fillStyle = 'rgba(232,230,220,.9)';
@@ -27,16 +32,26 @@ function texHighway(){
   return toTex(c);
 }
 /* łącznica / droga jednopasowa: asfalt z liniami krawędziowymi po obu stronach */
-function texRampRoad(){
+function texRampRoad(aux){
   const W = 128, H = 256, c = mkCanvas(W,H), g = c.getContext('2d');
   g.fillStyle = '#303237'; g.fillRect(0,0,W,H);
   noiseOver(g, W, H, 18);
   g.fillStyle = 'rgba(226,224,214,.85)';
-  g.fillRect(7, 0, 4, H); g.fillRect(W - 11, 0, 4, H);
+  g.fillRect(7, 0, 4, H);                    // prawa (zewnętrzna) krawędź
+  if (!aux) g.fillRect(W - 11, 0, 4, H);     // lewa — brak, gdy pas przylega do jezdni (tam linia przerywana jezdni)
   return toTex(c);
 }
-const hwyLaneTex = texHighway(), hwyRampTex = texRampRoad();
-const hwTopBuf = new GeoBuf(), hwRampBuf = new GeoBuf(), hwConcBuf = new GeoBuf();
+/* nos: asfalt z ukośnym kreskowaniem (P-21) */
+function texGore(){
+  const W = 128, c = mkCanvas(W, W), g = c.getContext('2d');
+  g.fillStyle = '#303237'; g.fillRect(0, 0, W, W);
+  noiseOver(g, W, W, 18);
+  g.strokeStyle = 'rgba(232,230,220,.9)'; g.lineWidth = 14;
+  for (let k = -2; k <= 2; k++){ g.beginPath(); g.moveTo(k * W / 2 - W, W); g.lineTo(k * W / 2 + W, -W); g.stroke(); }
+  return toTex(c);
+}
+const hwyLaneTex = texHighway(false), hwyLaneAuxTex = texHighway(true), hwyRampTex = texRampRoad(false), hwyRampAuxTex = texRampRoad(true), hwyGoreTex = texGore();
+const hwTopBuf = new GeoBuf(), hwTopAuxBuf = new GeoBuf(), hwRampBuf = new GeoBuf(), hwRampAuxBuf = new GeoBuf(), hwGoreBuf = new GeoBuf(), hwConcBuf = new GeoBuf(), hwCushionBuf = new GeoBuf();
 const FILL_Y = 4.5;                                    // poniżej: lity nasyp zamiast płyty na filarach
 
 /* czworokąt z UV i normalną w stronę out */
@@ -62,7 +77,13 @@ function wayBarrier(w, i, side){
   if (w.kind === 'cw') return side > 0 && !cwBarrierGap(w.name, (a.s + b.s) / 2);
   if (w.kind === 'col') return side > 0;
   if (w.kind === 'conn' && side < 0 && (i < w.auxIn - 1 || i >= w.pts.length - w.auxOut)) return false;   // przy jezdni (pas wył./wł.)
+  if (side < 0 && w.noBarL){ const dm = (a.d + b.d) / 2; if (w.noBarL.some(r => dm > r[0] - 0.25 && dm < r[1] + 0.25)) return false; }   // nos
   return side > 0 ? w.barR : w.barL;
+}
+/* odcinek i drogi przylega lewą krawędzią do jezdni (pas zbierający, wyłączenia, włączenia) */
+function wayAuxSeg(w, i){
+  if (w.kind === 'col') return true;
+  return w.kind === 'conn' && (i < w.auxIn - 1 || i >= w.pts.length - w.auxOut);
 }
 function buildWay(w){
   const P = w.pts, n = P.length, isMed = w.kind === 'med', slab = HP.slab;
@@ -80,7 +101,8 @@ function buildWay(w){
     const ya = ground ? 0.015 : a.y + lift, yb = ground ? 0.015 : b.y + lift;
     const aL = E(i, -a.hw), aR = E(i, a.hw), bL = E(i + 1, -b.hw), bR = E(i + 1, b.hw);
     const va = a.d / ROAD_TILE, vb = b.d / ROAD_TILE;
-    const topBuf = isMed ? hwConcBuf : (w.tex === 'hwy' || (w.tex === 'term' && (a.hw + b.hw) / 2 > 4)) ? hwTopBuf : hwRampBuf;
+    const wide = w.tex === 'hwy' || (w.tex === 'term' && (a.hw + b.hw) / 2 > 4);
+    const topBuf = isMed ? hwConcBuf : wide ? (w.kind === 'cw' && cwAuxAdj(w.name, (a.s + b.s) / 2) ? hwTopAuxBuf : hwTopBuf) : (wayAuxSeg(w, i) ? hwRampAuxBuf : hwRampBuf);
     quadUV(topBuf, [aR[0], ya, aR[1]], [bR[0], yb, bR[1]], [bL[0], yb, bL[1]], [aL[0], ya, aL[1]],
            [0, va], [0, vb], [1, vb], [1, va], [0, 1, 0]);
     if (ground) continue;
@@ -92,6 +114,8 @@ function buildWay(w){
     sides.forEach(sd => {
       const s = sd[0];
       if (!isMed && s < 0 && (w.kind === 'cw' || w.kind === 'col')) return;          // wnętrze przekroju (pas rozdziału / jezdnia obok)
+      if (!isMed && s > 0 && w.kind === 'cw' && cwBarrierGap(w.name, (a.s + b.s) / 2)) return;   // styk z pasem obok / nosem
+      if (!isMed && s < 0 && (wayAuxSeg(w, i) || (w.noBarL && w.noBarL.some(r => (a.d + b.d) / 2 > r[0] && (a.d + b.d) / 2 < r[1])))) return;
       const pa = s > 0 ? aR : aL, pb = s > 0 ? bR : bL;
       quadUV(hwConcBuf, [pa[0], sd[1], pa[1]], [pb[0], sd[2], pb[1]], [pb[0], yb, pb[1]], [pa[0], ya, pa[1]], [0,0],[1,0],[1,1],[0,1],
              [R[i].x * s, 0, R[i].z * s]);
@@ -142,6 +166,29 @@ function buildWay(w){
   }
 }
 HWY_WAYS.forEach(buildWay);
+
+/* nosy: nawierzchnia z kreskowaniem między krawędzią jezdni a lewą krawędzią pętli / łącznicy, spód płyty,
+   zamknięcie czoła przy amortyzatorze, kolizja; amortyzator (żółty blok) w miejscu, gdzie zaczynają się bariery */
+HWY_GORES.forEach(g => {
+  const P = g.pts; let u = 0;
+  for (let i = 0; i < P.length - 1; i++){
+    const a = P[i], b = P[i + 1], l = Math.hypot(b.ex - a.ex, b.ez - a.ez), u1 = u + l / 3;
+    const ga = Math.hypot(a.lx - a.ex, a.lz - a.ez) / 3, gb = Math.hypot(b.lx - b.ex, b.lz - b.ez) / 3;
+    quadUV(hwGoreBuf, [a.ex, a.y, a.ez], [b.ex, b.y, b.ez], [b.lx, b.y, b.lz], [a.lx, a.y, a.lz], [u, 0], [u1, 0], [u1, gb], [u, ga], [0, 1, 0]);
+    if (a.y > FILL_Y) quadUV(hwConcBuf, [a.ex, a.y - HP.slab, a.ez], [b.ex, b.y - HP.slab, b.ez], [b.lx, b.y - HP.slab, b.lz], [a.lx, a.y - HP.slab, a.lz], [0,0],[1,0],[1,1],[0,1], [0, -1, 0]);
+    const mx = (a.ex + b.ex + a.lx + b.lx) / 4, mz = (a.ez + b.ez + a.lz + b.lz) / 4, my = (a.y + b.y) / 2, wd = (ga + gb) * 1.5;
+    if (wd > 0.05) staticBoxQ(mx, my - 0.25, mz, wd, 0.5, l + 0.1, segQuat(b.ex - a.ex, b.y - a.y, b.ez - a.ez));
+    u = u1;
+  }
+  /* czoło nosa (szczelina 1 m między barierami) i amortyzator */
+  const e = P[0].d < P[P.length - 1].d ? P[P.length - 1] : P[0], f = e === P[0] ? P[1] : P[P.length - 2];
+  const out = [e.ex - f.ex, 0, e.ez - f.ez];
+  quadUV(hwConcBuf, [e.ex, e.y - HP.slab, e.ez], [e.lx, e.y - HP.slab, e.lz], [e.lx, e.y, e.lz], [e.ex, e.y, e.ez], [0,0],[1,0],[1,1],[0,1], out);
+  const cx = (e.ex + e.lx) / 2, cz = (e.ez + e.lz) / 2, ol = Math.hypot(out[0], out[2]) || 1;
+  const bx = cx - out[0] / ol * 0.7, bz = cz - out[2] / ol * 0.7;
+  hwCushionBuf.box(bx, e.y + 0.45, bz, 1.0, 0.9, 1.0, 1, false);
+  staticBox(bx, e.y + 0.45, bz, 1.0, 0.9, 1.0);
+});
 
 /* filary (kolumna + oczep pod płytą), z kolizją */
 HWY_PIERS.forEach(p => {
@@ -222,6 +269,10 @@ HWY_WAYS.forEach(w => {
 
 /* --- scalenie; nawierzchnie i beton zasłaniają kamerę (nie przechodzi przez płytę) --- */
 const hwTopMesh  = addMerged(hwTopBuf,  new THREE.MeshLambertMaterial({ map: hwyLaneTex, color: 0xbcbcbc }), false, true);
+const hwTopAuxMesh = addMerged(hwTopAuxBuf, new THREE.MeshLambertMaterial({ map: hwyLaneAuxTex, color: 0xbcbcbc }), false, true);
 const hwRampMesh = addMerged(hwRampBuf, new THREE.MeshLambertMaterial({ map: hwyRampTex, color: 0xbcbcbc }), false, true);
+const hwRampAuxMesh = addMerged(hwRampAuxBuf, new THREE.MeshLambertMaterial({ map: hwyRampAuxTex, color: 0xbcbcbc }), false, true);
+const hwGoreMesh = addMerged(hwGoreBuf, new THREE.MeshLambertMaterial({ map: hwyGoreTex, color: 0xbcbcbc }), false, true);
 const hwConcMesh = addMerged(hwConcBuf, new THREE.MeshLambertMaterial({ color: 0x9a978f }), true, true);
-[hwTopMesh, hwRampMesh, hwConcMesh].forEach(m => { if (m) camBlockers.push(m); });
+addMerged(hwCushionBuf, new THREE.MeshLambertMaterial({ color: 0xe8b81c }), true, true);
+[hwTopMesh, hwTopAuxMesh, hwRampMesh, hwRampAuxMesh, hwGoreMesh, hwConcMesh].forEach(m => { if (m) camBlockers.push(m); });
