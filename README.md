@@ -1,10 +1,10 @@
 # GTA by Claude
 
-Przeglądarkowa gra 3D w stylu mini-GTA: miasto z dzielnicami, ruchem ulicznym, autostradą i estakadą, cyklem dnia i nocy, bronią i kradzieżą aut. Działa w przeglądarce, bez instalacji i bez serwera. Cała oprawa (tekstury, modele, dźwięk) jest generowana proceduralnie w JavaScripcie, bez zewnętrznych plików graficznych i dźwiękowych.
+Przeglądarkowa gra 3D w stylu mini-GTA: miasto z dzielnicami, ruchem ulicznym, autostradami na estakadach z węzłem koniczynowym, cyklem dnia i nocy, bronią i kradzieżą aut. Działa w przeglądarce, bez instalacji i bez serwera. Cała oprawa (tekstury, modele, dźwięk) jest generowana proceduralnie w JavaScripcie, bez zewnętrznych plików graficznych i dźwiękowych.
 
 ![Miasto z lotu ptaka](screenshots/miasto-z-gory.jpg)
 
-| Rondo | Estakada | Węzeł autostradowy |
+| Rondo | Ulica pod estakadami | Węzeł koniczynowy |
 |---|---|---|
 | ![Rondo](screenshots/rondo.jpg) | ![Estakada](screenshots/estakada.jpg) | ![Węzeł](screenshots/wezel.jpg) |
 
