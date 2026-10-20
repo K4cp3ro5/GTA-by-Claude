@@ -746,7 +746,7 @@ function roundaboutYield(n){
   for (const m of npcs){ if (m !== n && conflict(m.pos.x, m.pos.y, m.speed)) return true; }
   const cv = chassisBody.velocity;
   if (conflict(chassisBody.position.x, chassisBody.position.z, Math.hypot(cv.x, cv.z))) return true;
-  if (mainCarPlaceholder && conflict(mainCarPlaceholder.body.position.x, mainCarPlaceholder.body.position.z, 0)) return true;
+  for (const q of parkedCars) if (conflict(q.body.position.x, q.body.position.z, 0)) return true;
   return false;
 }
 

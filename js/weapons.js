@@ -127,14 +127,15 @@ const Weapons = {
 };
 Weapons.init();
 
-/* --- koło broni (radialne, sterowane wirtualnym kursorem — pointer lock nie daje pozycji bezwzględnej) --- */
-let wheelOpen = false, wheelVX = 0, wheelVY = 0, wheelSel = 0;
+/* --- koło wyboru (radialne, sterowane wirtualnym kursorem — pointer lock nie daje pozycji bezwzględnej):
+   broń (Q) albo pojazdy (V, vehicle-entry.js: VEHICLE_MENU) — ta sama mechanika i rysowanie --- */
+let wheelOpen = false, wheelVX = 0, wheelVY = 0, wheelSel = 0, wheelMenu = null;
 const wheelWrap = document.getElementById('wheelWrap');
 const wheelCanvas = document.getElementById('wheelCanvas');
 const wctx = wheelCanvas.getContext('2d');
 
-function drawWheel(){
-  const cx = 180, cy = 180, R = 130, r0 = 46, n = WEAPON_DEFS.length;
+function drawWheel(labels){
+  const cx = 180, cy = 180, R = 130, r0 = 46, n = labels.length;
   wctx.clearRect(0, 0, 360, 360);
   for (let i = 0; i < n; i++){
     const a0 = -Math.PI/2 + i/n*TAU - Math.PI/n, a1 = -Math.PI/2 + i/n*TAU + Math.PI/n;
@@ -151,24 +152,24 @@ function drawWheel(){
     wctx.fillStyle = i === wheelSel ? '#14161b' : '#f2f0ea';
     wctx.font = '600 14px Inter, system-ui, sans-serif';
     wctx.textAlign = 'center'; wctx.textBaseline = 'middle';
-    wctx.fillText(WEAPON_DEFS[i].name, lx, ly);
+    wctx.fillText(labels[i], lx, ly);
   }
 }
 
 function updateWheel(){
-  const wasOpen = wheelOpen;
-  wheelOpen = pointerLocked && mode === 'foot' && !player.dead && down('wheel');
+  const was = wheelMenu, can = pointerLocked && mode === 'foot' && !player.dead;
+  const menu = !can ? null : down('wheel') ? 'weapons' : down('vehicleWheel') ? 'vehicles' : null;
+  if (menu && menu !== was){ wheelVX = 0; wheelVY = 0; wheelSel = menu === 'weapons' ? Weapons.idx : 0; }
+  wheelMenu = menu; wheelOpen = !!menu;
   wheelWrap.classList.toggle('on', wheelOpen);
-  if (wheelOpen && !wasOpen){ wheelVX = 0; wheelVY = 0; wheelSel = Weapons.idx; }
-  if (wheelOpen){
-    const n = WEAPON_DEFS.length;
+  if (menu){
+    const labels = menu === 'weapons' ? WEAPON_DEFS.map(d => d.name) : VEHICLE_MENU.map(m => m.label), n = labels.length;
     if (Math.hypot(wheelVX, wheelVY) > 12){
       const ang = Math.atan2(wheelVY, wheelVX);
       let idx = Math.round((ang + Math.PI/2) / TAU * n);
       wheelSel = ((idx % n) + n) % n;
     }
-    drawWheel();
-  } else if (wasOpen){
-    Weapons.select(wheelSel);
-  }
+    drawWheel(labels);
+  } else if (was === 'weapons') Weapons.select(wheelSel);
+  else if (was === 'vehicles') vehicleMenuPick(wheelSel);
 }

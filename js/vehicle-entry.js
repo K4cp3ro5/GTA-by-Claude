@@ -33,53 +33,76 @@ function npcDoorPoint(n, out){
 }
 const _npcDoor = { x: 0, z: 0 };
 
-/* --- główne auto: trwały obiekt, nigdy nie znika ---
-   Jedyny fizyczny, prowadzalny pojazd (chassisBody/vehicle/carModel) w danej
-   chwili reprezentuje ALBO główne auto, ALBO skradziony pojazd. Gdy gracz
-   kradnie coś innego niż główne auto, ono dostaje lekki "placeholder"
-   (statyczny model + kolizja) stojący dokładnie tam, gdzie je zaparkowano —
-   dzięki temu można po nie wrócić. Skradzione auto, gdy zostaje porzucone
-   na rzecz kolejnej kradzieży, nie zostawia żadnego śladu. */
-const MAIN_CAR_COLOR = 0xb3272b;
-let drivingIdentity = 'main';           // 'main' | 'jacked'
-let mainCarPos = new THREE.Vector3(CAR_SPAWN.x, CAR_SPAWN.y, CAR_SPAWN.z);
-let mainCarHeading = Math.PI;
-let mainCarPlaceholder = null;          // { mesh, body } albo null gdy główne auto jest właśnie prowadzone
-
-function showMainCarPlaceholder(){
-  if (mainCarPlaceholder) return;
-  const mdl = buildCarModel(MAIN_CAR_COLOR, true);
-  mdl.root.position.set(mainCarPos.x, mainCarPos.y, mainCarPos.z);   // root = środek masy (jak w syncCar); wcześniej -COM_H wkopywało atrapę w ziemię
-  mdl.root.rotation.y = mainCarHeading + Math.PI;
+/* --- auto gracza, auta skradzione i zaparkowane ---
+   Prowadzalny pojazd (chassisBody/vehicle/carModel) jest JEDEN; jego tożsamość to `driving`
+   (owner: 'player' = auto gracza, 'stolen' = skradzione; typ i kolor). Gdy gracz przesiada się do
+   innego auta, dotychczasowe zostaje w świecie jako atrapa w parkedCars (model + statyczna bryła)
+   z tym samym typem, kolorem i właścicielem — można do niego wrócić. Auto gracza jest dokładnie
+   jedno i nigdy nie znika samo; skradzione zostają tam, gdzie je porzucono (maks. PARKED_STOLEN_MAX —
+   nadmiarowe najstarsze usuwane dopiero > 120 m od gracza i poza kadrem) i nigdy nie stają się
+   autem gracza. Menu kołowe V (pieszo): nowe auto gracza wybranego typu przed graczem
+   (poprzednie auto gracza znika) albo przywołanie obecnego. */
+const MAIN_CAR_COLOR = 0xb3272b, PARKED_STOLEN_MAX = 4;
+const driving = { owner: 'player', type: 'sedan', color: MAIN_CAR_COLOR };
+let drivingIdentity = 'main';           // zgodność: 'main' = auto gracza, 'jacked' = skradzione
+const parkedCars = [];                  // { id, owner, type, color, mesh, body, x, y (podłoże), z, heading, t }
+let parkedSeq = 0;
+function setDriving(owner, type, color){
+  driving.owner = owner; driving.type = type; driving.color = color;
+  drivingIdentity = owner === 'player' ? 'main' : 'jacked';
+}
+/* wysokość dachu modelu typu (bryła atrapy od podłoża do dachu) */
+const _carTop = {};
+function carTopOf(type){ return _carTop[type] || (_carTop[type] = Math.max(...carParts(type).map(q => q[5] + q[1] / 2))); }
+function addParked(owner, type, color, x, yGround, z, heading){
+  const T = CAR_TYPES[type], mdl = buildCarModel(color, true, type), top = carTopOf(type);
+  mdl.root.position.set(x, yGround + T.restY, z);          // root = środek nadwozia (jak w syncCar)
+  mdl.root.rotation.y = heading + Math.PI;
   const b = new CANNON.Body({ mass: 0, material: matCar });
-  b.addShape(new CANNON.Box(new CANNON.Vec3(0.95, 0.62, 2.1)), new CANNON.Vec3(0, COM_H, 0));
-  b.position.set(mainCarPos.x, 0, mainCarPos.z);
-  b.quaternion.setFromAxisAngle(new CANNON.Vec3(0,1,0), mainCarHeading + Math.PI);
+  b.addShape(new CANNON.Box(new CANNON.Vec3(T.half[0] - 0.01, top / 2 - 0.05, T.half[2] - 0.06)), new CANNON.Vec3(0, top / 2, 0));
+  b.position.set(x, yGround, z);
+  b.quaternion.setFromAxisAngle(new CANNON.Vec3(0,1,0), heading + Math.PI);
   b.collisionFilterGroup = G_CAR;
   b.collisionFilterMask  = -1;
   addBody(b);
-  mainCarPlaceholder = { mesh: mdl.root, body: b };
+  const p = { id: ++parkedSeq, owner: owner, type: type, color: color, mesh: mdl, body: b, x: x, y: yGround, z: z, heading: heading, t: clock };
+  parkedCars.push(p);
+  return p;
 }
-function hideMainCarPlaceholder(){
-  if (!mainCarPlaceholder) return;
-  scene.remove(mainCarPlaceholder.mesh);
-  delBody(mainCarPlaceholder.body);
-  mainCarPlaceholder = null;
+function removeParked(p){
+  disposeCarModel(p.mesh); delBody(p.body);
+  const i = parkedCars.indexOf(p); if (i >= 0) parkedCars.splice(i, 1);
 }
-function mainPlaceholderDoorPoint(out){
-  mainCarPlaceholder.body.quaternion.vmult(CAR_LEFT, _v1);
-  out.x = mainCarPlaceholder.body.position.x + _v1.x * 1.25;
-  out.z = mainCarPlaceholder.body.position.z + _v1.z * 1.25;
+function parkedDoorPoint(p, out){
+  p.body.quaternion.vmult(CAR_LEFT, _v1);
+  const o = CAR_TYPES[p.type].half[0] + 0.29;
+  out.x = p.body.position.x + _v1.x * o;
+  out.z = p.body.position.z + _v1.z * o;
 }
-const _mainDoor = { x: 0, z: 0 };
+/* bieżące prowadzalne auto zostaje w świecie jako atrapa (przed przesiadką do innego) */
+function parkActive(){
+  const T = CAR_TYPES[carType], p = chassisBody.position;
+  return addParked(driving.owner, carType, driving.color, p.x, p.y - T.restY, p.z, carYaw());
+}
+/* prowadzalne auto przyjmuje typ, kolor, właściciela i pozycję (yGround = podłoże) */
+function takeOver(type, color, owner, x, yGround, z, heading){
+  applyCarType(type, color);
+  chassisBody.position.set(x, yGround + CAR_TYPES[type].restY + 0.13, z);
+  chassisBody.quaternion.setFromAxisAngle(new CANNON.Vec3(0,1,0), heading + Math.PI);
+  chassisBody.velocity.set(0, 0, 0);
+  chassisBody.angularVelocity.set(0, 0, 0);
+  setDriving(owner, type, color);
+}
+const _parkDoor = { x: 0, z: 0 };
 
 function nearestVehicle(){
   const p = player.body.position;
-  let best = { kind: 'own', dist: distToDoor() };
-  if (drivingIdentity === 'jacked' && mainCarPlaceholder){
-    mainPlaceholderDoorPoint(_mainDoor);
-    const d = Math.hypot(p.x - _mainDoor.x, p.z - _mainDoor.z);
-    if (d < best.dist) best = { kind: 'main', dist: d };
+  let best = { kind: 'own', dist: distToDoor() };            // 'own' = prowadzalne auto (twoje albo skradzione), stoi gdzieś
+  for (const q of parkedCars){
+    if (Math.abs(q.y - (p.y - 0.9)) > 2) continue;
+    parkedDoorPoint(q, _parkDoor);
+    const d = Math.hypot(p.x - _parkDoor.x, p.z - _parkDoor.z);
+    if (d < best.dist) best = { kind: 'parked', dist: d, parked: q };
   }
   for (const n of npcs){
     if (Math.abs((n.y || 0) - (p.y - 0.9)) > 2) continue;           // auto na estakadzie nad / pod graczem
@@ -90,38 +113,106 @@ function nearestVehicle(){
   return best;
 }
 
-/* kradzież: auto NPC znika z ruchu na dobre (w jego miejsce pojawia się nowe,
-   gdzie indziej), a jedyny prowadzalny pojazd przenosi się w jego miejsce
-   i przyjmuje jego kolor. Jeśli gracz jechał dotąd głównym autem, zostaje
-   ono jako placeholder tam, gdzie stało; jeśli jechał już skradzionym —
-   tamto po prostu znika bez śladu. */
+/* kradzież: auto NPC znika z ruchu na dobre (w jego miejsce pojawia się nowe, gdzie indziej),
+   prowadzalne auto przenosi się w jego miejsce i przyjmuje jego typ i kolor jako SKRADZIONE;
+   dotychczasowe auto (twoje albo inne skradzione) zostaje zaparkowane tam, gdzie stało */
 function jackCar(n){
-  if (drivingIdentity === 'main'){
-    mainCarPos.set(chassisBody.position.x, chassisBody.position.y, chassisBody.position.z);
-    mainCarHeading = carYaw();
-    showMainCarPlaceholder();
-  }
-
-  const targetX = n.pos.x, targetZ = n.pos.y, targetHeading = n.heading, color = n.color, type = n.type || 'sedan';
+  parkActive();
+  const x = n.pos.x, z = n.pos.y, y = n.y || 0, h = n.heading, color = n.color, type = n.type || 'sedan';
   removeNpcCar(n);
   spawnRandomNpcCar();
+  takeOver(type, color, 'stolen', x, y, z, h);
+}
+/* wejście do zaparkowanego auta (twojego albo skradzionego) */
+function enterParked(q){
+  const d = { owner: q.owner, type: q.type, color: q.color, x: q.x, y: q.y, z: q.z, heading: q.heading };
+  parkActive();
+  removeParked(q);
+  takeOver(d.type, d.color, d.owner, d.x, d.y, d.z, d.heading);
+}
+/* zgodność ze starszym kodem / testami: wróć do auta gracza, jeśli stoi zaparkowane */
+function returnToMainCar(){ const own = parkedCars.find(q => q.owner === 'player'); if (own) enterParked(own); }
 
-  applyCarType(type, color);                                                  // auto przejmuje typ i kolor NPC
-  chassisBody.position.set(targetX, (n.y || 0) + CAR_TYPES[type].restY + 0.13, targetZ);
-  chassisBody.quaternion.setFromAxisAngle(new CANNON.Vec3(0,1,0), targetHeading + Math.PI);
-  chassisBody.velocity.set(0, 0, 0);
-  chassisBody.angularVelocity.set(0, 0, 0);
-  drivingIdentity = 'jacked';
+/* nadmiar skradzionych: najstarsze, daleko od gracza i poza kadrem */
+const _camDir = new THREE.Vector3();
+function pruneParked(){
+  const stolen = parkedCars.filter(q => q.owner === 'stolen').sort((a, b) => a.t - b.t);
+  if (stolen.length <= PARKED_STOLEN_MAX) return;
+  const p = mode === 'car' ? chassisBody.position : player.body.position;
+  camera.getWorldDirection(_camDir);
+  for (const q of stolen){
+    const dx = q.x - camera.position.x, dz = q.z - camera.position.z, dl = Math.hypot(dx, dz) || 1;
+    const inView = (dx * _camDir.x + dz * _camDir.z) / dl > 0.55 && dl < 420;
+    if (Math.hypot(q.x - p.x, q.z - p.z) > 120 && !inView){ removeParked(q); return; }
+  }
 }
 
-function returnToMainCar(){
-  chassisBody.position.copy(mainCarPos);
-  chassisBody.quaternion.setFromAxisAngle(new CANNON.Vec3(0,1,0), mainCarHeading + Math.PI);
-  chassisBody.velocity.set(0, 0, 0);
-  chassisBody.angularVelocity.set(0, 0, 0);
-  carModel.paintMat.color.setHex(MAIN_CAR_COLOR);
-  hideMainCarPlaceholder();
-  drivingIdentity = 'main';
+/* --- menu kołowe pojazdów (V) --- */
+const VEHICLE_MENU = [
+  { label: 'Zwykły', type: 'sedan' }, { label: 'Pickup', type: 'pickup' }, { label: 'Sportowy', type: 'sport' }, { label: 'Przywołaj', summon: true }
+];
+let lastCarSpawn = -99;
+const _ray = new CANNON.Ray(), _rayRes = new CANNON.RaycastResult();
+function rayHit(x0, y0, z0, x1, y1, z1, mask){
+  _rayRes.reset();
+  _ray.from.set(x0, y0, z0); _ray.to.set(x1, y1, z1);
+  _ray.intersectWorld(world, { mode: CANNON.Ray.CLOSEST, result: _rayRes, skipBackfaces: true, collisionFilterGroup: G_WORLD, collisionFilterMask: mask || (G_WORLD | G_CAR) });
+  return _rayRes.hasHit ? _rayRes : null;
+}
+function groundAt(x, z, yTop){
+  const h = rayHit(x, yTop, z, x, yTop - 25, z, G_WORLD);                   // tylko świat (nie dach innego auta)
+  return (h && h.hitNormalWorld.y > 0.85) ? h.hitPointWorld.y : null;
+}
+/* czy auto typu T zmieści się w (x, y=podłoże, z) z kursem heading: budynki, auta, piesi, słupki, drzewa
+   i każda inna bryła (promienie poziome od środka do obrysu na dwóch wysokościach) */
+function carSpotFree(x, y, z, heading, T){
+  const hw = T.half[0] + 0.3, hl = T.half[2] + 0.3, f = { x: Math.sin(heading), z: Math.cos(heading) }, r = { x: -f.z, z: f.x };
+  const inRect = (px, pz, m) => { const dx = px - x, dz = pz - z; return Math.abs(dx * f.x + dz * f.z) < hl + m && Math.abs(dx * r.x + dz * r.z) < hw + m; };
+  if (buildings.some(b => Math.abs(b.x - x) < b.w / 2 + hl && Math.abs(b.z - z) < b.d / 2 + hl)) return false;
+  if (npcs.some(n => Math.abs((n.y || 0) - y) < 2.5 && Math.hypot(n.pos.x - x, n.pos.y - z) < n.halfL + hl + 0.6)) return false;
+  if (Pedestrians.list.some(q => Math.hypot(q.pos.x - x, q.pos.y - z) < hl + 1)) return false;
+  if (parkedCars.some(q => Math.abs(q.y - y) < 2.5 && Math.hypot(q.x - x, q.z - z) < hl + CAR_TYPES[q.type].half[2] + 0.6)) return false;
+  if (driving.owner !== 'player' && Math.hypot(chassisBody.position.x - x, chassisBody.position.z - z) < hl + 3) return false;
+  if (lampSpots.some(s => inRect(s.x, s.z, 0.3)) || treeSpots.some(s => inRect(s.x, s.z, 0.6)) || signGeomLog.some(s => (s.poles || []).some(p => inRect(p.x, p.z, 0.2)))) return false;
+  if (HWY_PIERS.some(p => inRect(p.x, p.z, p.size / 2 + 0.2))) return false;
+  for (const yy of [0.45, 1.1]) for (const q of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]){
+    const tx = x + f.x * hl * q[0] + r.x * hw * q[1], tz = z + f.z * hl * q[0] + r.z * hw * q[1];
+    if (rayHit(x, y + yy, z, tx, y + yy, tz)) return false;
+  }
+  return true;
+}
+/* miejsce 5–9 m przed graczem (w kierunku kamery), na gruncie albo pomoście */
+function findCarSpot(type){
+  const T = CAR_TYPES[type], p = player.body.position;
+  camera.getWorldDirection(_camDir); _camDir.y = 0;
+  if (_camDir.lengthSq() < 1e-4) _camDir.set(0, 0, -1);
+  _camDir.normalize();
+  const heading = Math.atan2(_camDir.x, _camDir.z), right = { x: -_camDir.z, z: _camDir.x };
+  for (const d of [6.5, 8, 5.5, 9.5]) for (const lat of [0, 2.5, -2.5]){
+    const x = p.x + _camDir.x * d + right.x * lat, z = p.z + _camDir.z * d + right.z * lat;
+    const g = groundAt(x, z, p.y + 2.5);
+    if (g === null || Math.abs(g - (p.y - 0.9)) > 2.5) continue;
+    if (carSpotFree(x, g, z, heading, T)) return { x: x, y: g, z: z, heading: heading };
+  }
+  return null;
+}
+function spawnOwnCar(type){
+  if (clock - lastCarSpawn < 3){ hudToast('Poczekaj chwilę'); return false; }
+  const spot = findCarSpot(type);
+  if (!spot){ hudToast('Brak miejsca na auto'); return false; }
+  lastCarSpawn = clock;
+  if (driving.owner === 'player') takeOver(type, MAIN_CAR_COLOR, 'player', spot.x, spot.y, spot.z, spot.heading);   // twoje auto stoi puste — przenosi się
+  else {
+    const own = parkedCars.find(q => q.owner === 'player'); if (own) removeParked(own);
+    addParked('player', type, MAIN_CAR_COLOR, spot.x, spot.y, spot.z, spot.heading);
+  }
+  hudToast('Twój samochód: ' + CAR_TYPES[type].name);
+  return true;
+}
+function ownCarType(){ if (driving.owner === 'player') return carType; const own = parkedCars.find(q => q.owner === 'player'); return own ? own.type : 'sedan'; }
+function vehicleMenuPick(i){
+  const it = VEHICLE_MENU[i]; if (!it) return;
+  if (it.summon) spawnOwnCar(ownCarType()); else spawnOwnCar(it.type);
 }
 
 function toggleVehicle(){
@@ -130,7 +221,7 @@ function toggleVehicle(){
     const nv = nearestVehicle();
     if (nv.dist > 3.5) return;
     if (nv.kind === 'npc') jackCar(nv.npc);
-    else if (nv.kind === 'main') returnToMainCar();
+    else if (nv.kind === 'parked') enterParked(nv.parked);
     mode = 'car';
     player.mesh.visible = false;
     delBody(player.body);

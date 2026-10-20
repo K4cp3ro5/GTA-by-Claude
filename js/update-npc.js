@@ -54,8 +54,7 @@ function updateNpcs(dt){
     if (checkPoint(chassisBody.position.x, chassisBody.position.z, 1.0, chassisBody.position.y - 0.5)){ block = true; why = 'gracz-auto'; }
     if (!block && mode === 'foot' &&
         checkPoint(player.body.position.x, player.body.position.z, 0.5, player.body.position.y - 0.9)){ block = true; why = 'gracz'; }
-    if (!block && mainCarPlaceholder &&
-        checkPoint(mainCarPlaceholder.body.position.x, mainCarPlaceholder.body.position.z, 1.0, mainCarPlaceholder.body.position.y)){ block = true; why = 'atrapa'; }   // zaparkowane główne auto
+    if (!block) for (const q of parkedCars){ if (checkPoint(q.body.position.x, q.body.position.z, 1.0, q.body.position.y)){ block = true; why = 'atrapa'; break; } }   // zaparkowane auta (twoje, skradzione)
     /* piesi na jezdni (na przejściu albo leżący) — auto staje przed nimi */
     if (!block && low) for (const p of Pedestrians.list){ if (pedOnRoad(p) && checkPoint(p.pos.x, p.pos.y, 0.7)){ block = true; why = 'pieszy'; break; } }
     /* przejście, po którym ktoś właśnie idzie (także po drugiej połowie jezdni): nie wjeżdżam na pasy */

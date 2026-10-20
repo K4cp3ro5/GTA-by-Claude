@@ -53,6 +53,7 @@ function frame(now){
   }
   Weapons.updatePose(dt);
   updateWheel();
+  pruneParked();
 
   const alpha = physicsStep(dt);
 
