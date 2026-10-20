@@ -57,13 +57,13 @@ const Sound = {
   },
 
   /* rpm01: 0..1, load: 0..1 */
-  engine(on, rpm01, load){
+  engine(on, rpm01, load, tone){
     if (!this.ready) return;
-    const t = this.ctx.currentTime;
-    const f = 42 + rpm01 * 168;
+    const t = this.ctx.currentTime, pitch = tone ? tone.pitch : 1, bright = tone ? tone.bright : 1;
+    const f = (42 + rpm01 * 168) * pitch;
     this.eng.frequency.setTargetAtTime(f, t, 0.06);
     this.sub.frequency.setTargetAtTime(f * 0.5, t, 0.06);
-    this.engFilter.frequency.setTargetAtTime(280 + rpm01 * 1700 + load * 420, t, 0.08);
+    this.engFilter.frequency.setTargetAtTime((280 + rpm01 * 1700 + load * 420) * bright, t, 0.08);
     this.engGain.gain.setTargetAtTime(on ? (0.055 + rpm01 * 0.085 + load * 0.03) : 0, t, 0.12);
   },
 
@@ -230,4 +230,5 @@ chassisBody.addEventListener('collide', e => {
   if (v > 3.2) Sound.thud(v);
   if (mode === 'car' && v > 10) damagePlayer((v - 10) * 4, 'kraksa');
   if (e.body && e.body.isPed && v > 2.2) Pedestrians.hit(e.body.pedRef, v);   // body.pedRef = obiekt pieszego (samo ciało nie ma group/state)
+  if (e.body && e.body.npcRef && v > 5.6) npcHitByPlayer(e.body.npcRef, v);    // > 20 km/h: NPC staje ze światłami awaryjnymi
 });

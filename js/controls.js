@@ -16,7 +16,7 @@ const promptEl = document.getElementById('prompt');
 const DEFAULT_BINDS = {
   forward:'KeyW', back:'KeyS', left:'KeyA', right:'KeyD',
   sprint:'ShiftLeft', jump:'Space',
-  enter:'KeyF', horn:'KeyH', reload:'KeyR', wheel:'KeyQ',
+  enter:'KeyF', horn:'KeyH', reload:'KeyR', wheel:'KeyQ', vehicleWheel:'KeyV',
   slot1:'Digit1', slot2:'Digit2', slot3:'Digit3',
   daytime:'KeyT', mute:'KeyM'
 };
@@ -26,6 +26,7 @@ const BIND_ROWS = [
   ['enter','Wsiądź / wysiądź / ukradnij auto (+ E)'],
   ['reload','Przeładuj / postaw auto na kołach'],
   ['wheel','Koło broni (przytrzymaj)'],
+  ['vehicleWheel','Menu pojazdów (przytrzymaj)'],
   ['slot1','Broń — slot 1'], ['slot2','Broń — slot 2'], ['slot3','Broń — slot 3'],
   ['horn','Klakson'], ['daytime','Przyspiesz dobę'], ['mute','Wycisz dźwięk']
 ];
@@ -200,7 +201,8 @@ const dbg = {
   bodies:   document.getElementById('dbgBodies'),
   counts:   document.getElementById('dbgCounts'),
   fps:      document.getElementById('dbgFps'),
-  close:    document.getElementById('closeDebug')
+  close:    document.getElementById('closeDebug'),
+  clearStolen: document.getElementById('dbgClearStolen')
 };
 
 function toggleDebugMenu(){
@@ -280,6 +282,7 @@ dbg.speed.addEventListener('input', () => {
   dbg.speedVal.textContent = carSpeedMult.toFixed(1) + '×';
 });
 dbg.heal.addEventListener('click', ev => { ev.stopPropagation(); player.health = 100; player.stamina = 100; });
+dbg.clearStolen.addEventListener('click', ev => { ev.stopPropagation(); parkedCars.filter(q => q.owner === 'stolen').forEach(removeParked); refreshDebugInfo(); });
 dbg.ammo.addEventListener('click', ev => { ev.stopPropagation(); Weapons.reserve += 200; });
 dbg.teleport.addEventListener('click', ev => {
   ev.stopPropagation();

@@ -86,6 +86,11 @@
     transition:opacity .25s ease,transform .25s ease;
   }
   #speedo.on{opacity:1;transform:none}
+  #carlbl{font-size:12px;letter-spacing:.08em;color:#c9c6bd;margin-bottom:2px;white-space:nowrap}
+  #carlbl.stolen{color:#e8a35a}
+  #toast{position:fixed;left:50%;top:18%;transform:translateX(-50%);padding:8px 16px;border-radius:8px;background:rgba(20,22,27,.82);
+    color:#f2f0ea;font:600 15px Inter,system-ui,sans-serif;opacity:0;transition:opacity .25s;pointer-events:none;z-index:30}
+  #toast.on{opacity:1}
   #kmh{
     font-size:58px;font-weight:200;line-height:.92;letter-spacing:-.02em;
     font-variant-numeric:tabular-nums;
@@ -292,6 +297,7 @@
   </section>
 
   <section class="panel" id="speedo">
+    <div id="carlbl">Twój samochód · Zwykły</div>
     <div id="kmh">0<span>KM/H</span></div>
     <div id="bar"><i id="barfill"></i></div>
     <div id="gear">
@@ -300,6 +306,7 @@
     </div>
   </section>
 
+  <div id="toast"></div>
   <div id="prompt">Naciśnij <kbd>F</kbd> lub <kbd>E</kbd>, aby wsiąść</div>
   <section class="panel" id="weaponhud"><span class="wname" id="wname">Pięści</span><span class="wammo" id="wammo"></span></section>
   <div id="crosshair"></div>
@@ -357,6 +364,7 @@
       <div class="drow"><span>Amunicja pistoletu</span><button class="dbtn" id="dbgAmmo">+200</button></div>
       <div class="drow"><span>Nieśmiertelność</span><input type="checkbox" id="dbgGod"></div>
       <div class="drow"><span>Pozycja</span><button class="dbtn" id="dbgTeleport">Teleportuj do startu</button></div>
+      <div class="drow"><span>Zaparkowane skradzione auta</span><button class="dbtn" id="dbgClearStolen">Usuń</button></div>
       <div class="drow"><span>Mnożnik prędkości auta: <b class="dval" id="dbgSpeedVal">1.0×</b></span><input type="range" id="dbgSpeed" min="0.2" max="3" step="0.1" value="1"></div>
     </div>
 
@@ -374,10 +382,12 @@
 
 <script src="js/core.js"></script>
 <script src="js/hwy-plan.js"></script>
+<script src="js/car-types.js"></script>
 <script src="js/textures.js"></script>
 <script src="js/geobuf.js"></script>
 <script src="js/physics-world.js"></script>
 <script src="js/signs.js"></script>
+<script src="js/districts.js"></script>
 <script src="js/city-generation.js"></script>
 <script src="js/highways.js"></script>
 <script src="js/traffic-lights.js"></script>

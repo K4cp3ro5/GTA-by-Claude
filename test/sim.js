@@ -55,11 +55,65 @@ if (process.env.SEED) base.GAME_SEED = parseInt(process.env.SEED, 10);
 const order = fs.readFileSync(__dirname+'/../loadorder.txt','utf8').trim().split('\n').map(s=>s.trim());
 let code = order.map(f => fs.readFileSync(__dirname+'/../js/'+f,'utf8')).join('\n');
 code += `
+/* --- węzeł: czy punkt (x,z) na wysokości y leży ≥ tol wewnątrz innej drogi (|Δy| < 0.3) — indeks drogi albo null --- */
+let __segGrid = null;
+function __insideWay(x, z, y, wi, tol){
+  const CS = 16;
+  if (!__segGrid){
+    __segGrid = new Map();
+    HWY_WAYS.forEach(w => { for (let i = 0; i < w.pts.length - 1; i++){ const a = w.pts[i], b = w.pts[i+1], s = { w: w.idx, a: a, b: b };
+      const x0 = Math.floor((Math.min(a.x, b.x) - 12) / CS), x1 = Math.floor((Math.max(a.x, b.x) + 12) / CS);
+      const z0 = Math.floor((Math.min(a.z, b.z) - 12) / CS), z1 = Math.floor((Math.max(a.z, b.z) + 12) / CS);
+      for (let gx = x0; gx <= x1; gx++) for (let gz = z0; gz <= z1; gz++){ const k = gx + ',' + gz; if (!__segGrid.has(k)) __segGrid.set(k, []); __segGrid.get(k).push(s); } } });
+  }
+  const c = __segGrid.get(Math.floor(x / CS) + ',' + Math.floor(z / CS)); if (!c) return null;
+  for (const s of c){ if (s.w === wi) continue;
+    const dx = s.b.x - s.a.x, dz = s.b.z - s.a.z, l2 = dx*dx + dz*dz || 1, t = ((x - s.a.x)*dx + (z - s.a.z)*dz) / l2;
+    if (t < 0 || t > 1) continue;
+    const px = s.a.x + dx*t, pz = s.a.z + dz*t, hw = s.a.hw + (s.b.hw - s.a.hw)*t, yy = s.a.y + (s.b.y - s.a.y)*t;
+    if (Math.abs(yy - y) < 0.3 && Math.hypot(x - px, z - pz) < hw - tol) return s.w;
+  }
+  return null;
+}
+/* wysokości powierzchni pod punktem: nawierzchnie dróg, góra pasa rozdziału, korony barier, nosy */
+function __surfacesAt(x, z){
+  const ys = [];
+  HWY_WAYS.forEach(w => { for (let i = 0; i < w.pts.length - 1; i++){ const a = w.pts[i], b = w.pts[i+1];
+    const dx = b.x - a.x, dz = b.z - a.z, l2 = dx*dx + dz*dz || 1, t = ((x - a.x)*dx + (z - a.z)*dz) / l2;
+    if (t < -0.01 || t > 1.01) continue;
+    const px = a.x + dx*t, pz = a.z + dz*t, hw = a.hw + (b.hw - a.hw)*t, y = a.y + (b.y - a.y)*t, l = Math.sqrt(l2);
+    const lat = ((x - px) * -dz + (z - pz) * dx) / l;                 // + w prawo
+    if (Math.abs(lat) <= hw) ys.push(w.kind === 'med' ? y + 0.9 : y);
+    else if (Math.abs(lat) <= hw + 0.4 && wayBarrier(w, i, Math.sign(lat))) ys.push(y + 1.0);
+  } });
+  HWY_GORES.forEach(g => { for (let i = 0; i < g.pts.length - 1; i++){ const a = g.pts[i], b = g.pts[i+1];
+    const poly = [[a.ex, a.ez], [b.ex, b.ez], [b.lx, b.lz], [a.lx, a.lz]];
+    let inside = false; for (let k = 0, m = 3; k < 4; m = k++){ const [xi, zi] = poly[k], [xj, zj] = poly[m]; if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) inside = !inside; }
+    if (inside) ys.push((a.y + b.y) / 2);
+  } });
+  return ys;
+}
+/* nakładanie górnych powierzchni dróg i nosów na tym samym poziomie: próbki co 0.5 m */
+function hwyOverlapCheck(){
+  const pairs = {};
+  const hit = (k, x, z) => { const p = pairs[k] || (pairs[k] = { n: 0, at: [x.toFixed(0), z.toFixed(0)] }); p.n++; };
+  HWY_WAYS.forEach(w => { for (let i = 0; i < w.pts.length - 1; i++){ const a = w.pts[i], b = w.pts[i+1];
+    const l = Math.hypot(b.x - a.x, b.z - a.z); if (l < 0.01) continue; const hx = (b.x - a.x)/l, hz = (b.z - a.z)/l;
+    for (let d = 0.25; d < l; d += 0.5){ const t = d / l, hw = a.hw + (b.hw - a.hw)*t, y = a.y + (b.y - a.y)*t;
+      for (let o = -hw + 0.35; o < hw - 0.1; o += 0.5){
+        const x = a.x + hx*d - hz*o, z = a.z + hz*d + hx*o, o2 = __insideWay(x, z, y, w.idx, 0.1);
+        if (o2 !== null) hit(w.name + ' | ' + HWY_WAYS[o2].name, x, z);
+      } } } });
+  (typeof HWY_GORES !== 'undefined' ? HWY_GORES : []).forEach(g => g.pts.forEach((p, i) => { if (!i) return; const q = g.pts[i - 1];
+    for (let t = 0.2; t < 0.9; t += 0.3){ const x = lerp(lerp(q.ex, p.ex, 0.5), lerp(q.lx, p.lx, 0.5), t), z = lerp(lerp(q.ez, p.ez, 0.5), lerp(q.lz, p.lz, 0.5), t);
+      const o2 = __insideWay(x, z, p.y, -1, 0.1); if (o2 !== null) hit('nos ' + g.cw + ' | ' + HWY_WAYS[o2].name, x, z); } }));
+  return { pairs: Object.keys(pairs).length, area: +Object.values(pairs).reduce((s, p) => s + p.n * 0.25, 0).toFixed(1), list: Object.entries(pairs).slice(0, 10).map(e => e[0] + ': ' + (e[1].n*0.25).toFixed(1) + ' m² @' + e[1].at) };
+}
 function __static(){
   const out = {};
   /* normalne: poziome trójkąty muszą patrzeć W GÓRĘ (inaczej z góry niewidoczne) */
   const down = {};
-  [['roadBuf',roadBuf],['crossBuf',crossBuf],['crosswalkBuf',crosswalkBuf],['roundaboutPaintBuf',roundaboutPaintBuf],['hwTopBuf',hwTopBuf],['hwRampBuf',hwRampBuf],['lawnBuf',lawnBuf],['walkBuf',walkBuf]].forEach(([nm,b]) => {
+  [['roadBuf',roadBuf],['crossBuf',crossBuf],['crosswalkBuf',crosswalkBuf],['roundaboutPaintBuf',roundaboutPaintBuf],['hwTopBuf',hwTopBuf],['hwTopAuxBuf',hwTopAuxBuf],['hwRampBuf',hwRampBuf],['hwRampAuxBuf',hwRampAuxBuf],['hwGoreBuf',hwGoreBuf],['lawnBuf',lawnBuf],['walkBuf',walkBuf]].forEach(([nm,b]) => {
     let flatUp = 0, flatDown = 0;
     for (let i = 0; i < b.n.length; i += 3){
       const ny = b.n[i+1];
@@ -95,6 +149,33 @@ function __static(){
     if (g.kind === 'C-9' || Math.abs(g.x) > CITY_EDGE || Math.abs(g.z) > CITY_EDGE || hwyCovered(g.x, g.z, 0.5)) return;   // znaki na/pod autostradą osobno
     if (!['C-12','A-7','STOP','sygnalizator'].includes(g.kind) && (nearAxis(g.x) < ROAD_H - 0.01 || nearAxis(g.z) < ROAD_H - 0.01)) bad.push(g.kind + ' NA JEZDNI ' + g.x.toFixed(1) + ',' + g.z.toFixed(1));
   });
+  /* słupki: podstawa na nawierzchni / koronie bariery / pasie rozdziału / nosie / chodniku / gruncie (≤ 5 cm) */
+  const float = [];
+  signGeomLog.forEach(g => (g.poles || []).forEach(p => {
+    if (p.base < 0.3) return;                                   // chodnik / grunt (kontrola „na jezdni” osobno)
+    const ys = __surfacesAt(p.x, p.z);
+    if (!ys.some(y => Math.abs(y - p.base) < 0.05)) float.push((g.kind || '?') + ' @' + p.x.toFixed(1) + ',' + p.z.toFixed(1) + ' podstawa ' + p.base.toFixed(2) + ' pod: [' + ys.map(y => y.toFixed(2)).join(',') + ']');
+  }));
+  /* duplikaty: ten sam znak, ten sam kierunek, < 3 m */
+  let dups = 0; const dupEx = [];
+  signLog.forEach((a, i) => { for (let k = i + 1; k < signLog.length; k++){ const b = signLog[k];
+    if (a.kind === b.kind && Math.abs(wrapAngle(a.rot - b.rot)) < 0.3 && Math.hypot(a.x - b.x, a.z - b.z) < 3){ dups++; if (dupEx.length < 3) dupEx.push(a.kind + ' @' + a.x.toFixed(0) + ',' + a.z.toFixed(0)); } } });
+  /* aleja z pierwszeństwem: każdy wlot poprzeczny ma A-7 albo STOP, każdy wylot alei D-1 */
+  const prioMiss = [];
+  const signNear = (kinds, x, z, r) => signLog.some(s => kinds.includes(s.kind) && Math.hypot(s.x - x, s.z - z) < r);
+  PRIO.forEach((axis, key) => {
+    const [i, j] = key.split(',').map(Number), cx = L(i), cz = L(j);
+    if (TL_PTS.some(t => t[0] === i && t[1] === j)) return;
+    [-1, 1].forEach(sz => { if (j + sz < 0 || j + sz > GRID) return; if (!legalTravel(i, j, {x:0, z:sz}, {x:0, z:-sz})) return;
+      if (!signNear(['A-7', 'STOP'], cx, cz + sz * STOP_AT, 9)) prioMiss.push('A-7/STOP ' + i + ',' + j + (sz > 0 ? ' S' : ' N')); });
+    [-1, 1].forEach(sx => { if (i + sx < 1 || i + sx > GRID) return;
+      if (!signNear(['D-1'], cx + sx * (ROAD_H + 5), cz, 9)) prioMiss.push('D-1 ' + i + ',' + j + (sx > 0 ? ' E' : ' W')); });
+  });
+  /* detale (drzewa, latarnie, kosze, hydranty) w obrysie budynku */
+  const inB = p => buildings.some(b => Math.abs(p.x - b.x) < b.w / 2 - 0.2 && Math.abs(p.z - b.z) < b.d / 2 - 0.2);
+  const propsIn = [['drzewo', treeSpots], ['latarnia', lampSpots], ['kosz', binSpots], ['hydrant', hydSpots]].reduce((acc, e) => acc.concat(e[1].filter(inB).map(p => e[0] + ' @' + p.x.toFixed(0) + ',' + p.z.toFixed(0))), []);
+  out.propsInBuildings = { n: propsIn.length, examples: propsIn.slice(0, 5) };
+  out.signChecks = { float: float.length, dups: dups, prioMissing: prioMiss.length, examples: float.slice(0, 4).concat(dupEx, prioMiss.slice(0, 3)) };
   const kinds = {}; signLog.forEach(g => kinds[g.kind] = (kinds[g.kind] || 0) + 1);
   out.signKinds = kinds;
   out.signProblems = bad;
@@ -150,24 +231,51 @@ function __static(){
     }
   }));
   hb.buildings = buildings.filter(b => hwyRectCovered(b.x, b.z, b.w, b.d, 0)).length;
+  /* węzeł: nakładanie nawierzchni (ta sama wysokość), bariery na jezdni sąsiedniej drogi, nosy, sekwencja ćwiartek */
+  const ov = hwyOverlapCheck();
+  const onRoad = [];
+  HWY_WAYS.forEach(w => { for (let i = 0; i < w.pts.length - 1; i++) [1, -1].forEach(sd => {
+    if (!wayBarrier(w, i, sd)) return;
+    const a = w.pts[i], b = w.pts[i + 1], l = Math.hypot(b.x - a.x, b.z - a.z) || 1, rx = -(b.z - a.z) / l, rz = (b.x - a.x) / l;
+    [0.25, 0.5, 0.75].forEach(t => { const hw = lerp(a.hw, b.hw, t) + 0.2, x = lerp(a.x, b.x, t) + rx * sd * hw, z = lerp(a.z, b.z, t) + rz * sd * hw, y = lerp(a.y, b.y, t);
+      const o = __insideWay(x, z, y, w.idx, 0.05); if (o !== null) onRoad.push(w.name + ' na ' + HWY_WAYS[o].name + ' @' + x.toFixed(0) + ',' + z.toFixed(0)); });
+  }); });
+  const seq = ['A1+', 'A1-', 'A2+', 'A2-'].map(cw => {
+    const ex = HWY_RAMPS.find(r => r.kind === 'conn' && r.from === cw), en = HWY_RAMPS.find(r => r.kind === 'conn' && r.to === cw);
+    const sOf = p => Math.abs(hwyAxisOf(p.x, p.z).s);
+    return [sOf(ex.way.pts[0]), sOf(ex.way.pts[ex.way.auxIn - 1]), HP.colS, HP.colS, sOf(en.way.pts[en.way.pts.length - en.way.auxOut]), sOf(en.way.pts[en.way.pts.length - 1])].map(v => v.toFixed(1)).join('/');
+  });
+  hb.overlap = ov; hb.barrierOnRoad = onRoad; hb.seq = seq;
+  /* teren węzła: kopce, stawy, boiska nie na ulicach, nie przy filarach, kopiec pod pomostem z prześwitem ≥ 3 m */
+  const tb = [];
+  terrainLog.forEach(t => {
+    if (t.kind === 'green') return;
+    if (nearAxis(t.x) < ROAD_H + t.r - 1 || nearAxis(t.z) < ROAD_H + t.r - 1) tb.push(t.kind + ' na ulicy @' + t.x.toFixed(0) + ',' + t.z.toFixed(0));
+    if (HWY_PIERS.some(p => Math.hypot(p.x - t.x, p.z - t.z) < t.r * 0.6 + p.size / 2)) tb.push(t.kind + ' przy filarze @' + t.x.toFixed(0) + ',' + t.z.toFixed(0));
+    if (t.kind === 'mound' && deckClearAt(t.x, t.z) < t.h + 3) tb.push('kopiec pod pomostem @' + t.x.toFixed(0) + ',' + t.z.toFixed(0));
+  });
+  out.terrain = { mounds: terrainLog.filter(t => t.kind === 'mound').length, ponds: terrainLog.filter(t => t.kind === 'pond').length, courts: terrainLog.filter(t => t.kind === 'court').length,
+                  greens: terrainLog.filter(t => t.kind === 'green').length, problems: tb.length, examples: tb.slice(0, 5) };
+  hb.gores = HWY_GORES.length; hb.goreMinGap = Math.min(...HWY_GORES.map(g => g.gap));
   out.hwy = { ways: HWY_WAYS.length, piers: HWY_PIERS.length, maxSpan: +HWY_MAX_SPAN.toFixed(1), pierRoad: hb.pierRoad.length, pierWalk: hb.pierWalk.length,
-              lowClearance: hb.clearance.length, minClearance: +hb.minClear.toFixed(2), buildingsInBand: hb.buildings, examples: hb.pierRoad.concat(hb.pierWalk, hb.clearance).slice(0, 5) };
+              lowClearance: hb.clearance.length, minClearance: +hb.minClear.toFixed(2), buildingsInBand: hb.buildings,
+              overlapArea: hb.overlap.area, barrierOnRoad: hb.barrierOnRoad.length, gores: hb.gores, goreMinGap: +hb.goreMinGap.toFixed(2),
+              seqSame: hb.seq.every(q => q === hb.seq[0]), seq: hb.seq[0],
+              examples: hb.pierRoad.concat(hb.pierWalk, hb.clearance, hb.overlap.list, hb.barrierOnRoad).slice(0, 6) };
   out.world = { wall: WALL_X, cityEdge: CITY_EDGE };
   return out;
 }
 /* prawdziwe nakładanie nadwozi: test osi rozdzielającej (SAT) dla prostokątów 1.86 x 4.1 m
    obróconych wg kierunku jazdy (pomniejszone o 0.1 m — styk zderzaków to jeszcze nie kolizja) */
 function __obb(a, b){
-  const ha = [0.88, 2.0], ax = [[Math.cos(a.h), -Math.sin(a.h)], [Math.sin(a.h), Math.cos(a.h)]];
-  const bx = [[Math.cos(b.h), -Math.sin(b.h)], [Math.sin(b.h), Math.cos(b.h)]];
+  /* prostokąty nadwozi wg typów (hw, hl), lekko pomniejszone (0.05 m) — jak dawne 0.88 × 2.0 dla sedana */
+  const axes = [a.h, a.h + Math.PI/2, b.h, b.h + Math.PI/2].map(h => [Math.sin(h), Math.cos(h)]);
   const d = [b.x - a.x, b.z - a.z];
-  for (const axis of ax.concat(bx)){
-    const ra = ha[0]*Math.abs(ax[0][0]*axis[0] + ax[0][1]*axis[1]) + ha[1]*Math.abs(ax[1][0]*axis[0] + ax[1][1]*axis[1]);
-    const rb = ha[0]*Math.abs(bx[0][0]*axis[0] + bx[0][1]*axis[1]) + ha[1]*Math.abs(bx[1][0]*axis[0] + bx[1][1]*axis[1]);
-    if (Math.abs(d[0]*axis[0] + d[1]*axis[1]) > ra + rb) return false;
-  }
+  const ext = (o, ax) => { const f = [Math.sin(o.h), Math.cos(o.h)], r = [f[1], -f[0]]; return Math.abs(f[0]*ax[0] + f[1]*ax[1]) * (o.hl - 0.05) + Math.abs(r[0]*ax[0] + r[1]*ax[1]) * (o.hw - 0.05); };
+  for (const ax of axes){ if (Math.abs(d[0]*ax[0] + d[1]*ax[1]) > ext(a, ax) + ext(b, ax)) return false; }
   return true;
 }
+
 function __sim(seconds){
   const dt = 0.05, steps = Math.floor(seconds/dt);
   chassisBody.position.set(9999, 0.6, 9999);       // auto gracza poza trasami
@@ -178,10 +286,28 @@ function __sim(seconds){
   redLightAhead = (...a) => { const v = _r(...a); if (v){ cnt.red++; if (late) cnt.red2++; } return v; };
   stopSignAhead = (...a) => { const v = _s(...a); if (v){ cnt.stop++; if (late) cnt.stop2++; } return v; };
   roundaboutYield = (...a) => { const v = _y(...a); if (v) cnt.yield++; return v; };
+  /* scenariusz: dwa auta zaparkowane na pasach pętli miejskich (środek długiego prostego odcinka) — objazdy */
+  const obstPaths = new Set();
+  [3, 11].forEach(li => {
+    const P = LOOPS[li];
+    for (let k = 0; k < P.length; k++){
+      const a = P[k], b = P[(k + 1) % P.length], l = Math.hypot(b.x - a.x, b.z - a.z);
+      if (l < 34 || a.rb !== undefined || b.rb !== undefined || a.hwy || b.hwy) continue;
+      /* środek kwartału wzdłuż ulicy (poza skrzyżowaniem i przejściami) */
+      const na = v => { let m = 1e9; for (let i = 0; i <= GRID; i++) m = Math.min(m, Math.abs(v - L(i))); return m; };
+      const ts = [0.5, 0.35, 0.65, 0.2, 0.8].find(t => { const x = lerp(a.x, b.x, t), z = lerp(a.z, b.z, t); return Math.abs(b.x - a.x) > Math.abs(b.z - a.z) ? na(x) > 19 : na(z) > 19; });
+      if (ts === undefined) continue;
+      const x = lerp(a.x, b.x, ts), z = lerp(a.z, b.z, ts);
+      if (npcs.some(n => Math.hypot(n.pos.x - x, n.pos.y - z) < 12)) continue;
+      addParked('stolen', 'sedan', 0x777777, x, 0, z, Math.atan2(b.x - a.x, b.z - a.z)); obstPaths.add(P); break;
+    }
+  });
+  NPC_LOD_DIST = 300;                     // gracz daleko: wszystkie auta liczone co drugą klatkę (test LOD)
   const stuck = new Map(), report = { stuckMax:0, stuckIds:[], overlaps:0, overlapPairs:new Set(), minSpeedSamples:0 };
   for (let s = 0; s < steps; s++){
     late = s > steps / 2;
     updateTrafficLights(dt); updateNpcs(dt); updatePedestrians(dt);
+    if (s > 0 && s % Math.round(60 / dt) === 0 && Pedestrians.list.length){ const q = Pedestrians.list[s % Pedestrians.list.length]; Pedestrians.scare(q.pos.x, q.pos.y, 30); npcPanicAt(q.pos.x, q.pos.y); }
     for (const p of Pedestrians.list){
       if (p.state === 'wait') cnt.pedWaitMax = Math.max(cnt.pedWaitMax, p.waitT);
       if (!pedOnRoad(p)) continue;
@@ -196,11 +322,15 @@ function __sim(seconds){
       const rk = n.path[n.wp].rk;
       if (rk !== n.__rk){ if (rk === 'loop') cnt.loopPass = (cnt.loopPass || 0) + 1; if (rk === 'conn') cnt.connPass = (cnt.connPass || 0) + 1; if (rk === 'enter') cnt.hwyEnter = (cnt.hwyEnter || 0) + 1; n.__rk = rk; }
       if ((n.y || 0) > 1) cnt.hwyMax = Math.max(cnt.hwyMax, n.speed);
+      /* zjazd z odcinka wyprzedzania na lewym pasie (ma być 0) */
+      const tgo = n.path[n.wp];
+      if (n.__ovt && !tgo.ovt && tgo.hwy && (n.lat || 0) > 0.5) cnt.leftExit = (cnt.leftExit || 0) + 1;
+      n.__ovt = !!tgo.ovt;
       /* przepisy: limit prędkości strefy (z tolerancją 10%), jednokierunkowe */
       /* na autostradzie / łącznicy limitem jest vmax punktu trasy (znaki B-33 przy rampach), ulice pod estakadą nie liczą się */
       const tg = n.path[n.wp], onHwy = tg.hwy || (n.y || 0) > 1;
       const tp = n.path[(n.wp - 1 + n.path.length) % n.path.length];   // limit odcinka: większy z jego końców (hamowanie trwa)
-      const lim = onHwy ? (tg.vmax !== undefined && tp.vmax !== undefined ? Math.max(tg.vmax, tp.vmax) : tg.vmax) : speedLimitAt(n.pos.x, n.pos.y);
+      const lim = onHwy ? (((n.latT || 0) > 1 || (n.lat || 0) > 0.3) && tg.ovt ? HP.vmax : (tg.vmax !== undefined && tp.vmax !== undefined ? Math.max(tg.vmax, tp.vmax) : tg.vmax)) : speedLimitAt(n.pos.x, n.pos.y);   // lewy pas odcinka wyprzedzania: 100 km/h
       if (lim && n.speed > lim * 1.1 + 0.3) cnt.overLimit++;
       if (!onHwy && inZone30(n.pos.x, n.pos.y)) cnt.v30 = Math.max(cnt.v30, n.speed);
       else if (!onHwy && lim) cnt.v50 = Math.max(cnt.v50, n.speed);
@@ -220,7 +350,7 @@ function __sim(seconds){
       }
       for (let k = i+1; k < npcs.length; k++){
         const m = npcs[k];
-        if (Math.abs((n.y || 0) - (m.y || 0)) < 2.5 && Math.hypot(n.pos.x-m.pos.x, n.pos.y-m.pos.y) < 4.6 && __obb({x:n.pos.x, z:n.pos.y, h:n.heading}, {x:m.pos.x, z:m.pos.y, h:m.heading})){ report.overlaps++; if ((n.y || 0) > 1) cnt.hwyOverlap = (cnt.hwyOverlap || 0) + 1; report.overlapPairs.add(i+'-'+k); (report.locs = report.locs || []).push([+n.pos.x.toFixed(0), +n.pos.y.toFixed(0), +n.heading.toFixed(1), +m.heading.toFixed(1)]); }
+        if (Math.abs((n.y || 0) - (m.y || 0)) < 2.5 && Math.hypot(n.pos.x-m.pos.x, n.pos.y-m.pos.y) < 6 && __obb({x:n.pos.x, z:n.pos.y, h:n.heading, hw:n.halfW, hl:n.halfL}, {x:m.pos.x, z:m.pos.y, h:m.heading, hw:m.halfW, hl:m.halfL})){ report.overlaps++; if ((n.y || 0) > 1) cnt.hwyOverlap = (cnt.hwyOverlap || 0) + 1; report.overlapPairs.add(i+'-'+k); (report.locs = report.locs || []).push([+n.pos.x.toFixed(0), +n.pos.y.toFixed(0), +n.heading.toFixed(1), +m.heading.toFixed(1)]); }
       }
     }
   }
@@ -229,6 +359,9 @@ function __sim(seconds){
     report.dump = npcs.map((m,i)=>({i, x:+m.pos.x.toFixed(1), z:+m.pos.y.toFixed(1), h:+m.heading.toFixed(2), sp:+Math.hypot(m.body.velocity.x,m.body.velocity.z).toFixed(2), blk:m.blocked, sp2:m.stopPass, hold:m.stopHold, wp:m.wp}))
       .filter(m => Math.hypot(m.x-sn.pos.x, m.z-sn.pos.y) < 20);
   }
+  report.g7 = { objazdy: npcs.reduce((a, n) => a + (n.bypassCount || 0), 0), maksCzekaniePrzedPrzeszkoda: +Math.max(0, ...npcs.map(n => n.obstMax || 0)).toFixed(1),
+                 wyprzedzenia: npcs.reduce((a, n) => a + (n.ovtCount || 0), 0), zjazdyZLewegoPasa: cnt.leftExit || 0, ucieczkiPieszych: Pedestrians.fled,
+                 profile: npcs.reduce((a, n) => (a[n.profile] = (a[n.profile] || 0) + 1, a), {}), typy: npcs.reduce((a, n) => (a[n.type] = (a[n.type] || 0) + 1, a), {}) };
   report.cnt = cnt;
   report.hwyRun = { nakładaniaNaAutostradzie: cnt.hwyOverlap || 0, przejazdyPętli: cnt.loopPass || 0, przejazdyŁącznic: cnt.connPass || 0, wjazdyZPrzekątnych: cnt.hwyEnter || 0, maksKmh: +(cnt.hwyMax*3.6).toFixed(0), poniżejPomostu: cnt.underDeck || 0 };
   report.npcCount = npcs.length;
@@ -251,6 +384,9 @@ console.log('Znaki wg rodzaju:', JSON.stringify(st.signKinds));
 console.log('Elementy poza murem:', st.outsideWall.length, st.outsideWall.slice(0,5));
 console.log('Świat:', JSON.stringify(st.world));
 console.log('Autostrady (statycznie):', JSON.stringify(st.hwy));
+console.log('Teren węzła:', JSON.stringify(st.terrain));
+console.log('Znaki (kontrola):', JSON.stringify(st.signChecks));
+console.log('Detale w budynkach:', JSON.stringify(st.propsInBuildings));
 const r = base.__sim(secs);
 console.log('Symulacja', secs, 's gry,', r.npcCount, 'aut NPC (miasto + trasy przez autostrady)');
 console.log('Najdłuższy postój jednego auta (v<0.3):', r.stuckMax.toFixed(1), 's', r.stuckAt ? '(auto #'+r.stuckId+' przy '+r.stuckAt+')' : '');
@@ -262,4 +398,5 @@ console.log('Ronda: klatki z nadwoziem na wyspie:', r.cnt.rbNear, '| jazda pod p
 console.log('Piesi:', r.peds, 'przejść przez jezdnię:', r.crossings, '| przejścia używane przez pieszych:', r.pedCw, '| najdłuższe czekanie:', r.cnt.pedWaitMax.toFixed(1), 's | najbliżej auta NPC (pieszy na jezdni):', r.cnt.pedMinD.toFixed(2), 'm | klatki < 2.2 m (środek–środek):', r.cnt.pedHit);
 console.log('Przepisy: klatki z przekroczeniem limitu >10%:', r.cnt.overLimit, '| maks. w strefie 30:', (r.cnt.v30*3.6).toFixed(0), 'km/h | maks. w mieście (50):', (r.cnt.v50*3.6).toFixed(0), 'km/h | maks. na autostradzie:', (r.cnt.hwyMax*3.6).toFixed(0), 'km/h | jazda pod prąd po jednokierunkowej:', r.cnt.wrongWay);
 console.log('Postawionych znaków/sygnalizatorów:', r.signs, '| stojących w budynku:', r.signsInBuildings.length, r.signsInBuildings.slice(0,6));
+console.log('NPC (G7):', JSON.stringify(r.g7));
 console.log('Autostrady (ruch):', JSON.stringify(r.hwyRun));

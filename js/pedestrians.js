@@ -33,21 +33,26 @@ const pedBlockSet = new Set(pedBlockCandidates.map(b => b.bi + ',' + b.bj));
 const pedCrosswalks = crosswalks.filter(c => c.blocks.every(b => pedBlockSet.has(b[0] + ',' + b[1])));
 pedCrosswalks.forEach(c => { c.tl = trafficLights.find(t => Math.abs(t.x - L(c.i)) < 1 && Math.abs(t.z - L(c.j)) < 1) || null; });
 
-const Pedestrians = { list: [] };
+const PED_SHIRTS = [0x8a3b3b, 0x3b5a8a, 0x4b7a4f, 0x6b4f8a, 0x8a7a3b, 0x3b8a83, 0x555b63, 0x9c7a2f, 0xc9c4b8, 0xb85a2a, 0x2a2d33, 0xd8b23a, 0x7a2f4f];
+const PED_PANTS = [0x2c2f36, 0x33363d, 0x40424a, 0x25272d, 0x1e2024, 0x3a4a63, 0x5b4a3a, 0x6b6f75];
+const Pedestrians = { list: [], fled: 0 };
 const PED_WALK = 1.15, PED_CROSS = 1.55;
 
 function spawnPed(bi, bj){
   const path = pedLoopFor(bi, bj);
   const idx = randInt(0, 3);
-  const pal = PED_PALETTES[randInt(0, PED_PALETTES.length - 1)];
+  /* różnorodność: kolory skóry/włosów z palet, ubrania z szerszej listy, wzrost 0.9–1.1, tempo */
+  const P0 = PED_PALETTES[randInt(0, PED_PALETTES.length - 1)];
+  const pal = { skin: P0.skin, hair: P0.hair, shirt: pick(PED_SHIRTS), pants: pick(PED_PANTS) };
   const h = buildHumanoid(pal);
+  h.group.scale.setScalar(rand(0.9, 1.1));
   h.group.userData.pedRef = null;   // uzupełnione niżej po utworzeniu n
   scene.add(h.group);
   const n = {
     path: path, wp: (idx + 1) % 4, block: [bi, bj],
     pos: new THREE.Vector2(path[idx].x, path[idx].z), y: WALK_H,
     heading: 0, walkPhase: rand(0, TAU),
-    speed: PED_WALK + rand(-0.18, 0.22),
+    speed: PED_WALK * rand(0.8, 1.25), dir: 1, fleeT: 0,
     group: h.group, armL: h.armL, armR: h.armR, legL: h.legL, legR: h.legR,
     body: null, state: 'walk', stateT: 0, cw: null, cwTo: null, waitT: 0
   };
@@ -127,18 +132,20 @@ function updatePedestrians(dt){
     }
 
     let moving = true;
+    if (n.fleeT > 0) n.fleeT -= dt;
+    const run = n.fleeT > 0 ? 2.6 : 1;                                       // ucieczka po strzałach: bieg
     if (n.state === 'walk'){
       const tgt = n.path[n.wp];
-      if (pedStepTo(n, tgt.x, tgt.z, n.speed, dt)){
-        /* narożnik: czasem przejście na sąsiedni kwartał */
+      if (pedStepTo(n, tgt.x, tgt.z, n.speed * run, dt)){
+        /* narożnik: czasem przejście na sąsiedni kwartał (nie w czasie ucieczki) */
         const near = pedCrosswalks.filter(c => Math.hypot(c.a.x - tgt.x, c.a.z - tgt.z) < 4 || Math.hypot(c.b.x - tgt.x, c.b.z - tgt.z) < 4);
-        const c = (near.length && rnd() < 0.45) ? pick(near) : null;
+        const c = (near.length && n.fleeT <= 0 && rnd() < 0.45) ? pick(near) : null;
         if (c){
           const fromA = Math.hypot(c.a.x - tgt.x, c.a.z - tgt.z) < 4;
           n.cw = c; n.cwFrom = fromA ? c.a : c.b; n.cwTo = fromA ? c.b : c.a;
           n.cwBlock = c.blocks[fromA ? 1 : 0];
           n.state = 'toCurb';
-        } else n.wp = (n.wp + 1) % 4;
+        } else n.wp = (n.wp + (n.dir || 1) + 4) % 4;
       }
     } else if (n.state === 'toCurb'){
       if (pedStepTo(n, n.cwFrom.x, n.cwFrom.z, n.speed, dt)){ n.state = 'wait'; n.waitT = 0; }
@@ -153,13 +160,13 @@ function updatePedestrians(dt){
       const wx = n.cwTo.x - n.pos.x, wz = n.cwTo.z - n.pos.y, wl = Math.hypot(wx, wz) || 1;
       const blockedBy = (x, z) => { const ox = x - n.pos.x, oz = z - n.pos.y, a = (ox*wx + oz*wz)/wl; return a > 0 && a < 3.2 && Math.abs(ox*wz - oz*wx)/wl < 2.3; };
       if (npcs.some(m => blockedBy(m.pos.x, m.pos.y)) || blockedBy(chassisBody.position.x, chassisBody.position.z)) moving = false;
-      else if (pedStepTo(n, n.cwTo.x, n.cwTo.z, PED_CROSS, dt)){
+      else if (pedStepTo(n, n.cwTo.x, n.cwTo.z, PED_CROSS * (run > 1 ? 1.8 : 1), dt)){
         /* po drugiej stronie: pętla nowego kwartału od najbliższego narożnika */
         n.block = n.cwBlock;
         n.path = pedLoopFor(n.block[0], n.block[1]);
         let best = 0, bd = 1e9;
         n.path.forEach((p, k) => { const d = Math.hypot(p.x - n.pos.x, p.z - n.pos.y); if (d < bd){ bd = d; best = k; } });
-        n.wp = best; n.state = 'walk'; n.cw = null;
+        n.wp = best; n.state = 'walk'; n.cw = null; n.dir = 1;
         Pedestrians.crossings = (Pedestrians.crossings || 0) + 1;
       }
     }
@@ -175,7 +182,7 @@ function updatePedestrians(dt){
     n.group.rotation.y = n.heading;
 
     if (moving){
-      n.walkPhase += dt * (3.0 + (n.state === 'cross' ? PED_CROSS : n.speed) * 1.1);
+      n.walkPhase += dt * (3.0 + (n.state === 'cross' ? PED_CROSS : n.speed) * 1.1 * run);
       const s = Math.sin(n.walkPhase), c = Math.sin(n.walkPhase + Math.PI);
       n.legL.rotation.x = s * 0.5; n.legR.rotation.x = c * 0.5;
       n.armL.rotation.x = c * 0.42; n.armR.rotation.x = s * 0.42;
@@ -185,6 +192,20 @@ function updatePedestrians(dt){
   }
 }
 
+/* strzał w (x,z): piesi w promieniu r uciekają biegiem 5–8 s, w stronę od strzelca (zawracają na pętli,
+   przerywają czekanie przy przejściu) */
+Pedestrians.scare = function(x, z, r){
+  for (const n of this.list){
+    if (n.state === 'down' || Math.hypot(n.pos.x - x, n.pos.y - z) > (r || 40)) continue;
+    if (n.fleeT <= 0) this.fled++;
+    n.fleeT = rand(5, 8);
+    if (n.state === 'wait' || n.state === 'toCurb'){ n.state = 'walk'; n.cw = null; }
+    if (n.state === 'walk'){
+      const t = n.path[n.wp];
+      if (Math.hypot(t.x - x, t.z - z) < Math.hypot(n.pos.x - x, n.pos.y - z)){ n.dir = -(n.dir || 1); n.wp = (n.wp + n.dir + 4) % 4; }
+    }
+  }
+};
 Pedestrians.hit = function(n, force, gentle){
   if (!n || n.state === 'down') return;
   n.state = 'down';

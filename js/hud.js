@@ -22,8 +22,13 @@ const el = {
   wammo:       document.getElementById('wammo'),
   crosshair:   document.getElementById('crosshair'),
   hurtFlash:   document.getElementById('hurtFlash'),
-  deadScreen:  document.getElementById('deadScreen')
+  deadScreen:  document.getElementById('deadScreen'),
+  carlbl:      document.getElementById('carlbl'),
+  toast:       document.getElementById('toast')
 };
+/* krótki komunikat na środku ekranu */
+let _toastT = 0;
+function hudToast(text, secs){ el.toast.textContent = text; el.toast.classList.add('on'); _toastT = secs || 2.2; }
 
 /* statyczna mapa CAŁEGO świata (miasto + pas podmiejski + autostrady) rysowana raz */
 const MAP_SCALE = 1.35;
@@ -95,13 +100,19 @@ function drawMinimap(){
     mg.fillRect(p[0]-2, p[1]-2, 4, 4);
   }
 
-  /* auto gracza — strzałka jak u pieszego, ten sam poprawny wzór obrotu */
-  const cp = toMap(chassisBody.position.x, chassisBody.position.z);
-  const cy = carYaw();
+  /* zaparkowane skradzione (i porzucone prowadzalne skradzione) — małe fioletowe kwadraty */
+  mg.fillStyle = '#b07ad8';
+  const sq = (x, z) => { const p = toMap(x, z); if (p[0] > -6 && p[0] < MM+6 && p[1] > -6 && p[1] < MM+6) mg.fillRect(p[0]-2.5, p[1]-2.5, 5, 5); };
+  parkedCars.forEach(q => { if (q.owner === 'stolen') sq(q.x, q.z); });
+  if (mode === 'foot' && driving.owner !== 'player') sq(chassisBody.position.x, chassisBody.position.z);
+  /* auto gracza — strzałka jak u pieszego, ten sam poprawny wzór obrotu (prowadzone albo zaparkowane twoje) */
+  const ownP = driving.owner === 'player' || mode === 'car' ? null : parkedCars.find(q => q.owner === 'player');
+  const cp = ownP ? toMap(ownP.x, ownP.z) : toMap(chassisBody.position.x, chassisBody.position.z);
+  const cy = ownP ? ownP.heading : carYaw();
   mg.save();
   mg.translate(clamp(cp[0], 5, MM-5), clamp(cp[1], 5, MM-5));
   mg.rotate(-cy + Math.PI);
-  mg.fillStyle = mode === 'car' ? '#ffb03a' : '#e05a4a';
+  mg.fillStyle = mode === 'car' ? (driving.owner === 'player' ? '#ffb03a' : '#e8a35a') : '#e05a4a';
   mg.beginPath();
   mg.moveTo(0, -6.5); mg.lineTo(3.6, 4.5); mg.lineTo(0, 2.2); mg.lineTo(-3.6, 4.5);
   mg.closePath(); mg.fill();
@@ -152,7 +163,10 @@ function updateHud(dt, kmh){
   hudAcc += dt; fpsAcc += dt; fpsCount++;
 
   el.speedo.classList.toggle('on', mode === 'car');
+  if (_toastT > 0){ _toastT -= dt; if (_toastT <= 0) el.toast.classList.remove('on'); }
   if (mode === 'car'){
+    const lbl = (driving.owner === 'player' ? 'Twój samochód' : 'Skradziony') + ' · ' + CAR_TYPES[carType].name;
+    if (el.carlbl.textContent !== lbl){ el.carlbl.textContent = lbl; el.carlbl.classList.toggle('stolen', driving.owner !== 'player'); }
     el.kmh.firstChild.nodeValue = String(Math.round(kmh));
     el.barfill.style.width = clamp(kmh / 210 * 100, 0, 100) + '%';
     el.gval.textContent = gearTxt;

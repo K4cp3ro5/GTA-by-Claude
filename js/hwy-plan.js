@@ -129,8 +129,12 @@ const HWY_RAMPS = [];    // { way, from: 'A1+', to: 'A2+', kind: 'loop'|'conn', 
   const xe = (HP.auxOff + Rc) * SQ2 - zl - Rc;         // koniec pierwszego łuku na prostej
   const sC = ((xe - Rc * IS2) - (zl + Rc - Rc * IS2)) * IS2;   // s na A2 początku łuku (ujemne)
   HP.connS = -sC;
-  const auxIn = []; for (let i = 0; i <= 10; i++){ const s = sC - HP.auxLen + HP.auxLen * i / 10; auxIn.push(hwyPt('A2', s, HP.auxOff)); }
-  const auxOut = []; for (let i = 0; i <= 10; i++){ const s = -sC + HP.auxLen * i / 10; auxOut.push(hwyPt('A1', s, HP.auxOff)); }
+  /* pas wyłączenia / włączenia: klin TAPER m — wewnętrzna krawędź przylega do krawędzi jezdni (11.5 m od osi),
+     zewnętrzna odsuwa się od 0.3 do pełnych 5.5 m */
+  const EDGE = HP.cwOff + HP.cwHW, TAPER = 25;
+  const auxPt = (id, s, t) => { const hw = lerp(0.3, HP.rampHW, smooth01(t)); return Object.assign(hwyPt(id, s, EDGE + hw), { hw: hw }); };
+  const auxIn = []; for (let i = 0; i <= 20; i++){ const s = sC - HP.auxLen + HP.auxLen * i / 20; auxIn.push(auxPt('A2', s, (s - (sC - HP.auxLen)) / TAPER)); }
+  const auxOut = []; for (let i = 0; i <= 20; i++){ const s = -sC + HP.auxLen * i / 20; auxOut.push(auxPt('A1', s, (-sC + HP.auxLen - s) / TAPER)); }
   const connBase = plJoin(auxIn, plArc(xe, zl + Rc, Rc, Math.PI * 5 / 4, Math.PI * 3 / 2, 2), plLine({ x: xe, z: zl }, { x: -xe, z: zl }, 6),
                           plArc(-xe, zl + Rc, Rc, Math.PI * 3 / 2, Math.PI * 7 / 4, 2), auxOut);
   for (let k = 0; k < 4; k++){
@@ -186,6 +190,40 @@ const HWY_TERM = [];     // { k, exit: way, entry: way, exitCw, entryCw }
     HWY_TERM.push({ k: k, exit: ex, entry: en, exitCw: CWEXIT[k], entryCw: CWENTRY[k] });
   }
 })();
+/* --- nosy (strefy rozdzielenia / włączenia): między krawędzią jezdni a lewą krawędzią pętli / łącznicy,
+   od punktu styku do miejsca, gdzie szczelina ma ≥ 1 m (tam zaczynają się bariery obu dróg i stoi
+   amortyzator). Nos ma pełną nawierzchnię z kreskowaniem (P-21) — bez dziury w pomoście i bez barier
+   wchodzących na sąsiednią jezdnię. Linia przerywana przy pasach przylegających: HWY_AUXGAPS. --- */
+const HWY_AUXGAPS = HWY_GAPS.slice();
+const HWY_GORES = [];    // { cw, wi, pts: [{ex, ez, lx, lz, y, s, d}], gap }
+(function gores(){
+  const EDGE = HP.cwOff + HP.cwHW, NEED = 1.0;
+  function gore(w, cwName, d0, dir){
+    const id = cwName.slice(0, 2), sg = cwName[2] === '+' ? 1 : -1, A = HWY_AX[id], pts = [];
+    let gap = 0;
+    for (let k = 0; k <= 120; k++){
+      const d = d0 + dir * k * 0.5, q = wayAt(w, d), hw = lerp(q.a.hw, q.b.hw, q.t);
+      const lx = q.x + q.hz * hw, lz = q.z - q.hx * hw;                  // lewa krawędź drogi
+      const s = A.u.x * lx + A.u.z * lz;
+      gap = sg * (A.n.x * lx + A.n.z * lz) - EDGE;
+      const done = gap >= NEED;
+      if (k % 2 === 0 || done) pts.push({ ex: A.u.x * s + A.n.x * sg * EDGE, ez: A.u.z * s + A.n.z * sg * EDGE, lx: lx, lz: lz, y: q.y, s: s, d: d });
+      if (done) break;
+    }
+    if (dir < 0) pts.reverse();
+    const ss = pts.map(p => p.s), dd = pts.map(p => p.d);
+    HWY_GORES.push({ cw: cwName, wi: w.idx, pts: pts, gap: gap });
+    HWY_GAPS.push({ cw: cwName, s0: Math.min(...ss), s1: Math.max(...ss) });
+    (w.noBarL = w.noBarL || []).push([Math.min(...dd), Math.max(...dd)]);
+  }
+  HWY_RAMPS.forEach(r => {
+    const w = r.way;
+    if (r.kind === 'loop'){ gore(w, r.from, 0, 1); gore(w, r.to, w.len, -1); }
+    else { gore(w, r.from, w.pts[w.auxIn - 1].d, 1); gore(w, r.to, w.pts[w.pts.length - w.auxOut].d, -1); }
+  });
+})();
+/* czy wzdłuż jezdni cw w miejscu s przylega pas zbierający / wyłączenia (linia przerywana zamiast krawędziowej) */
+function cwAuxAdj(cw, s){ return HWY_AUXGAPS.some(g => g.cw === cw && s > Math.min(g.s0, g.s1) && s < Math.max(g.s0, g.s1)); }
 /* przerwy w barierze zewnętrznej jezdni: segment jezdni w zakresie s którejś przerwy => bez bariery */
 function cwBarrierGap(cw, s){ return HWY_GAPS.some(g => g.cw === cw && s > Math.min(g.s0, g.s1) - 0.5 && s < Math.max(g.s0, g.s1) + 0.5); }
 
@@ -326,7 +364,9 @@ function hwyTripPoints(cwInName, cwOutName, lane){
   const cin = CW[cwInName], cout = CW[cwOutName], lo = lane === 1 ? HP.laneL : HP.laneR;
   const v = HP.vmax * (lane === 1 ? 1 : 0.85), aux = HP.auxOff - HP.cwOff, step = 6;
   const ease = (d, a, b, o0, o1) => lerp(o0, o1, smooth01((d - a) / (b - a)));
-  if (cwInName === cwOutName) return wayLane(cin, 0, cin.len, () => lo, step, v);
+  /* prosto: lewy pas tylko w środku jezdni — wjazd z terminalu i zjazd na terminal są z prawego pasa,
+     więc zmiana pasa płynnie na 140 m przy obu końcach (bez skoku w bok) */
+  if (cwInName === cwOutName) return wayLane(cin, 0, cin.len, d => lane !== 1 ? lo : (d < 200 ? ease(Math.max(d, 60), 60, 200, HP.laneR, HP.laneL) : d > cin.len - 200 ? ease(Math.min(d, cin.len - 60), cin.len - 200, cin.len - 60, HP.laneL, HP.laneR) : HP.laneL), step, v);
   const rp = HWY_RAMPS.find(r => r.from === cwInName && r.to === cwOutName);
   const w = rp.way, out = [];
   if (rp.kind === 'loop'){
