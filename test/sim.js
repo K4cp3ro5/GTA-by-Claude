@@ -127,6 +127,7 @@ function __static(){
   const bad = [];
   signLog.forEach(g => {
     if (!['C-12','A-7','STOP','sygnalizator'].includes(g.kind)) return;
+    if (Math.abs(g.x) > CITY_EDGE || Math.abs(g.z) > CITY_EDGE) return;           // poza siatką (lotnisko, pas podmiejski)
     if (nearAxis(g.x) < ROAD_H - 0.01 && nearAxis(g.z) < ROAD_H - 0.01) bad.push(g.kind+' w skrzyżowaniu '+g.x.toFixed(0)+','+g.z.toFixed(0));
     else if (nearAxis(g.x) < ROAD_H - 0.01 || nearAxis(g.z) < ROAD_H - 0.01) bad.push(g.kind+' NA JEZDNI '+g.x.toFixed(1)+','+g.z.toFixed(1));
     // środek najbliższego skrzyżowania
@@ -249,7 +250,7 @@ function __static(){
   /* teren węzła: kopce, stawy, boiska nie na ulicach, nie przy filarach, kopiec pod pomostem z prześwitem ≥ 3 m */
   const tb = [];
   terrainLog.forEach(t => {
-    if (t.kind === 'green') return;
+    if (['green', 'airport', 'station', 'mall', 'plaza'].includes(t.kind)) return;
     if (nearAxis(t.x) < ROAD_H + t.r - 1 || nearAxis(t.z) < ROAD_H + t.r - 1) tb.push(t.kind + ' na ulicy @' + t.x.toFixed(0) + ',' + t.z.toFixed(0));
     if (HWY_PIERS.some(p => Math.hypot(p.x - t.x, p.z - t.z) < t.r * 0.6 + p.size / 2)) tb.push(t.kind + ' przy filarze @' + t.x.toFixed(0) + ',' + t.z.toFixed(0));
     if (t.kind === 'mound' && deckClearAt(t.x, t.z) < t.h + 3) tb.push('kopiec pod pomostem @' + t.x.toFixed(0) + ',' + t.z.toFixed(0));

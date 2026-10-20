@@ -6,6 +6,7 @@ geobuf.js
 physics-world.js
 signs.js
 districts.js
+airport.js
 city-generation.js
 highways.js
 traffic-lights.js
