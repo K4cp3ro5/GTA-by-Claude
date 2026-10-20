@@ -22,7 +22,9 @@ Brak bundlera: `index.html` ładuje zwykłe `<script>` w kolejności z `loadorde
 | geobuf.js | `GeoBuf` (scalanie brył: `quad`, `quadOut`, `triOut`, `box`…) |
 | physics-world.js | świat cannon, materiały, statyczne kolizje w komórkach, poprawka `computeAABB` |
 | signs.js | znaki drogowe: tarcze, słupki, `placeSign`, `signSpotFree` |
-| city-generation.js | ulice, chodniki, przejścia, ronda, dzielnice, budynki, domki, parki, pas podmiejski, mur |
+| car-types.js | typy aut (CAR_TYPES: sedan, pickup, sport) — napęd, zawieszenie, bryła, części modelu (carParts) |
+| districts.js | zabudowa dzielnic (wieżowce, bloki, domki z działkami, parki, plac, galeria, stacja, przemysł); CB(kolor) = bufory scalane w jedną siatkę z kolorami wierzchołków |
+| city-generation.js | ulice, chodniki, przejścia, ronda, układ dzielnic, teren węzła (kopce, stawy, parkingi pod estakadą), pas podmiejski, mur |
 | highways.js | budowa autostrad z planu: pomosty, nasypy, bariery, filary, latarnie, znaki |
 | traffic-lights.js | sygnalizacja 2-fazowa na wybranych skrzyżowaniach |
 | road-rules.js | limity (`speedLimitAt`), droga z pierwszeństwem (`PRIO`), jednokierunkowa obwodnica, ich znaki |
@@ -50,13 +52,15 @@ Klatka (`main-loop.js`): `updateSky` → `updateTrafficLights` → `updateNpcs` 
 ## Fizyka
 - Statyczne kolizje idą do złożonych ciał-komórek 48 m (`staticShape`, `staticBox`, `staticBoxQ`) — tysiące osobnych ciał zabijały wydajność.
 - `fixComputeAABB` (physics-world.js) poprawia błąd cannon 0.6.2 w AABB obróconych kształtów. **Nie usuwać** — bez tego koła przepadają przez pomost.
-- Jedno prowadzalne auto (`chassisBody`) reprezentuje główne albo skradzione auto; zaparkowane auto to atrapa (statyczne ciało + model).
+- Jedno prowadzalne auto (`chassisBody`, typ `carType`, zmiana typu w locie: `applyCarType`); tożsamość w `driving` (owner `player` | `stolen`). Pozostałe auta gracza i skradzione to atrapy w `parkedCars` (statyczne ciało + model) — przesiadka zamienia prowadzone auto w atrapę (`parkActive`/`takeOver`).
 - Domyślny `collisionFilterMask` w cannon to 1 — ustawiaj `-1`. Grupy: G_WORLD 1, G_PLAYER 2, G_CAR 4, G_PED 8.
 - Fizyczny przód auta gracza to lokalne −Z (kwaternion = kurs + π); model NPC jedzie w lokalne +Z.
 
 ## NPC
 - Trasy to zamknięte pętle punktów `{x, z, y?, vmax?, hwy?, rk?}`. Ciało kinematyczne prowadzone prędkością; `n.y` i pochylenie interpolowane między punktami.
-- `npcConflict`: kolejka i rozstrzyganie skrzyżowań wg czasu dojazdu (ETA), tie-break po `id`; ignoruje auta na innym poziomie (|Δy| > 2,5).
+- `npcConflict`: kolejka i rozstrzyganie skrzyżowań wg czasu dojazdu (ETA), tie-break po `id`; ignoruje auta na innym poziomie (|Δy| > 2,5); progi wg wymiarów typu (`n.halfL`, `n.halfW`).
+- Przesunięcie boczne toru `n.lat` → `n.latT` (objazd przeszkody `npcTryBypass`, zmiana pasa `npcHwyLanes` na punktach `p.ovt`); cel jazdy z `npcAim`. Przeszkody (auto gracza, atrapy) po obrysie: `rectInCorridor`.
+- Węzeł: nosy `HWY_GORES`, linia przerywana przy pasach przylegających `HWY_AUXGAPS`/`cwAuxAdj`; znaki na pomoście przez `hwySignAt` (korona bariery), tablice przez `hwyBoard` (bramownica).
 - Przepisy miejskie (światła, STOP, ronda z `RB.commit`, piesi, zebry, `speedLimitAt`, pierwszeństwo) tylko na poziomie ulic; na autostradzie limit z `vmax` punktu.
 
 ## Pułapki
