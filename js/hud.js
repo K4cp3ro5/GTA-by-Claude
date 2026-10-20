@@ -229,7 +229,7 @@ function updateHud(dt, kmh){
   el.speedo.classList.toggle('on', mode === 'car');
   if (_toastT > 0){ _toastT -= dt; if (_toastT <= 0) el.toast.classList.remove('on'); }
   if (mode === 'car'){
-    const lbl = (driving.owner === 'player' ? 'Twój samochód' : 'Skradziony') + ' · ' + CAR_TYPES[carType].name;
+    const lbl = (driving.owner === 'player' ? (CAR_TYPES[carType].bike ? 'Twój rower' : 'Twój samochód') : 'Skradziony') + ' · ' + CAR_TYPES[carType].name;
     if (el.carlbl.textContent !== lbl){ el.carlbl.textContent = lbl; el.carlbl.classList.toggle('stolen', driving.owner !== 'player'); }
     drawSpeedo(kmh);
     el.gval.textContent = gearTxt;

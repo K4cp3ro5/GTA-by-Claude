@@ -17,13 +17,19 @@ const CAR_TYPES = {
   sport:  { name: 'Sportowy', mass: 1150, force: 6400, fadeKmh: 300, drag: 0.70, steer: 0.55, brake: 76, grip: 4.3,
             stiff: 58, rest: 0.28, travel: 0.24, damp: [4.6, 6.2], half: [0.98, 0.28, 2.2], boxY: 0.08,
             wheelR: 0.35, track: 0.88, wbF: -1.40, wbR: 1.40, connY: 0.10, pitch: 1.3, bright: 1.45,
-            npc: { hw: 0.97, hl: 2.2, hh: 0.52, accel: 2.3, speed: 1.08 } }
+            npc: { hw: 0.97, hl: 2.2, hh: 0.52, accel: 2.3, speed: 1.08 } },
+  /* rower: ten sam RaycastVehicle — 4 koła o rozstawie 0.12 m (wizualnie 2), w pionie trzyma go moment
+     prostujący (update-vehicle.js); napęd, hamulce i hamowanie silnikiem skalowane do masy */
+  bike:   { name: 'Rower', mass: 95, force: 150, fadeKmh: 32, drag: 0.32, steer: 0.55, brake: 2.4, grip: 2.6,
+            stiff: 40, rest: 0.30, travel: 0.2, damp: [3.0, 4.0], half: [0.18, 0.35, 0.8], boxY: 0.28,
+            wheelR: 0.34, track: 0.06, wbF: -0.55, wbR: 0.55, connY: 0.0, pitch: 1, bright: 1, bike: true, wheelW: 0.06,
+            npc: { hw: 0.35, hl: 0.9, hh: 0.8, accel: 1.1, speed: 1 } }
 };
 const CAR_TYPE_IDS = ['sedan', 'pickup', 'sport'];
 Object.keys(CAR_TYPES).forEach(k => {
   const T = CAR_TYPES[k], g = 9.82;
   T.id = k;
-  T.gauge = k === 'sport' ? 280 : k === 'pickup' ? 180 : 200;                 // skala prędkościomierza
+  T.gauge = k === 'sport' ? 280 : k === 'pickup' ? 180 : k === 'bike' ? 50 : 200;   // skala prędkościomierza
   T.dy = (T.wheelR - 0.36) + (T.rest - g / (4 * T.stiff)) - (0.36 - g / 160) - (T.connY - 0.11);
   T.restY = 0.48 + T.dy;
 });
@@ -32,6 +38,19 @@ function randomCarType(){ const r = rnd(); return r < 0.65 ? 'sedan' : r < 0.87 
 
 /* części nadwozia: [szer, wys, dł, materiał, x, y, z, rx] — materiały: paint, dark, glass, chrome, lampF, lampR */
 function carParts(type){
+  if (type === 'bike') return [
+    [0.06, 0.06, 0.78, 'paint', 0, 0.62, 0.16, 0.72],      // rura dolna
+    [0.06, 0.06, 0.62, 'paint', 0, 0.86, 0.06, 0.08],      // rura górna
+    [0.06, 0.58, 0.06, 'paint', 0, 0.64, -0.2, -0.25],     // rura podsiodłowa
+    [0.05, 0.05, 0.6, 'dark', 0, 0.38, -0.32, 0.12],       // tylne widełki
+    [0.05, 0.62, 0.05, 'dark', 0, 0.64, 0.5, 0.3],         // widelec
+    [0.62, 0.04, 0.04, 'dark', 0, 1.06, 0.44],             // kierownica
+    [0.04, 0.26, 0.04, 'dark', 0, 0.95, 0.46],
+    [0.15, 0.06, 0.27, 'dark', 0, 0.96, -0.28],            // siodełko
+    [0.22, 0.04, 0.12, 'chrome', 0, 0.36, 0],              // korby
+    [0.08, 0.06, 0.04, 'lampF', 0, 0.98, 0.55],
+    [0.06, 0.04, 0.03, 'lampR', 0, 0.86, -0.64]
+  ];
   if (type === 'pickup') return [
     [2.00, 0.50, 5.30, 'paint', 0, 0.90, 0],               // nadwozie
     [1.86, 0.32, 5.00, 'dark',  0, 0.58, 0],               // podwozie / progi

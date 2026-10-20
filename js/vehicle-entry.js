@@ -149,7 +149,7 @@ function pruneParked(){
 
 /* --- menu kołowe pojazdów (V) --- */
 const VEHICLE_MENU = [
-  { label: 'Zwykły', type: 'sedan' }, { label: 'Pickup', type: 'pickup' }, { label: 'Sportowy', type: 'sport' }, { label: 'Przywołaj', summon: true }
+  { label: 'Zwykły', type: 'sedan' }, { label: 'Pickup', type: 'pickup' }, { label: 'Sportowy', type: 'sport' }, { label: 'Rower', type: 'bike' }
 ];
 let lastCarSpawn = -99;
 const _ray = new CANNON.Ray(), _rayRes = new CANNON.RaycastResult();
@@ -206,7 +206,7 @@ function spawnOwnCar(type){
     const own = parkedCars.find(q => q.owner === 'player'); if (own) removeParked(own);
     addParked('player', type, MAIN_CAR_COLOR, spot.x, spot.y, spot.z, spot.heading);
   }
-  hudToast('Twój samochód: ' + CAR_TYPES[type].name);
+  hudToast(type === 'bike' ? 'Twój rower' : 'Twój samochód: ' + CAR_TYPES[type].name);
   return true;
 }
 function ownCarType(){ if (driving.owner === 'player') return carType; const own = parkedCars.find(q => q.owner === 'player'); return own ? own.type : 'sedan'; }

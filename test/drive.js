@@ -72,7 +72,7 @@ function __follow(x0, z0, heading, wps, secs, kmhMax, doneFn, look, y0){
     const lim = 0.45/(1 + sp/18);
     const st = Math.max(-lim, Math.min(lim, err*1.4));
     vehicle.setSteeringValue(st,0); vehicle.setSteeringValue(st,1);
-    const f = kmh < kmhMax ? 4200 : 0;
+    const f = (kmh < kmhMax ? 4200 : 0) * chassisBody.mass / 1250;   // siła wg masy (rower)
     for (let i = 0; i < 4; i++){ vehicle.applyEngineForce(i >= 2 ? f : 0, i); vehicle.setBrake(0, i); }
     world.step(1/60);
     let dev = 1e9; for (let k = 0; k < path.length-1; k++) dev = Math.min(dev, distSeg(p, path[k], path[k+1]));   // odległość do całej trasy (cross-track)
@@ -100,12 +100,12 @@ function __perf(type){
   for (; t < 60 * 60; t++){
     updateCar(1/60); world.step(1/60);
     const v = chassisBody.velocity, kmh = Math.hypot(v.x, v.z) * 3.6; out.vmax = Math.max(out.vmax, kmh);
-    if (out.t100 === null && kmh >= 100) out.t100 = +(t / 60).toFixed(2);
+    if (out.t100 === null && kmh >= (T.bike ? 20 : 100)) out.t100 = +(t / 60).toFixed(2);
     const q = new CANNON.Vec3(); chassisBody.quaternion.vmult(new CANNON.Vec3(0,1,0), q); if (q.y < 0.3) out.flipped = true;
     if (Math.hypot(chassisBody.position.x - p0.x, chassisBody.position.z - p0.z) > 780) break;
   }
   keys[BIND.forward] = false;
-  place(60, 100 / 3.6);
+  place(60, (T.bike ? 25 : 100) / 3.6);
   for (let i = 0; i < 6; i++){ world.step(1/60); }
   const b0 = chassisBody.position.clone(); keys[BIND.back] = true;
   for (let i = 0; i < 60 * 15; i++){ updateCar(1/60); world.step(1/60); const v = chassisBody.velocity; if (Math.hypot(v.x, v.z) < 0.3){ out.brake = +Math.hypot(chassisBody.position.x - b0.x, chassisBody.position.z - b0.z).toFixed(1); break; } }
@@ -180,13 +180,13 @@ if (K.sign){
 }
 hit('mur północny', K.wallX, -K.wall, 0, K.wall - CITY_EDGE_T - 5, 150);
 console.log('=== 8) TYPY AUT: 0–100 km/h, v maks. na prostej A1+ (790 m), droga hamowania 100 -> 0, rondo ===');
-['sedan', 'pickup', 'sport'].forEach(t => {
+['sedan', 'pickup', 'sport', 'bike'].forEach(t => {
   const r = base.__perf(t);
-  console.log(' ' + r.name + ':', '0–100:', r.t100, 's | v maks.:', r.vmax, 'km/h | hamowanie:', r.brake, 'm | przewrócone:', r.flipped, '| wys. nadwozia w spoczynku', r.restY);
+  console.log(' ' + r.name + ':', t === 'bike' ? '0–20 (hamowanie z 25):' : '0–100:', r.t100, 's | v maks.:', r.vmax, 'km/h | hamowanie:', r.brake, 'm | przewrócone:', r.flipped, '| wys. nadwozia w spoczynku', r.restY);
   base.applyCarType(t, 0x888888);
   const c = base.__rbCenter(0), uOut = {x:-1,z:0}, route = base.__rbRoute(0, {x:0,z:1}, uOut), last = route[route.length - 1], tail = [[last[0] - 25, last[1]], [last[0] - 45, last[1]]];
   let minD = 1e9;
-  const rr = base.__follow(c[0] + 3.5, c[1] + 45, Math.PI, route.concat(tail), 40, 25, p => { minD = Math.min(minD, Math.hypot(p.x - c[0], p.z - c[1])); return Math.hypot(p.x - tail[1][0], p.z - tail[1][1]) < 4; }, t === 'pickup' ? [4.2, 0.2] : [3.2, 0.15]);   // dłuższy rozstaw osi: dalszy punkt celowania autopilota
+  const rr = base.__follow(c[0] + 3.5, c[1] + 45, Math.PI, route.concat(tail), 40, t === 'bike' ? 15 : 25, p => { minD = Math.min(minD, Math.hypot(p.x - c[0], p.z - c[1])); return Math.hypot(p.x - tail[1][0], p.z - tail[1][1]) < 4; }, t === 'pickup' ? [4.2, 0.2] : [3.2, 0.15]);   // dłuższy rozstaw osi: dalszy punkt celowania autopilota
   rep('   rondo w lewo:', rr, '| maks. odchylenie: ' + rr.maxDev.toFixed(2) + ' m | najbliżej środka: ' + minD.toFixed(2) + ' m');
 });
 base.applyCarType('sedan', 0xb3272b);

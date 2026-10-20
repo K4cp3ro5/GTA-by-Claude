@@ -10,7 +10,15 @@ world.addEventListener('preStep', () => {
   chassisBody.force.z -= v.z * spd * drag;
   /* tłumienie obrotu wokół osi pionowej bez skrętu (mniej "pływania" tyłu po puszczeniu kierownicy), nie przy ręcznym */
   if (!handbrakeOn && Math.abs(steer) < 0.05) chassisBody.angularVelocity.y *= 0.985;
+  /* rower: moment prostujący (sprężyna + tłumik) wokół osi poziomych — trzyma ramę w pionie */
+  if (CAR_TYPES[carType].bike){
+    chassisBody.quaternion.vmult(_upLocal, _upW);
+    const w = chassisBody.angularVelocity, kp = 900, kd = 150;
+    chassisBody.torque.x += -_upW.z * kp - w.x * kd;
+    chassisBody.torque.z +=  _upW.x * kp - w.z * kd;
+  }
 });
+const _upLocal = new CANNON.Vec3(0, 1, 0), _upW = new CANNON.Vec3();
 const HAND_F = 190;                        // ręczny; reszta parametrów wg typu auta (car-types.js)
 
 const _fwdWorld = new CANNON.Vec3();
@@ -23,7 +31,7 @@ function updateCar(dt){
   const spd = Math.hypot(vel.x, vel.z);
   const kmh = spd * 3.6;
 
-  const CT = CAR_TYPES[carType], MAX_STEER = CT.steer, MAX_FORCE = CT.force, BRAKE_F = CT.brake;
+  const CT = CAR_TYPES[carType], MAX_STEER = CT.steer, MAX_FORCE = CT.force, BRAKE_F = CT.brake, mScale = CT.mass / 1250;
   if (driving){
     const throttle = (down('forward') || keys['ArrowUp']) ? 1 : 0;
     const reverse  = (down('back')    || keys['ArrowDown']) ? 1 : 0;
@@ -50,13 +58,13 @@ function updateCar(dt){
       if (alongF < -0.6){ brake = BRAKE_F; }                       // hamowanie przy cofaniu
       else {
         const fade = 1 - clamp(kmh / CT.fadeKmh, 0, 1);
-        force = MAX_FORCE * (0.35 + fade * 0.65) * carSpeedMult;
+        force = MAX_FORCE * (CT.bike ? fade : 0.35 + fade * 0.65) * carSpeedMult;   // rower: siła mięśni zanika do zera przy prędkości granicznej
       }
     } else if (reverse){
       if (alongF > 0.6){ brake = BRAKE_F; }                        // hamulec zasadniczy
       else force = -MAX_FORCE * 0.46 * carSpeedMult;
     } else {
-      brake = 5;                                                   // hamowanie silnikiem
+      brake = CT.bike ? 0.15 : 5;                                  // hamowanie silnikiem (rower: wolne koło)
     }
 
     /* napęd na tył */
@@ -67,8 +75,8 @@ function updateCar(dt){
 
     for (let i = 0; i < 4; i++) vehicle.setBrake(brake, i);
     if (handbrakeOn){
-      vehicle.setBrake(HAND_F, 2);
-      vehicle.setBrake(HAND_F, 3);
+      vehicle.setBrake(HAND_F * mScale, 2);
+      vehicle.setBrake(HAND_F * mScale, 3);
       vehicle.applyEngineForce(0, 2);
       vehicle.applyEngineForce(0, 3);
       vehicle.wheelInfos[2].frictionSlip = 0.85;
@@ -84,13 +92,13 @@ function updateCar(dt){
     const load = throttle || reverse ? 1 : 0;
     const tRpm = clamp(0.14 + (kmh % 62) / 62 * 0.55 + clamp(kmh/200,0,1) * 0.42 + load * 0.12, 0, 1);
     engineRpm = damp(engineRpm, tRpm, 7, dt);
-    Sound.engine(true, engineRpm, load, CT);
+    if (CT.bike) Sound.engine(false, 0, 0); else Sound.engine(true, engineRpm, load, CT);
 
     /* światła stopu */
     const braking = (brake > 20) || handbrakeOn;
     carModel.tailMat.color.setRGB(braking ? 1.0 : 0.36, braking ? 0.18 : 0.08, braking ? 0.14 : 0.07);
   } else {
-    for (let i = 0; i < 4; i++){ vehicle.applyEngineForce(0, i); vehicle.setBrake(24, i); }
+    for (let i = 0; i < 4; i++){ vehicle.applyEngineForce(0, i); vehicle.setBrake(24 * Math.max(mScale, 0.2), i); }
     handbrakeOn = false;
     engineRpm = damp(engineRpm, 0, 3, dt);
     carModel.tailMat.color.setRGB(0.36, 0.08, 0.07);
@@ -129,4 +137,16 @@ function syncCar(alpha){
     _scW.compose(_scV, _scQ, _scS).premultiply(_scInv).premultiply(_scRen);
     _scW.decompose(carModel.wheels[i].position, carModel.wheels[i].quaternion, _scV);
   }
+  /* rower: koła w osi ramy (fizycznie rozstaw 0.12 m), przechył w zakręcie, rowerzysta pedałuje */
+  if (CAR_TYPES[carType].bike){
+    carModel.wheels[1].visible = carModel.wheels[3].visible = false;
+    const v = chassisBody.velocity, sp = Math.hypot(v.x, v.z);
+    carModel.body.rotation.z = damp(carModel.body.rotation.z, clamp(-steer * sp * 0.09, -0.45, 0.45), 6, 1 / 60);
+    if (carModel.rider){
+      carModel.rider.group.visible = mode === 'car';
+      _pedal += sp * 0.05;
+      carModel.rider.legL.rotation.x = -1.15 + Math.sin(_pedal) * 0.55; carModel.rider.legR.rotation.x = -1.15 - Math.sin(_pedal) * 0.55;
+    }
+  }
 }
+let _pedal = 0;
