@@ -130,3 +130,23 @@ function triOut(buf, a, b, c, out){
   if (nx*out[0] + ny*out[1] + nz*out[2] < 0) buf.tri(a, c, b, [0,0],[0.5,0.4],[1,0]);
   else buf.tri(a, b, c, [0,0],[1,0],[0.5,0.4]);
 }
+
+/* wiele buforów jednokolorowych -> jedna geometria z atrybutem color: pairs = [[GeoBuf, 0xRRGGBB], ...] */
+function mergeColoredGeometry(pairs){
+  let n = 0; pairs.forEach(p => { n += p[0].p.length; });
+  if (!n) return null;
+  const pos = new Float32Array(n), nor = new Float32Array(n), col = new Float32Array(n);
+  let o = 0;
+  pairs.forEach(p => {
+    const b = p[0], c = new THREE.Color(p[1]);
+    pos.set(b.p, o); nor.set(b.n, o);
+    for (let i = 0; i < b.p.length; i += 3){ col[o + i] = c.r; col[o + i + 1] = c.g; col[o + i + 2] = c.b; }
+    o += b.p.length;
+  });
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  g.computeBoundingSphere();
+  return g;
+}

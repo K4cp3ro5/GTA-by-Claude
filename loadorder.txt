@@ -4,6 +4,7 @@ textures.js
 geobuf.js
 physics-world.js
 signs.js
+districts.js
 city-generation.js
 highways.js
 traffic-lights.js

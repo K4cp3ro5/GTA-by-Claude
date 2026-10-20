@@ -56,12 +56,27 @@ function texHouse(wall){
 const HOUSE_WALLS = ['#e6dcc8', '#d8c6a4', '#c8d0d4', '#e2c8b2'].map(texHouse);
 const HOUSE_ROOFS = [0x9a4a32, 0x4a4d52, 0x6b4a36];
 const houseWallBufs = HOUSE_WALLS.map(() => new GeoBuf()), houseRoofBufs = HOUSE_ROOFS.map(() => new GeoBuf());
-function addHouse(cx, cz, w, d, h){
+function addHouse(cx, cz, w, d, h, roof){
   if (hwyRectCovered(cx, cz, w, d, 3.5)) return;
   const y0 = WALK_H, wb = houseWallBufs[randInt(0, 3)], rb = houseRoofBufs[randInt(0, 2)];
   const ridgeX = w >= d, rh = Math.min(w, d) * 0.36, ov = 0.35, top = y0 + h;
   wb.box(cx, y0 + h/2, cz, w, h, d, 3.2, false);
-  if (ridgeX){
+  if (roof === 'flat'){
+    /* płaski dach z attyką */
+    rb.box(cx, top + 0.2, cz, w + 0.3, 0.4, d + 0.3, 2, true);
+  } else if (roof === 'hip'){
+    /* czterospadowy: kalenica krótsza o połowę krótszego boku */
+    const x0 = cx - w/2 - ov, x1 = cx + w/2 + ov, z0 = cz - d/2 - ov, z1 = cz + d/2 + ov, k = Math.min(w, d) / 2 + ov;
+    if (ridgeX){
+      const ra = [x0 + k, top + rh, cz], rb2 = [x1 - k, top + rh, cz];
+      quadOut(rb, [x0, top, z0], [x1, top, z0], rb2, ra, [0, 1, -1]); quadOut(rb, [x0, top, z1], [x1, top, z1], rb2, ra, [0, 1, 1]);
+      triOut(rb, [x0, top, z0], [x0, top, z1], ra, [-1, 1, 0]); triOut(rb, [x1, top, z0], [x1, top, z1], rb2, [1, 1, 0]);
+    } else {
+      const ra = [cx, top + rh, z0 + k], rb2 = [cx, top + rh, z1 - k];
+      quadOut(rb, [x0, top, z0], [x0, top, z1], rb2, ra, [-1, 1, 0]); quadOut(rb, [x1, top, z0], [x1, top, z1], rb2, ra, [1, 1, 0]);
+      triOut(rb, [x0, top, z0], [x1, top, z0], ra, [0, 1, -1]); triOut(rb, [x0, top, z1], [x1, top, z1], rb2, [0, 1, 1]);
+    }
+  } else if (ridgeX){
     const x0 = cx - w/2 - ov, x1 = cx + w/2 + ov, za = cz - d/2 - ov, zb = cz + d/2 + ov;
     quadOut(rb, [x0, top, za], [x1, top, za], [x1, top + rh, cz], [x0, top + rh, cz], [0, 1, -1]);
     quadOut(rb, [x0, top, zb], [x1, top, zb], [x1, top + rh, cz], [x0, top + rh, cz], [0, 1, 1]);
@@ -162,11 +177,14 @@ const hydSpots  = [];
 const buildings = [];   // do minimapy
 const pedBlockCandidates = [];   // {bi,bj} kwartały z chodnikiem — baza pętli spacerowych pieszych
 
-function addBuilding(cx, cz, w, d, h, pool, yBase){
+function addBuilding(cx, cz, w, d, h, pool, yBase, shops){
   if (hwyRectCovered(cx, cz, w, d, 3.5)) return;             // pas zakazu zabudowy wzdłuż autostrad (hwy-plan.js)
   const v = pool ? pool[randInt(0, pool.length - 1)] : randInt(0, FACADES.length - 1);
   const y0 = (yBase === undefined) ? WALK_H : yBase;
-  facadeBufs[v].box(cx, y0 + h/2, cz, w, h, d, 8, false);
+  if (shops && h > 9){                                       // parter z witrynami (districts.js), wyżej elewacja z oknami
+    shopBand(cx, cz, w, d, y0, 4.5);
+    facadeBufs[v].box(cx, y0 + 4.5 + (h - 4.5)/2, cz, w, h - 4.5, d, 8, false);
+  } else facadeBufs[v].box(cx, y0 + h/2, cz, w, h, d, 8, false);
   roofBuf.plane(cx, y0 + h, cz, w, d, w/6, d/6);
   /* attyka */
   const par = 0.45;
@@ -244,15 +262,7 @@ function districtAt(cx, cz){
   const dist = Math.hypot(cx, cz);
   return dist < 165 ? 'center' : (cx < -115 && cz < 45) ? 'industrial' : (Math.abs(cz) < 56 || Math.abs(cx) < 56) ? 'commercial' : 'residential';
 }
-function buildParkBlock(cx, cz){
-  walkBuf.plane(cx, WALK_H, cz, LOT, LOT, LOT/4, LOT/4);
-  curbBuf.box(cx, WALK_H/2, cz, LOT, WALK_H, LOT, 2, false);
-  staticBox(cx, WALK_H/2, cz, LOT, WALK_H, LOT);
-  for (let t = 0; t < 10; t++){
-    const a = rand(0, TAU), rr = rand(2, LOT*0.4);
-    treeSpots.push({ x: cx+Math.cos(a)*rr, z: cz+Math.sin(a)*rr, type: randInt(0,1), scale: rand(0.8,1.4), rot: rnd()*TAU });
-  }
-}
+function buildParkBlock(cx, cz){ return buildParkBlockFull(cx, cz); }   // districts.js
 
 function buildCornerPlaza(cx, cz, kind){
   walkBuf.plane(cx, WALK_H, cz, LOT, LOT, LOT/4, LOT/4);
@@ -432,6 +442,13 @@ function buildUnderpassBlock(cx, cz){
     for (let t = 0; t < 6; t++){ const p = freeSpot(cx, cz, 11, (x, z) => Math.abs(x - cx) > 2.5 && Math.abs(z - cz) > 2.5 && !nearPierXZ(x, z, 1.5)); if (p) treeSpots.push({ x: p.x, z: p.z, type: randInt(0, 1), scale: rand(0.8, 1.2), rot: rnd() * TAU }); }
   }
 }
+/* kwartały specjalne poza siatką narożników: plac z fontanną (centrum), galeria handlowa (dzielnica handlowa),
+   dwa dodatkowe parki (mieszkaniówka) — pierwsze wolne od autostrady z listy kandydatów */
+const _freeBlock = (bi, bj) => hwyBlockFrac(bi, bj) === 0 && !PARKING_BLOCKS.some(p => p[0] === bi && p[1] === bj) && !specialCornerAt(bi, bj);
+const PLAZA_BLOCK = [[2,5],[5,2],[9,6],[6,9],[2,6],[6,2]].find(b => _freeBlock(b[0], b[1]));
+const MALL_BLOCK = [[1,6],[10,5],[6,10],[5,1],[1,5],[10,6]].find(b => _freeBlock(b[0], b[1]) && districtAt(blockCenter(b[0]), blockCenter(b[1])) === 'commercial');
+[[2,9],[9,2],[1,8],[10,3]].filter(b => _freeBlock(b[0], b[1])).slice(0, 2).forEach(b => SPECIAL_CORNERS.push({ bi: b[0], bj: b[1], kind: 'park' }));
+const isBlock = (b, bi, bj) => b && b[0] === bi && b[1] === bj;
 for (let bi = 0; bi < GRID; bi++){
   for (let bj = 0; bj < GRID; bj++){
     const cx = blockCenter(bi), cz = blockCenter(bj);
@@ -472,23 +489,32 @@ for (let bi = 0; bi < GRID; bi++){
     const pSingle = { center: 0.60, commercial: 0.30, industrial: 0.70, residential: 0.10 }[district];
     const pPair   = { center: 0.40, commercial: 0.40, industrial: 0.25, residential: 0.25 }[district];
 
+    const shops = district === 'center' || district === 'commercial';
     if (icGreen) buildInterchangeGreen(cx, cz, bi, bj);
-    else if (district === 'residential' && dist > 190){
-      /* obrzeża: 4 albo 6 domków z ogródkami */
+    else if (isBlock(PLAZA_BLOCK, bi, bj)) buildPlaza(cx, cz);
+    else if (isBlock(MALL_BLOCK, bi, bj)) buildMall(cx, cz);
+    else if (district === 'industrial') buildIndustrialBlock(cx, cz);
+    else if (district === 'residential' && dist > 215){
+      /* obrzeża: 4 albo 6 domków na działkach z żywopłotem, podjazdem, czasem garażem */
       lawnBuf.plane(cx, WALK_H + 0.012, cz, LOT - 5, LOT - 5, 4, 4);
       const six = r < 0.45, floors = () => (rnd() < 0.5 ? 3.6 : 6.4);
-      if (six){ for (const ox of [-8, 0, 8]) for (const oz of [-6, 6]) addHouse(cx + ox + rand(-0.3, 0.3), cz + oz + rand(-0.4, 0.4), rand(6.4, 7.2), rand(8, 10), floors()); }
-      else { for (const ox of [-6, 6]) for (const oz of [-6, 6]) addHouse(cx + ox + rand(-0.4, 0.4), cz + oz + rand(-0.4, 0.4), rand(8, 10), rand(8.5, 10.5), floors()); }
+      if (six){ for (const ox of [-8, 0, 8]) for (const oz of [-6, 6]) addHouseLot(cx + ox, cz + oz, 8, 12, Math.sign(oz), rand(6.2, 6.8), rand(7.5, 8.5), floors()); }
+      else { for (const ox of [-6, 6]) for (const oz of [-6, 6]) addHouseLot(cx + ox, cz + oz, 12, 12, Math.sign(oz), rand(7, 7.6), rand(7.5, 8.5), floors()); }
+    } else if (district === 'residential'){
+      /* pierścień środkowy: bloki 4–10 pięter z balkonami */
+      const fl = () => randInt(4, 10);
+      if (r < 0.5) addBlok(cx, cz, area - rand(0, 2), rand(11, 13), fl(), POOL);
+      else for (const o of [-1, 1]) addBlok(cx + o * (s + g) / 2, cz, s - rand(0, 1), area - rand(0, 2), fl(), POOL);
     } else if (r < pSingle){
       const w = area - rand(0,3), d = area - rand(0,3);
-      addBuilding(cx, cz, w, d, H(), POOL);
+      if (district === 'center') addTower(cx, cz, w, d, H(), POOL); else addBuilding(cx, cz, w, d, H(), POOL, undefined, shops);
     } else if (r < pSingle + pPair){
       const vertical = rnd() < 0.5;
       for (let k = 0; k < 2; k++){
         const off = (k === 0 ? -1 : 1) * (s + g) / 2;
         const w = vertical ? s : area, d = vertical ? area : s;
-        addBuilding(cx + (vertical ? off : 0), cz + (vertical ? 0 : off),
-                    w - rand(0,1.2), d - rand(0,1.2), H(), POOL);
+        if (district === 'center') addTower(cx + (vertical ? off : 0), cz + (vertical ? 0 : off), w - rand(0,1.2), d - rand(0,1.2), H(), POOL);
+        else addBuilding(cx + (vertical ? off : 0), cz + (vertical ? 0 : off), w - rand(0,1.2), d - rand(0,1.2), H(), POOL, undefined, shops);
       }
     } else {
       for (let a = 0; a < 2; a++){
@@ -496,12 +522,12 @@ for (let bi = 0; bi < GRID; bi++){
           if (rnd() < 0.1) continue;   // podwórko / parking
           const ox = (a ? 1 : -1) * (s + g) / 2;
           const oz = (b ? 1 : -1) * (s + g) / 2;
-          addBuilding(cx + ox, cz + oz, s - rand(0,1.4), s - rand(0,1.4), H() * 0.8, POOL);
+          addBuilding(cx + ox, cz + oz, s - rand(0,1.4), s - rand(0,1.4), H() * 0.8, POOL, undefined, shops);
         }
       }
     }
 
-    if (!icGreen && (district === 'center' || district === 'commercial') && rnd() < 0.30) buildBusStop(cx, cz, randInt(0, 3));
+    if (!icGreen && !isBlock(PLAZA_BLOCK, bi, bj) && !isBlock(MALL_BLOCK, bi, bj) && (district === 'center' || district === 'commercial') && rnd() < 0.30) buildBusStop(cx, cz, randInt(0, 3));
 
     /* detale na obrzeżu kwartału */
     const edge = LOT/2 - 1.3;
@@ -559,6 +585,8 @@ for (let bi = 0; bi < GRID; bi++){
     treeSpots.push({ x: x, z: z, y: 0, type: randInt(0, 1), scale: rand(0.9, 1.5), rot: rnd() * TAU });
   }
 })();
+
+buildGasStation();
 
 /* --- bariera betonowa: JEDEN obwód dookoła świata (miasto + pas podmiejski), x, z = ±WALL_X --- */
 (function barrier(){
@@ -735,25 +763,20 @@ function addMerged(buf, material, cast, receive){
 const roadMesh  = addMerged(roadBuf,  new THREE.MeshLambertMaterial({ map: texs.road,  color: 0xbcbcbc }), false, true);
 const crossMesh = addMerged(crossBuf, new THREE.MeshLambertMaterial({ map: texs.cross, color: 0xbcbcbc }), false, true);
 const crosswalkMesh = addMerged(crosswalkBuf, new THREE.MeshLambertMaterial({ map: texs.crossStrip, color: 0xbcbcbc }), false, true);
-const busMesh = addMerged(busBuf, new THREE.MeshLambertMaterial({ color: 0x4f6b82 }), true, true);
-const busSignMesh = addMerged(busSignBuf, new THREE.MeshLambertMaterial({ color: 0xe8b923 }), false, true);
-const roundaboutPaintMesh = addMerged(roundaboutPaintBuf, new THREE.MeshLambertMaterial({ color: 0xe4e2d8 }), false, true);
+
 const walkMesh  = addMerged(walkBuf,  new THREE.MeshLambertMaterial({ map: texs.walk }), false, true);
 const curbMesh  = addMerged(curbBuf,  new THREE.MeshLambertMaterial({ map: texs.curb }), true, true);
 const roofMesh  = addMerged(roofBuf,  new THREE.MeshLambertMaterial({ map: texs.roof }), true, true);
-const grassMesh = addMerged(grassBuf, new THREE.MeshLambertMaterial({ color: 0x3e6a31 }), false, true);
-const apronMesh = addMerged(apronBuf, new THREE.MeshLambertMaterial({ color: 0x6b5a54 }), false, true);
-const lawnMesh  = addMerged(lawnBuf, new THREE.MeshLambertMaterial({ color: 0x4a7339 }), false, true);
+
 const waterMat = new THREE.MeshLambertMaterial({ color: 0x3b6f86 });
 const waterMesh = addMerged(waterBuf, waterMat, false, true);
 if (waterMesh) waterMesh.onBeforeRender = () => { const t = performance.now() * 0.001; waterMat.color.setRGB(0.22 + 0.02 * Math.sin(t * 0.9), 0.42 + 0.03 * Math.sin(t * 0.7 + 1), 0.52 + 0.02 * Math.sin(t * 1.1)); };
-addMerged(fenceBuf, new THREE.MeshLambertMaterial({ color: 0x5d6469 }), true, true);
-addMerged(courtBuf, new THREE.MeshLambertMaterial({ color: 0xa4543e }), false, true);
-addMerged(benchBuf, new THREE.MeshLambertMaterial({ color: 0x8a5a33 }), true, true);
-addMerged(pathBuf, new THREE.MeshLambertMaterial({ color: 0xcdbf9f }), false, true);
+/* jednokolorowe: przystanki, malowanie, trawa, ogrodzenia, ławki, alejki, dachy domków + bryły dzielnic — jedna siatka */
+const districtMeshes = finalizeDistricts([[busBuf, 0x4f6b82], [busSignBuf, 0xe8b923], [roundaboutPaintBuf, 0xe4e2d8], [grassBuf, 0x3e6a31], [apronBuf, 0x6b5a54],
+  [lawnBuf, 0x4a7339], [fenceBuf, 0x5d6469], [courtBuf, 0xa4543e], [benchBuf, 0x8a5a33], [pathBuf, 0xcdbf9f]].concat(houseRoofBufs.map((b, i) => [b, HOUSE_ROOFS[i]])));
 HOUSE_WALLS.forEach((t, i) => addMerged(houseWallBufs[i], new THREE.MeshLambertMaterial({ map: t }), true, true));
-HOUSE_ROOFS.forEach((c, i) => addMerged(houseRoofBufs[i], new THREE.MeshLambertMaterial({ color: c }), true, true));
+
 const facadeMeshes = facadeBufs.map((b, i) => addMerged(b, facadeMats[i], true, true)).filter(Boolean);
 
 /* obiekty do sprawdzania kolizji kamery */
-const camBlockers = facadeMeshes.concat(curbMesh ? [curbMesh] : []);
+const camBlockers = facadeMeshes.concat(curbMesh ? [curbMesh] : [], districtMeshes);

@@ -171,6 +171,10 @@ function __static(){
     [-1, 1].forEach(sx => { if (i + sx < 1 || i + sx > GRID) return;
       if (!signNear(['D-1'], cx + sx * (ROAD_H + 5), cz, 9)) prioMiss.push('D-1 ' + i + ',' + j + (sx > 0 ? ' E' : ' W')); });
   });
+  /* detale (drzewa, latarnie, kosze, hydranty) w obrysie budynku */
+  const inB = p => buildings.some(b => Math.abs(p.x - b.x) < b.w / 2 - 0.2 && Math.abs(p.z - b.z) < b.d / 2 - 0.2);
+  const propsIn = [['drzewo', treeSpots], ['latarnia', lampSpots], ['kosz', binSpots], ['hydrant', hydSpots]].reduce((acc, e) => acc.concat(e[1].filter(inB).map(p => e[0] + ' @' + p.x.toFixed(0) + ',' + p.z.toFixed(0))), []);
+  out.propsInBuildings = { n: propsIn.length, examples: propsIn.slice(0, 5) };
   out.signChecks = { float: float.length, dups: dups, prioMissing: prioMiss.length, examples: float.slice(0, 4).concat(dupEx, prioMiss.slice(0, 3)) };
   const kinds = {}; signLog.forEach(g => kinds[g.kind] = (kinds[g.kind] || 0) + 1);
   out.signKinds = kinds;
@@ -359,6 +363,7 @@ console.log('Świat:', JSON.stringify(st.world));
 console.log('Autostrady (statycznie):', JSON.stringify(st.hwy));
 console.log('Teren węzła:', JSON.stringify(st.terrain));
 console.log('Znaki (kontrola):', JSON.stringify(st.signChecks));
+console.log('Detale w budynkach:', JSON.stringify(st.propsInBuildings));
 const r = base.__sim(secs);
 console.log('Symulacja', secs, 's gry,', r.npcCount, 'aut NPC (miasto + trasy przez autostrady)');
 console.log('Najdłuższy postój jednego auta (v<0.3):', r.stuckMax.toFixed(1), 's', r.stuckAt ? '(auto #'+r.stuckId+' przy '+r.stuckAt+')' : '');

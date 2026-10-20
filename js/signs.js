@@ -335,8 +335,23 @@ Object.assign(FACE, {
 const matSignBack = new THREE.MeshLambertMaterial({ color: 0x8e9196 });
 const matSignPole = new THREE.MeshLambertMaterial({ color: 0x7d8288 });
 const matSignDark = new THREE.MeshLambertMaterial({ color: 0x1b1d20 });
+/* tarcze wszystkich rodzajów w JEDNEJ siatce: tekstury składane w atlas (komórki 256 px z marginesem 6 px,
+   siatka N×N, N potęgą dwójki) i przemapowane UV — jedno wywołanie rysowania zamiast kilkudziesięciu */
 function finalizeSigns(){
-  signFaceBufs.forEach(e => addMerged(e.buf, new THREE.MeshLambertMaterial({ map: e.tex }), false, true));
+  const list = Array.from(signFaceBufs.values());
+  let N = 1; while (N * N < list.length) N *= 2;
+  const C = 256, pad = 6, S = N * C, atlas = mkCanvas(S, S), g = atlas.getContext('2d'), merged = new GeoBuf();
+  list.forEach((e, k) => {
+    const col = k % N, row = Math.floor(k / N), x = col * C, y = row * C;
+    g.drawImage(e.tex.image, x, y, C, C);                                       // margines = rozciągnięty brzeg
+    g.drawImage(e.tex.image, x + pad, y + pad, C - 2 * pad, C - 2 * pad);
+    const u0 = (x + pad) / S, v0 = 1 - (y + C - pad) / S, su = (C - 2 * pad) / S;
+    const b = e.buf;
+    for (let i = 0; i < b.p.length; i++){ merged.p.push(b.p[i]); merged.n.push(b.n[i]); }
+    for (let i = 0; i < b.u.length; i += 2){ merged.u.push(u0 + b.u[i] * su, v0 + b.u[i + 1] * su); }
+  });
+  const tex = toTex(atlas); tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+  addMerged(merged, new THREE.MeshLambertMaterial({ map: tex }), false, true);
   addMerged(signBackBuf, matSignBack, true, true);
   addMerged(signPoleBuf, matSignPole, true, true);
   addMerged(signDarkBuf, matSignDark, true, true);
