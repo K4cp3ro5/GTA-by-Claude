@@ -20,6 +20,7 @@ weapons.js
 controls.js
 sound.js
 vehicle-entry.js
+planes.js
 daynight.js
 update-player.js
 update-vehicle.js

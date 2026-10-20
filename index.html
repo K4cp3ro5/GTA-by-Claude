@@ -99,6 +99,9 @@
   #toast{position:fixed;left:50%;top:18%;transform:translateX(-50%);padding:8px 16px;border-radius:8px;background:rgba(20,22,27,.82);
     color:#f2f0ea;font:600 15px Inter,system-ui,sans-serif;opacity:0;transition:opacity .25s;pointer-events:none;z-index:30}
   #toast.on{opacity:1}
+  #stick{position:absolute;left:50%;top:50%;width:64px;height:64px;margin:-32px 0 0 -32px;border:1px solid rgba(242,240,234,.35);border-radius:50%;opacity:0;transition:opacity .2s}
+  #stick.on{opacity:1}
+  #stick i{position:absolute;left:28px;top:28px;width:8px;height:8px;border-radius:50%;background:#ffb03a}
   #kmh{
     font-size:58px;font-weight:200;line-height:.92;letter-spacing:-.02em;
     font-variant-numeric:tabular-nums;
@@ -307,6 +310,7 @@
   </section>
 
   <div id="toast"></div>
+  <div id="stick"><i id="stickDot"></i></div>
   <div id="prompt">Naciśnij <kbd>F</kbd> lub <kbd>E</kbd>, aby wsiąść</div>
   <section class="panel" id="weaponhud"><span class="wname" id="wname">Pięści</span><span class="wammo" id="wammo"></span></section>
   <div id="crosshair"></div>
@@ -402,6 +406,7 @@
 <script src="js/controls.js"></script>
 <script src="js/sound.js"></script>
 <script src="js/vehicle-entry.js"></script>
+<script src="js/planes.js"></script>
 <script src="js/daynight.js"></script>
 <script src="js/update-player.js"></script>
 <script src="js/update-vehicle.js"></script>

@@ -20,45 +20,8 @@ const AIRPORT_PLANES = [];
 const NPC_COLORS_AIR = [0x2e4d8f, 0xd9d4c8, 0x2f6f4e, 0x8a8f96, 0xe0a52c, 0x6b3a8f, 0x1b1d22, 0xb3272b];
 const carTopOf2 = type => Math.max(...carParts(type).map(q => q[5] + q[1] / 2));   // { x, z, heading, kind } — przyszłe latanie
 
-/* samolot: części w układzie lokalnym (nos w +Z), skala s; kolizja kadłuba i skrzydeł */
-function buildPlane(x, z, heading, s, livery, prop){
-  const cs = Math.cos(heading), sn = Math.sin(heading);
-  const W = (lx, lz) => [x + lx * cs + lz * sn, z - lx * sn + lz * cs];
-  const part = (col, lx, ly, lz, w, h, d, rot, top) => { const p = W(lx * s, lz * s); CB(col).boxRot(p[0], ly * s, p[1], w * s, h * s, d * s, heading + (rot || 0), 2, top !== false); };
-  const white = 0xe9eaec, dark = 0x2b2f35, grey = 0xb9bec6;
-  if (!prop){
-    part(white, 0, 3.2, 0, 3.0, 3.2, 22);                     // kadłub
-    part(white, 0, 3.0, 12.2, 2.5, 2.7, 2.6);                 // przód
-    part(white, 0, 2.9, 14.0, 1.5, 1.7, 1.2);                 // nos
-    part(white, 0, 3.7, -12.6, 2.2, 2.3, 3.4);                // stożek ogonowy
-    part(dark, 0, 3.95, 12.9, 2.3, 0.45, 0.9);                // szyby kabiny
-    part(dark, 0, 3.75, 0, 3.04, 0.32, 18);                   // okna
-    part(livery, 0, 2.55, 0, 3.05, 0.45, 20.5);               // pas malowania
-    for (const sd of [-1, 1]){
-      part(white, sd * 6.4, 2.1, -0.8, 11.5, 0.35, 4.0, -sd * 0.28);   // skrzydła (skos)
-      part(grey, sd * 4.4, 1.25, 1.2, 1.7, 1.7, 3.3);                  // silniki
-      part(dark, sd * 4.4, 1.25, 2.9, 1.2, 1.2, 0.1);
-      part(white, sd * 2.6, 4.4, -11.6, 4.6, 0.25, 2.2, -sd * 0.35);   // statecznik poziomy
-      part(dark, sd * 1.5, 0.8, -0.6, 0.45, 1.6, 0.45);                // podwozie główne
-    }
-    part(livery, 0, 6.6, -11.4, 0.35, 5.2, 3.4, 0, true);     // statecznik pionowy
-    part(dark, 0, 0.8, 10.2, 0.4, 1.6, 0.4);                  // podwozie przednie
-    const c = W(0, 0), wq = W(0, -0.8 * s);
-    staticBoxRot(c[0], 3.2 * s, c[1], 3.0 * s, 3.4 * s, 28 * s, heading);
-    staticBoxRot(wq[0], 2.1 * s, wq[1], 24 * s, 0.5 * s, 4 * s, heading);
-  } else {
-    part(white, 0, 1.6, 0, 1.4, 1.5, 7.5);
-    part(dark, 0, 2.0, 2.0, 1.3, 0.6, 1.4);
-    part(livery, 0, 2.5, 0.6, 11, 0.18, 1.6);                 // skrzydło górnopłata
-    part(white, 0, 1.9, -3.8, 3.6, 0.15, 1.1);
-    part(livery, 0, 2.6, -3.9, 0.15, 1.6, 1.2);
-    part(dark, 0, 1.6, 3.85, 0.2, 2.2, 0.08);                 // śmigło
-    part(dark, 0, 0.45, 1.6, 1.9, 0.12, 0.12); part(dark, 0, 0.5, -1.0, 0.1, 0.9, 0.1);
-    const c = W(0, 0);
-    staticBoxRot(c[0], 1.4 * s, c[1], 1.6 * s, 2.4 * s, 8 * s, heading);
-  }
-  AIRPORT_PLANES.push({ x: x, z: z, heading: heading, kind: prop ? 'prop' : 'jet' });
-}
+/* samolot na lotnisku: tylko miejsce i typ — model, kolizję i latanie buduje planes.js */
+function buildPlane(x, z, heading, s, livery, prop){ AIRPORT_PLANES.push({ x: x, z: z, heading: heading, kind: prop ? 'prop' : 'jet', livery: livery }); }
 
 function buildAirport(){
   const A = AIRPORT, y = 0.03;
@@ -107,8 +70,8 @@ function buildAirport(){
   paint(ap.x0 + 2, ap.z0 + 6, ap.x1 - 2, ap.z0 + 6, 0.25, YEL, y + 0.016);
 
   /* --- samoloty: dwa odrzutowce przy rękawach, jeden na drodze kołowania, awionetka przy hangarze --- */
-  buildPlane(gates[0], ap.z1 - 18, 0, 1, 0x1a4fa0);           // nosem do terminalu, przy rękawie
-  buildPlane(gates[1], ap.z1 - 18, 0, 1, 0xc0392b);
+  buildPlane(gates[0], ap.z1 - 17, Math.PI, 1, 0x1a4fa0);     // przy rękawie, nosem w stronę drogi kołowania (da się wykołować)
+  buildPlane(gates[1], ap.z1 - 17, Math.PI, 1, 0xc0392b);
   buildPlane(-105, tx.z, Math.PI / 2, 1, 0x2f8a4c);
   buildPlane(98, ap.z0 + 9, -Math.PI / 2, 1, 0xe0a52c, true);
 

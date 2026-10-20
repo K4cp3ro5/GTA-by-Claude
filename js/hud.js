@@ -23,6 +23,8 @@ const el = {
   hurtFlash:   document.getElementById('hurtFlash'),
   deadScreen:  document.getElementById('deadScreen'),
   carlbl:      document.getElementById('carlbl'),
+  stick:       document.getElementById('stick'),
+  stickDot:    document.getElementById('stickDot'),
   toast:       document.getElementById('toast')
 };
 /* krótki komunikat na środku ekranu */
@@ -79,8 +81,8 @@ const mg = mm.getContext('2d');
 const MM = mm.width;
 
 function drawMinimap(){
-  const px = mode === 'car' ? chassisBody.position.x : player.body.position.x;
-  const pz = mode === 'car' ? chassisBody.position.z : player.body.position.z;
+  const px = mode === 'car' ? chassisBody.position.x : mode === 'plane' && curPlane ? curPlane.pos.x : player.body.position.x;
+  const pz = mode === 'car' ? chassisBody.position.z : mode === 'plane' && curPlane ? curPlane.pos.z : player.body.position.z;
   const cx = (px - MAP_X0) * MAP_SCALE;
   const cz = (pz - MAP_Z0) * MAP_SCALE;
 
@@ -117,6 +119,13 @@ function drawMinimap(){
   mg.closePath(); mg.fill();
   mg.restore();
 
+  /* samolot gracza */
+  if (mode === 'plane' && curPlane){
+    _cpF.set(0, 0, 1).applyQuaternion(curPlane.quat);
+    mg.save(); mg.translate(MM / 2, MM / 2); mg.rotate(-Math.atan2(_cpF.x, _cpF.z) + Math.PI);
+    mg.fillStyle = '#f2f0ea'; mg.beginPath(); mg.moveTo(0, -7); mg.lineTo(1.4, -1); mg.lineTo(7, 1.5); mg.lineTo(1.4, 1.5); mg.lineTo(0.9, 5); mg.lineTo(3, 6.5); mg.lineTo(-3, 6.5); mg.lineTo(-0.9, 5); mg.lineTo(-1.4, 1.5); mg.lineTo(-7, 1.5); mg.lineTo(-1.4, -1); mg.closePath(); mg.fill();
+    mg.restore();
+  }
   /* gracz */
   if (mode === 'foot'){
     const pp = toMap(player.body.position.x, player.body.position.z);
@@ -196,16 +205,17 @@ function drawCompass(){
 }
 /* --- prędkościomierz: tarcza 240° do v maks. typu, wskazówka, liczba, obroty na wewnętrznym łuku --- */
 const speedCv = document.getElementById('speedCv'), sctx = speedCv.getContext('2d');
-function drawSpeedo(kmh){
+function drawSpeedo(kmh, gauge, rpm){
   const c = sctx, W = speedCv.width, cx = W / 2, cy = 82, R = 70, a0 = Math.PI * 0.75, a1 = Math.PI * 2.25;
-  const T = CAR_TYPES[carType], vmax = T.gauge || 200, f = v => a0 + (a1 - a0) * clamp(v / vmax, 0, 1);
+  const vmax = gauge || CAR_TYPES[carType].gauge || 200, f = v => a0 + (a1 - a0) * clamp(v / vmax, 0, 1);
+  const rp = rpm === undefined ? engineRpm : rpm;
   c.clearRect(0, 0, W, speedCv.height);
   c.lineCap = 'round';
   c.lineWidth = 4; c.strokeStyle = 'rgba(200,198,191,.16)'; c.beginPath(); c.arc(cx, cy, R, a0, a1); c.stroke();
   c.strokeStyle = '#ffb03a'; c.beginPath(); c.arc(cx, cy, R, a0, f(kmh)); c.stroke();
   /* obroty */
   c.lineWidth = 2; c.strokeStyle = 'rgba(200,198,191,.10)'; c.beginPath(); c.arc(cx, cy, R - 9, a0, a1); c.stroke();
-  c.strokeStyle = engineRpm > 0.85 ? '#ff4a3d' : '#6f8fa0'; c.beginPath(); c.arc(cx, cy, R - 9, a0, a0 + (a1 - a0) * clamp(engineRpm, 0, 1)); c.stroke();
+  c.strokeStyle = rp > 0.85 ? '#ff4a3d' : '#6f8fa0'; c.beginPath(); c.arc(cx, cy, R - 9, a0, a0 + (a1 - a0) * clamp(rp, 0, 1)); c.stroke();
   /* podziałka */
   const step = vmax <= 60 ? 10 : 20;
   c.font = '500 9px Inter, system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
@@ -226,7 +236,16 @@ let hudAcc = 0, fpsAcc = 0, fpsCount = 0;
 function updateHud(dt, kmh){
   hudAcc += dt; fpsAcc += dt; fpsCount++;
 
-  el.speedo.classList.toggle('on', mode === 'car');
+  el.speedo.classList.toggle('on', mode === 'car' || mode === 'plane');
+  el.stick.classList.toggle('on', mode === 'plane');
+  if (mode === 'plane' && curPlane){
+    const p = curPlane, lbl = 'Samolot · ' + p.T.name;
+    if (el.carlbl.textContent !== lbl){ el.carlbl.textContent = lbl; el.carlbl.classList.remove('stolen'); }
+    drawSpeedo(kmh, p.T.gauge, p.thr);
+    el.gval.textContent = Math.round(p.thr * 100) + '% · WYS ' + Math.max(0, Math.round(p.pos.y - p.T.gear - planeGroundY(p.pos.x, p.pos.z, p.pos.y))) + ' m';
+    el.ghand.textContent = 'GAZ'; el.ghand.className = '';
+    el.stickDot.style.transform = 'translate(' + (planeStick.x * 26).toFixed(1) + 'px,' + (planeStick.y * 26).toFixed(1) + 'px)';
+  } else if (el.ghand.textContent !== 'RĘCZNY') el.ghand.textContent = 'RĘCZNY';
   if (_toastT > 0){ _toastT -= dt; if (_toastT <= 0) el.toast.classList.remove('on'); }
   if (mode === 'car'){
     const lbl = (driving.owner === 'player' ? (CAR_TYPES[carType].bike ? 'Twój rower' : 'Twój samochód') : 'Skradziony') + ' · ' + CAR_TYPES[carType].name;
@@ -248,14 +267,14 @@ function updateHud(dt, kmh){
 
   if (hudAcc > 0.12){
     hudAcc = 0;
-    el.modetxt.textContent = mode === 'car' ? 'W pojeździe' : 'Pieszo';
+    el.modetxt.textContent = mode === 'car' ? 'W pojeździe' : mode === 'plane' ? 'W powietrzu' : 'Pieszo';
     const hours = timeOfDay * 24;
     const hh = Math.floor(hours), mmn = Math.floor((hours - hh) * 60);
     el.clock.textContent = (hh < 10 ? '0' : '') + hh + ':' + (mmn < 10 ? '0' : '') + mmn;
     el.clockIcon.textContent = (timeOfDay > 0.25 && timeOfDay < 0.8) ? '☀' : '☾';
     el.phase.textContent = phaseName(timeOfDay) + (muted ? ' · wyciszone' : '');
-    const px = mode === 'car' ? chassisBody.position.x : player.body.position.x;
-    const pz = mode === 'car' ? chassisBody.position.z : player.body.position.z;
+    const px = mode === 'car' ? chassisBody.position.x : mode === 'plane' && curPlane ? curPlane.pos.x : player.body.position.x;
+    const pz = mode === 'car' ? chassisBody.position.z : mode === 'plane' && curPlane ? curPlane.pos.z : player.body.position.z;
     el.coords.textContent = Math.round(px) + ', ' + Math.round(pz);
     drawMinimap();
   }
@@ -268,12 +287,14 @@ function updateHud(dt, kmh){
   let nv = null;
   if (mode === 'foot') nv = nearestVehicle();
   const near = !!nv && nv.dist < 3.5;
-  promptEl.classList.toggle('on', near || mode === 'car');
-  const want = mode === 'car' ? 'out' : (near ? (nv.kind === 'npc' ? 'jack' : 'in') : lastPrompt);
+  promptEl.classList.toggle('on', near || mode === 'car' || (mode === 'plane' && curPlane && curPlane.onGround && curPlane.v < 3));
+  const want = mode === 'car' ? 'out' : mode === 'plane' ? 'outPlane' : (near ? (nv.kind === 'npc' ? 'jack' : nv.kind === 'plane' ? 'plane' : 'in') : lastPrompt);
   if (want !== lastPrompt){
     lastPrompt = want;
-    promptEl.innerHTML = want === 'out' ? 'Naciśnij <kbd>F</kbd> lub <kbd>E</kbd>, aby wysiąść'
+    promptEl.innerHTML = want === 'out' ? 'Naciśnij <kbd>F</kbd>, aby wysiąść'
+                        : want === 'outPlane' ? 'Naciśnij <kbd>F</kbd>, aby wysiąść z samolotu'
                         : want === 'jack' ? 'Naciśnij <kbd>F</kbd> lub <kbd>E</kbd>, aby ukraść auto'
+                        : want === 'plane' ? 'Naciśnij <kbd>F</kbd> lub <kbd>E</kbd>, aby wsiąść do samolotu'
                         : 'Naciśnij <kbd>F</kbd> lub <kbd>E</kbd>, aby wsiąść';
   }
 }

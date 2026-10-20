@@ -126,6 +126,11 @@ document.addEventListener('mousemove', e => {
     wheelVY += e.movementY;
     return;
   }
+  if (mode === 'plane'){                                                     // mysz = drążek (wychylenie, wraca powoli do środka)
+    planeStick.x = clamp(planeStick.x + e.movementX * 0.0035, -1, 1);
+    planeStick.y = clamp(planeStick.y + e.movementY * 0.0035, -1, 1);
+    return;
+  }
   const s = 0.0022;
   camYaw   -= e.movementX * s;
   camPitch -= e.movementY * s;
