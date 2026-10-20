@@ -1,6 +1,7 @@
 /* ---------------------------------------------------------------
    11. RUCH DROGOWY (NPC)
    --------------------------------------------------------------- */
+const PIRATE_COLOR = 0x7cff2e;                 // piraci drogowi: kwasowa zieleń (nie występuje w zwykłym ruchu)
 const NPC_COLORS = [0x2e4d8f, 0xd9d4c8, 0x2f6f4e, 0x8a8f96, 0xe0a52c, 0x6b3a8f];
 const npcs = [];
 let npcIdSeq = 0;
@@ -181,15 +182,19 @@ function spawnNpcCar(path, colorHex, startIdx, frac, type){
   };
   /* profil kierowcy: ostrożny (30%), zwykły (50%), dynamiczny (20%) — trzymanie się limitu, odstęp,
      czas reakcji na zielone, przyspieszenie, prędkość docelowa */
-  const pr = rnd(), P = pr < 0.08 ? { k: 'pirat', obey: [1.18, 1.32], v: 1.2, a: 1.3, gap: -0.5, react: 0 }      // pirat drogowy (rzadko)
-                   : pr < 0.32 ? { k: 'ostrożny', obey: [0.88, 0.96], v: 0.92, a: 0.85, gap: 1.0, react: 0.9 }
-                   : pr < 0.8 ? { k: 'zwykły', obey: [0.95, 1.02], v: 1.0, a: 1.0, gap: 0, react: 0.45 }
-                   : { k: 'dynamiczny', obey: [1.0, 1.05], v: 1.06, a: 1.15, gap: -0.3, react: 0.15 };
-  n.profile = P.k; n.obey = rand(P.obey[0], P.obey[1]); n.target *= P.v; n.hwyF = P.v;
-  if (P.k === 'pirat') n.target = Math.max(n.target, 12);                     // pirat: szybko także w centrum (ograniczają go limity × obey)
-  if (type !== 'bike' && !path.hwyRoute && n.id % 11 === 4 && n.profile !== 'pirat'){                  // kilku stałych piratów w mieście
-    n.profile = 'pirat'; n.obey = rand(1.18, 1.32); n.target = Math.max(n.target * 1.2, 12); n.hwyF = 1.2; n.accel *= 1.3; n.gapX = -0.5; n.react = 0;
-  } n.accel *= P.a; n.gapX = P.gap; n.react = P.react;
+  const PIR = { k: 'pirat', obey: [1.35, 1.6], v: 1.25, a: 2.0, gap: -0.5, react: 0 };   // pirat drogowy: nie trzyma się żadnych zasad
+  const pr = rnd();
+  let P = pr < 0.08 ? PIR
+        : pr < 0.32 ? { k: 'ostrożny', obey: [0.88, 0.96], v: 0.92, a: 0.85, gap: 1.0, react: 0.9 }
+        : pr < 0.8 ? { k: 'zwykły', obey: [0.95, 1.02], v: 1.0, a: 1.0, gap: 0, react: 0.45 }
+        : { k: 'dynamiczny', obey: [1.0, 1.05], v: 1.06, a: 1.15, gap: -0.3, react: 0.15 };
+  if (type !== 'bike' && !path.hwyRoute && !path.some(q => q.rb !== undefined) && n.id % 7 === 3) P = PIR;   // kilku stałych piratów w mieście (pętle bez rond — te same, co rowerzystów)
+  if (type === 'bike' && P === PIR) P = { k: 'zwykły', obey: [1, 1], v: 1, a: 1, gap: 0, react: 0.45 };
+  n.profile = P.k; n.obey = rand(P.obey[0], P.obey[1]); n.target *= P.v; n.hwyF = P.v; n.accel *= P.a; n.gapX = P.gap; n.react = P.react;
+  if (P === PIR){                                                                             // jaskrawy lakier, szybko także w centrum
+    n.target = Math.max(n.target, 13); n.color = PIRATE_COLOR;
+    scene.remove(n.mesh); n.mesh = buildNpcModel(PIRATE_COLOR, type);
+  }
   const b = new CANNON.Body({ mass: 0, type: CANNON.Body.KINEMATIC, material: matCar });
   b.addShape(new CANNON.Box(new CANNON.Vec3(TN.hw + 0.02, TN.hh, TN.hl + 0.05)));
   b.position.set(n.pos.x, n.y + TN.hh + 0.1, n.pos.y);

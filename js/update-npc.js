@@ -102,9 +102,16 @@ function updateNpc(n, i, dt, honk){
       if (o){ block = true; why = 'atrapa'; obst = o; break; }
     }
     /* piesi na jezdni (na przejściu albo leżący) — auto staje przed nimi */
-    if (!block && low) for (const p of Pedestrians.list){ if (pedOnRoad(p) && checkPoint(p.pos.x, p.pos.y, 0.7)){ block = true; why = 'pieszy'; break; } }
+    const pir = n.profile === 'pirat';
+    if (!block && low && !pir) for (const p of Pedestrians.list){ if (pedOnRoad(p) && checkPoint(p.pos.x, p.pos.y, 0.7)){ block = true; why = 'pieszy'; break; } }
+    /* pirat nie hamuje przed pieszymi — potrąca tych, którzy są na jezdni przed maską */
+    if (pir && low && n.speed > 3) for (const p of Pedestrians.list){
+      if (p.state === 'down' || !pedOnRoad(p)) continue;
+      const ox = p.pos.x - n.pos.x, oz = p.pos.y - n.pos.y, a = ox * dx + oz * dz;
+      if (a > 0 && a < (n.halfL || 2.05) + 0.6 && Math.abs(ox * dz - oz * dx) < (n.halfW || 0.93) + 0.4){ Pedestrians.hit(p, n.speed + 2); n.pedHits = (n.pedHits || 0) + 1; }
+    }
     /* przejście, po którym ktoś właśnie idzie (także po drugiej połowie jezdni): nie wjeżdżam na pasy */
-    if (!block && low && zebraBusyAhead(n, dx, dz)){ block = true; why = 'zebra'; }
+    if (!block && low && !pir && zebraBusyAhead(n, dx, dz)){ block = true; why = 'zebra'; }
     /* auta NPC (npcConflict): jazda za autem w tym samym kierunku (cap), a przy ruchu poprzecznym
        punkt kolizji torów — auto, które już jest w strefie konfliktu, ma pierwszeństwo; gdy oba
        dopiero dojeżdżają, ustępuje to, które ma drugie po PRAWEJ (reguła prawej ręki). Bezpiecznik
@@ -126,7 +133,7 @@ function updateNpc(n, i, dt, honk){
     if (n.ignoreNpcT > 0) n.ignoreNpcT -= dt;
     n.waitT = (blockedByNpc && n.speed < 0.3) ? (n.waitT || 0) + dt : 0;
     if (n.waitT > 9){ n.ignoreNpcT = 2.5; n.waitT = 0; }
-    if (!block && low && redLightAhead(n.pos.x, n.pos.y, dx, dz)){ block = true; why = 'światło'; }
+    if (!block && low && !pir && redLightAhead(n.pos.x, n.pos.y, dx, dz)){ block = true; why = 'światło'; }   // pirat: na czerwonym też jedzie
     /* ruszanie na zielonym z opóźnieniem zależnym od kierowcy (ostrożny dłużej, dynamiczny od razu) */
     if (n.wasLight && why !== 'światło') n.reactT = n.react || 0;
     n.wasLight = why === 'światło';
@@ -138,8 +145,8 @@ function updateNpc(n, i, dt, honk){
       if (n.haz) n.haz.color.setHex(Math.floor(n.hitT * 2.6) % 2 ? 0xffa21a : 0x3a2a0a);
       if (n.hitT <= 0) npcHazardOff(n);
     }
-    if (!block && low && stopSignAhead(n, dx, dz, dt)){ block = true; why = 'STOP'; }
-    if (!block && low && roundaboutYield(n)){ block = true; why = 'rondo'; }
+    if (!block && low && !pir && stopSignAhead(n, dx, dz, dt)){ block = true; why = 'STOP'; }
+    if (!block && low && roundaboutYield(n)){ block = true; why = 'rondo'; }            // rondo: wjazd z ustąpieniem także dla pirata (inaczej zakleszczenia na pasie okrężnym)
     /* klakson gracza za autem stojącym > 2 s nie z powodu przepisów: rusza (pomija samą regułę pierwszeństwa) */
     n.stillT = n.speed < 0.3 ? (n.stillT || 0) + dt : 0;
     if (honk && n.stillT > 2 && !['światło', 'STOP', 'pieszy', 'zebra', 'rondo', 'kolizja', 'gracz-auto', 'gracz'].includes(why)){
@@ -180,7 +187,7 @@ function updateNpc(n, i, dt, honk){
       if (lim < Infinity) cap = Math.min(cap, lim * (n.obey || 1));
       /* skrzyżowanie z drogą z pierwszeństwem przed nami, a my na podporządkowanej (A-7/STOP): dojazd ~30 km/h */
       const pr = roadPriority(n.pos.x + dx*14, n.pos.y + dz*14);
-      if (pr && (pr === 'ew') !== (Math.abs(dx) > Math.abs(dz)) && roadPriority(n.pos.x, n.pos.y) === null) cap = Math.min(cap, 8.5);
+      if (!pir && pr && (pr === 'ew') !== (Math.abs(dx) > Math.abs(dz)) && roadPriority(n.pos.x, n.pos.y) === null) cap = Math.min(cap, 8.5);
     }
 
     if (n.ovtSlow) cap = Math.min(cap, n.speed * 0.85);
@@ -344,7 +351,7 @@ function npcHwyLanes(n, dx, dz, tgt){
 /* pirat drogowy w mieście: wyprzedza wolniejsze auto po przeciwnym pasie (prosty odcinek bez skrzyżowania,
    nikogo z naprzeciwka w 40 m) i bardzo rzadko (PIRATE_RAM_CHANCE na mijanego rowerzystę) zjeżdża w rowerzystę
    — rowerzysta się przewraca, pirat jedzie dalej */
-let PIRATE_RAM_CHANCE = 0.03;
+let PIRATE_RAM_CHANCE = 0.15;
 function npcPirate(n, dx, dz, tgt, dt){
   if (n.y > 1 || n.rb >= 0 || tgt.hwy || n.byp) return;
   /* trwające taranowanie: zbliżenie w bok do rowerzysty, kontakt -> przewrócenie */
@@ -439,7 +446,13 @@ function npcConflict(n, m, dx, dz, onlyClose){
   if (ahead > 0 && npcTouchAhead(n, m, dx, dz, rx, rz, ahead)){  // nadwozie m tuż przed naszym przodem — stop...
     const mdx0 = m.dirX !== undefined ? m.dirX : Math.sin(m.heading), mdz0 = m.dirZ !== undefined ? m.dirZ : Math.cos(m.heading);
     const mutual = (-rx*mdx0 - rz*mdz0) > 0;                       // ...chyba że m też widzi nas przed sobą: wtedy
-    return !(mutual && n.id < m.id);                               // ustępuje tylko jedno (wyższe id), inaczej stałyby w nieskończoność
+    if (!mutual) return true;
+    const cr0 = dx*mdz0 - dz*mdx0;
+    if (Math.abs(cr0) > 0.6){                                      // poprzecznie: jedzie to, które jest bliżej punktu przecięcia torów
+      const t0 = (rx*mdz0 - rz*mdx0) / cr0, s0 = (rx*dz - rz*dx) / cr0;   // (drugie ma nos przy jego boku — czeka)
+      if (Math.abs(t0 - s0) > 0.15) return t0 > s0;
+    }
+    return !(n.id < m.id);                                         // ustępuje tylko jedno (wyższe id), inaczej stałyby w nieskończoność
   }
   const mdx = m.dirX !== undefined ? m.dirX : Math.sin(m.heading), mdz = m.dirZ !== undefined ? m.dirZ : Math.cos(m.heading);
   const dot = dx*mdx + dz*mdz;
@@ -486,7 +499,13 @@ function npcConflict(n, m, dx, dz, onlyClose){
      sedanów ~3.3 m jak dawniej; mały rower nie „mija” toru pickupa za wcześnie */
   const nL = n.halfL || 2.05, mL = m.halfL || 2.05, nW = n.halfW || 0.93, mW = m.halfW || 0.93;
   if (t < -(nL + mW + 0.3) || t > Math.max(14, vn*3) || s < -(mL + nW + 0.3) || s > Math.max(14, vm*3)) return Infinity;   // minięte (z tyłem auta) albo daleko
-  const mIn = s < mL + nW + 0.3, nIn = t < nL + mW + 0.3;          // w strefie konfliktu (lub tuż przed nią)
+  const zN = nL + mW + 0.3, zM = mL + nW + 0.3;
+  const mIn = s < zM, nIn = t < zN;                                // w strefie konfliktu (lub tuż przed nią)
+  /* wolne auto, które wtoczyło się w strefę, czekając, nie przejmuje pierwszeństwa przed szybkim, które już nie wyhamuje
+     (droga hamowania NPC ≈ v / 5.5 — damp w updateNpc); obie strony liczą to samo */
+  const nStop = t - zN > n.speed / 5.5 + 0.3, mStop = s - zM > m.speed / 5.5 + 0.3;
+  if (nIn && !mIn && n.speed < 3 && !mStop) return true;           // wpełzłem — czekam, ono przejedzie
+  if (mIn && !nIn && m.speed < 3 && !nStop) return Infinity;       // ono wpełzło, ja nie wyhamuję — jadę
   if (nIn && !mIn) return Infinity;                                // jestem już w środku — jadę dalej
   if (mIn && !nIn) return true;                                    // ono jest w środku — czekam
   if (mIn && nIn) return t > s ? true : Infinity;                  // oba w środku: dalsze od punktu ustępuje
@@ -496,6 +515,9 @@ function npcConflict(n, m, dx, dz, onlyClose){
      a na skrzyżowaniu z drogą z pierwszeństwem (aleja j=6) — pierwszeństwo jadących aleją.
      Obie strony liczą to samo, więc decyzje są zgodne (jedno jedzie, drugie czeka). */
   const etaN = t / vn, etaM = s / vm, rightness = rx*-dz + rz*dx;  // rightness > 0: m po mojej prawej
+  /* pirat nie ustępuje z przepisów — czeka tylko na auto, które ewidentnie będzie pierwsze; pozostali jeżdżą przy nim defensywnie */
+  if (n.profile === 'pirat') return etaM + 0.6 < etaN ? true : Infinity;
+  if (m.profile === 'pirat') return etaN + 0.6 < etaM ? Infinity : true;
   const pr = roadPriority(n.pos.x + dx*t, n.pos.y + dz*t);
   if (pr){
     const nMain = (pr === 'ew') === (Math.abs(dx) > Math.abs(dz)), mMain = (pr === 'ew') === (Math.abs(mdx) > Math.abs(mdz));
