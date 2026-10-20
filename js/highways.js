@@ -208,6 +208,33 @@ HWY_PIERS.forEach(p => {
     [1, -1].forEach(sg => lampSpots.push({ x: p.x, z: p.z, rot: Math.atan2(A.n.x * sg, A.n.z * sg), y: p.y + 0.9, gy: p.y + 0.01 }));
   }
 });
+/* latarnie na zewnętrznej barierze pętli i łącznic (po zewnętrznej stronie łuku = lewa) co ~40 m */
+HWY_RAMPS.forEach(r => {
+  const w = r.way;
+  for (let d = 20; d < w.len - 15; d += 40){
+    const q = wayAt(w, d), i = w.pts.indexOf(q.a);
+    if (i < 0 || !wayBarrier(w, Math.min(i, w.pts.length - 2), -1)) continue;
+    const hw = lerp(q.a.hw, q.b.hw, q.t) + 0.2;
+    lampSpots.push({ x: q.x + q.hz * hw, z: q.z - q.hx * hw, rot: Math.atan2(-q.hz, q.hx), y: q.y + 1.0, gy: q.y + 0.01 });
+  }
+});
+/* ekrany akustyczne (panele 2.5 m na barierze) tam, gdzie jezdnia biegnie obok dzielnicy mieszkalnej */
+const hwNoiseBuf = new GeoBuf();
+['A1+', 'A1-', 'A2+', 'A2-'].forEach(nm => {
+  const w = CW[nm];
+  for (let i = 0; i < w.pts.length - 1; i++){
+    if (!wayBarrier(w, i, 1)) continue;
+    const a = w.pts[i], b = w.pts[i + 1], l = Math.hypot(b.x - a.x, b.z - a.z) || 1, rx = -(b.z - a.z) / l, rz = (b.x - a.x) / l;
+    const ox = (a.x + b.x) / 2 + rx * 24, oz = (a.z + b.z) / 2 + rz * 24;
+    if (Math.abs(ox) > CITY_EDGE - 15 || Math.abs(oz) > CITY_EDGE - 15) continue;
+    const bi = Math.floor((ox + HALF) / BLOCK), bj = Math.floor((oz + HALF) / BLOCK);
+    if (districtAt(blockCenter(bi), blockCenter(bj)) !== 'residential') continue;
+    const o = a.hw + 0.2, A = [a.x + rx * o, a.y + 1.0, a.z + rz * o], B = [b.x + rx * o, b.y + 1.0, b.z + rz * o];
+    const A2 = [A[0], A[1] + 2.5, A[2]], B2 = [B[0], B[1] + 2.5, B[2]];
+    quadOut(hwNoiseBuf, A, B, B2, A2, [rx, 0, rz]); quadOut(hwNoiseBuf, A, B, B2, A2, [-rx, 0, -rz]);
+    hwConcBuf.box(A[0], A[1] + 1.25, A[2], 0.14, 2.5, 0.14, 1, true);
+  }
+});
 /* latarnie wzdłuż dróg pasa podmiejskiego (po prawej stronie, wysięgnik nad drogę) */
 HWY_TERM.forEach(t => [t.exit, t.entry].forEach(w => {
   for (let d = 20; d < w.len - 10; d += 34){
@@ -275,4 +302,5 @@ const hwRampAuxMesh = addMerged(hwRampAuxBuf, new THREE.MeshLambertMaterial({ ma
 const hwGoreMesh = addMerged(hwGoreBuf, new THREE.MeshLambertMaterial({ map: hwyGoreTex, color: 0xbcbcbc }), false, true);
 const hwConcMesh = addMerged(hwConcBuf, new THREE.MeshLambertMaterial({ color: 0x9a978f }), true, true);
 addMerged(hwCushionBuf, new THREE.MeshLambertMaterial({ color: 0xe8b81c }), true, true);
+addMerged(hwNoiseBuf, new THREE.MeshLambertMaterial({ color: 0x9cc6d8, transparent: true, opacity: 0.38, depthWrite: false }), false, false);
 [hwTopMesh, hwTopAuxMesh, hwRampMesh, hwRampAuxMesh, hwGoreMesh, hwConcMesh].forEach(m => { if (m) camBlockers.push(m); });

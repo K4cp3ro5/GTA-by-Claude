@@ -201,6 +201,16 @@ function __static(){
     return [sOf(ex.way.pts[0]), sOf(ex.way.pts[ex.way.auxIn - 1]), HP.colS, HP.colS, sOf(en.way.pts[en.way.pts.length - en.way.auxOut]), sOf(en.way.pts[en.way.pts.length - 1])].map(v => v.toFixed(1)).join('/');
   });
   hb.overlap = ov; hb.barrierOnRoad = onRoad; hb.seq = seq;
+  /* teren węzła: kopce, stawy, boiska nie na ulicach, nie przy filarach, kopiec pod pomostem z prześwitem ≥ 3 m */
+  const tb = [];
+  terrainLog.forEach(t => {
+    if (t.kind === 'green') return;
+    if (nearAxis(t.x) < ROAD_H + t.r - 1 || nearAxis(t.z) < ROAD_H + t.r - 1) tb.push(t.kind + ' na ulicy @' + t.x.toFixed(0) + ',' + t.z.toFixed(0));
+    if (HWY_PIERS.some(p => Math.hypot(p.x - t.x, p.z - t.z) < t.r * 0.6 + p.size / 2)) tb.push(t.kind + ' przy filarze @' + t.x.toFixed(0) + ',' + t.z.toFixed(0));
+    if (t.kind === 'mound' && deckClearAt(t.x, t.z) < t.h + 3) tb.push('kopiec pod pomostem @' + t.x.toFixed(0) + ',' + t.z.toFixed(0));
+  });
+  out.terrain = { mounds: terrainLog.filter(t => t.kind === 'mound').length, ponds: terrainLog.filter(t => t.kind === 'pond').length, courts: terrainLog.filter(t => t.kind === 'court').length,
+                  greens: terrainLog.filter(t => t.kind === 'green').length, problems: tb.length, examples: tb.slice(0, 5) };
   hb.gores = HWY_GORES.length; hb.goreMinGap = Math.min(...HWY_GORES.map(g => g.gap));
   out.hwy = { ways: HWY_WAYS.length, piers: HWY_PIERS.length, maxSpan: +HWY_MAX_SPAN.toFixed(1), pierRoad: hb.pierRoad.length, pierWalk: hb.pierWalk.length,
               lowClearance: hb.clearance.length, minClearance: +hb.minClear.toFixed(2), buildingsInBand: hb.buildings,
@@ -306,6 +316,7 @@ console.log('Znaki wg rodzaju:', JSON.stringify(st.signKinds));
 console.log('Elementy poza murem:', st.outsideWall.length, st.outsideWall.slice(0,5));
 console.log('Świat:', JSON.stringify(st.world));
 console.log('Autostrady (statycznie):', JSON.stringify(st.hwy));
+console.log('Teren węzła:', JSON.stringify(st.terrain));
 const r = base.__sim(secs);
 console.log('Symulacja', secs, 's gry,', r.npcCount, 'aut NPC (miasto + trasy przez autostrady)');
 console.log('Najdłuższy postój jednego auta (v<0.3):', r.stuckMax.toFixed(1), 's', r.stuckAt ? '(auto #'+r.stuckId+' przy '+r.stuckAt+')' : '');

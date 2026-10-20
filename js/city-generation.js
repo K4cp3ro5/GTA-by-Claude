@@ -238,6 +238,12 @@ const SPECIAL_CORNERS = [
 ];
 function specialCornerAt(bi, bj){ return SPECIAL_CORNERS.find(c => c.bi === bi && c.bj === bj); }
 
+/* dzielnice: centrum (wieżowce), handlowa (wzdłuż głównych arterii),
+   przemysłowa (zachód/południowy zachód: niskie, duże hale), mieszkalna (reszta, na obrzeżach domki) */
+function districtAt(cx, cz){
+  const dist = Math.hypot(cx, cz);
+  return dist < 165 ? 'center' : (cx < -115 && cz < 45) ? 'industrial' : (Math.abs(cz) < 56 || Math.abs(cx) < 56) ? 'commercial' : 'residential';
+}
 function buildParkBlock(cx, cz){
   walkBuf.plane(cx, WALK_H, cz, LOT, LOT, LOT/4, LOT/4);
   curbBuf.box(cx, WALK_H/2, cz, LOT, WALK_H, LOT, 2, false);
@@ -288,16 +294,142 @@ function buildCornerPlaza(cx, cz, kind){
   }
 }
 
-/* kwartał w większości pod autostradą (lub plac narożny, którego pomnik nie zmieści się pod płytą):
-   podest z trawą i drzewami poza śladem jezdni, bez budynków i bez pętli pieszych */
+/* --- teren węzła i kwartały pod estakadami ---
+   Węzeł koniczynowy zajmuje kwartały 3..8 × 3..8. Te z nich, które autostrada tylko zahacza
+   (wnętrza pętli, trójkąty między pętlą, łącznicą i jezdnią), dostają zieleń: trawę, niskie kopce
+   (czasza kuli — ta sama bryła w kolizji, więc da się po nich jechać), krzewy i drzewa, w dwóch
+   wnętrzach pętli staw; ogrodzenie z furtką 3.5 m od krawężnika (piesi NPC chodzą chodnikiem obok).
+   Kwartały w większości pod pomostem: parking z miejscami P-18, boisko do kosza albo zieleń z alejką
+   i ławkami — wszystko omija filary (HWY_PIERS). terrainLog: kontrola statyczna w sim.js. */
+const waterBuf = new GeoBuf(), fenceBuf = new GeoBuf(), courtBuf = new GeoBuf(), benchBuf = new GeoBuf(), pathBuf = new GeoBuf();
+const terrainLog = [];
+const IC_ZONE = (bi, bj) => bi >= 3 && bi <= 8 && bj >= 3 && bj <= 8;
+const POND_BLOCKS = ['5,7', '7,5', '4,6'];
+function deckClearAt(x, z){ const q = hwyQuery(x, z, 0.3); return q.length ? Math.min(...q.map(h => h.y)) - HP.slab - WALK_H : Infinity; }
+function nearPierXZ(x, z, r){ return HWY_PIERS.some(p => Math.hypot(p.x - x, p.z - z) < r + p.size / 2 + 0.4); }
+/* niski kopiec trawy: czasza kuli o promieniu podstawy r i wysokości h */
+function mound(cx, cz, r, h){
+  const Rs = (r*r + h*h) / (2*h), y0 = WALK_H + 0.012, seg = 16, rings = 5;
+  const P = (k, s) => { const rr = r * k / rings, a = s / seg * TAU; return [cx + Math.cos(a)*rr, y0 + Math.sqrt(Math.max(0, Rs*Rs - rr*rr)) - (Rs - h), cz + Math.sin(a)*rr]; };
+  for (let k = 0; k < rings; k++) for (let s = 0; s < seg; s++){
+    if (k === 0) triOut(lawnBuf, P(0, 0), P(1, s), P(1, s + 1), [0, 1, 0]);
+    else quadOut(lawnBuf, P(k, s), P(k, s + 1), P(k + 1, s + 1), P(k + 1, s), [0, 1, 0]);
+  }
+  staticShape(new CANNON.Sphere(Rs), cx, y0 + h - Rs, cz, undefined, true);
+  terrainLog.push({ kind: 'mound', x: cx, z: cz, r: r, h: h });
+}
+/* staw: elipsa wody z kamiennym obrzeżem */
+function pond(cx, cz, rx, rz){
+  const seg = 24, y = WALK_H + 0.03;
+  for (let s = 0; s < seg; s++){
+    const a0 = s / seg * TAU, a1 = (s + 1) / seg * TAU;
+    triOut(waterBuf, [cx, y, cz], [cx + Math.cos(a0)*rx, y, cz + Math.sin(a0)*rz], [cx + Math.cos(a1)*rx, y, cz + Math.sin(a1)*rz], [0, 1, 0]);
+    const o0 = [cx + Math.cos(a0)*(rx + 0.6), y + 0.12, cz + Math.sin(a0)*(rz + 0.6)], o1 = [cx + Math.cos(a1)*(rx + 0.6), y + 0.12, cz + Math.sin(a1)*(rz + 0.6)];
+    quadOut(curbBuf, [cx + Math.cos(a0)*rx, y + 0.12, cz + Math.sin(a0)*rz], [cx + Math.cos(a1)*rx, y + 0.12, cz + Math.sin(a1)*rz], o1, o0, [0, 1, 0]);
+  }
+  terrainLog.push({ kind: 'pond', x: cx, z: cz, r: Math.max(rx, rz) + 0.6, h: 0 });
+}
+/* ogrodzenie (słupki co 2 m, dwie poprzeczki, 1.1 m) z kolizją; odcinki przy filarach pomijane */
+function fenceLine(x0, z0, x1, z1){
+  const len = Math.hypot(x1 - x0, z1 - z0), n = Math.max(1, Math.round(len / 2)), y = WALK_H;
+  for (let k = 0; k < n; k++){
+    const ax = lerp(x0, x1, k / n), az = lerp(z0, z1, k / n), bx = lerp(x0, x1, (k + 1) / n), bz = lerp(z0, z1, (k + 1) / n);
+    const mx = (ax + bx) / 2, mz = (az + bz) / 2, l = len / n, rot = Math.atan2(bx - ax, bz - az);
+    if (nearPierXZ(mx, mz, 0.8) || deckClearAt(mx, mz) < 2) continue;
+    fenceBuf.box(ax, y + 0.55, az, 0.07, 1.1, 0.07, 1, true);
+    fenceBuf.boxRot(mx, y + 1.05, mz, 0.05, 0.05, l, rot, 1, true);
+    fenceBuf.boxRot(mx, y + 0.55, mz, 0.04, 0.04, l, rot, 1, true);
+    staticBoxRot(mx, y + 0.55, mz, 0.1, 1.1, l, rot);
+  }
+}
+function bench(x, z, rot){
+  if (nearPierXZ(x, z, 1.2)) return;
+  benchBuf.boxRot(x, WALK_H + 0.45, z, 1.7, 0.08, 0.45, rot, 1, true);
+  const bx = x - Math.sin(rot + Math.PI/2) * 0.2, bz = z - Math.cos(rot + Math.PI/2) * 0.2;
+  benchBuf.boxRot(bx, WALK_H + 0.75, bz, 1.7, 0.4, 0.06, rot, 1, true);
+  fenceBuf.boxRot(x, WALK_H + 0.22, z, 1.5, 0.44, 0.3, rot, 1, true);
+  staticBoxRot(x, WALK_H + 0.45, z, 1.7, 0.9, 0.5, rot);
+}
+/* wolne miejsce w kwartale: losowe próby, warunek ok(x, z) */
+function freeSpot(cx, cz, lim, ok){
+  for (let t = 0; t < 30; t++){ const x = cx + rand(-lim, lim), z = cz + rand(-lim, lim); if (ok(x, z)) return { x: x, z: z }; }
+  return null;
+}
+/* zieleń węzła (kwartał zahaczony przez autostradę, bez budynków) — podest i pętla pieszych już są */
+function buildInterchangeGreen(cx, cz, bi, bj){
+  lawnBuf.plane(cx, WALK_H + 0.012, cz, LOT - 5, LOT - 5, 4, 4);
+  const taken = [];
+  const free = (x, z, r) => !taken.some(t => Math.hypot(t.x - x, t.z - z) < t.r + r + 1) && !nearPierXZ(x, z, r + 1);
+  if (POND_BLOCKS.includes(bi + ',' + bj)){
+    const rx = rand(5, 7), rz = rand(3.8, 5.2), p = freeSpot(cx, cz, 10.5 - rx, (x, z) => free(x, z, rx) && !hwyCovered(x, z, rx + 0.5));
+    if (p){ pond(p.x, p.z, rx, rz); taken.push({ x: p.x, z: p.z, r: rx + 0.6 }); }
+  }
+  const nm = randInt(1, 2);
+  for (let m = 0; m < nm; m++){
+    const r = rand(4, 6), h = rand(0.6, 1.1);
+    const p = freeSpot(cx, cz, 11 - r, (x, z) => free(x, z, r) &&
+      [[0,0],[1,0],[-1,0],[0,1],[0,-1],[0.7,0.7],[-0.7,-0.7],[0.7,-0.7],[-0.7,0.7]].every(q => deckClearAt(x + q[0]*r, z + q[1]*r) > h + 3));
+    if (p){ mound(p.x, p.z, r, h); taken.push({ x: p.x, z: p.z, r: r }); }
+  }
+  for (let t = 0; t < 14; t++){
+    const big = t < 8, p = freeSpot(cx, cz, 10.5, (x, z) => free(x, z, big ? 1.2 : 0.6));
+    if (!p) continue;
+    treeSpots.push({ x: p.x, z: p.z, type: big ? randInt(0, 1) : 1, scale: big ? rand(0.85, 1.3) : rand(0.4, 0.6), rot: rnd() * TAU });
+  }
+  /* ogrodzenie 3.5 m od krawężnika z furtką od losowej strony */
+  const e = LOT/2 - 3.5, gate = randInt(0, 3), g = 1.6;
+  const sides = [[cx - e, cz - e, cx + e, cz - e], [cx + e, cz - e, cx + e, cz + e], [cx + e, cz + e, cx - e, cz + e], [cx - e, cz + e, cx - e, cz - e]];
+  sides.forEach((sd, k) => {
+    if (k !== gate) return fenceLine(sd[0], sd[1], sd[2], sd[3]);
+    const mx = (sd[0] + sd[2]) / 2, mz = (sd[1] + sd[3]) / 2, ux = Math.sign(sd[2] - sd[0]), uz = Math.sign(sd[3] - sd[1]);
+    fenceLine(sd[0], sd[1], mx - ux * g, mz - uz * g); fenceLine(mx + ux * g, mz + uz * g, sd[2], sd[3]);
+  });
+  terrainLog.push({ kind: 'green', x: cx, z: cz, r: 0, h: 0 });
+}
+/* kwartał w większości pod pomostem: podest + parking / boisko / zieleń z alejką */
 function buildUnderpassBlock(cx, cz){
   walkBuf.plane(cx, WALK_H, cz, LOT, LOT, LOT/4, LOT/4);
   curbBuf.box(cx, WALK_H/2, cz, LOT, WALK_H, LOT, 2, false);
   staticBox(cx, WALK_H/2, cz, LOT, WALK_H, LOT);
-  lawnBuf.plane(cx, WALK_H + 0.012, cz, LOT - 5, LOT - 5, 4, 4);
-  for (let t = 0; t < 8; t++){
-    const x = cx + rand(-11, 11), z = cz + rand(-11, 11);
-    treeSpots.push({ x: x, z: z, type: randInt(0, 1), scale: rand(0.8, 1.2), rot: rnd() * TAU });
+  const y = WALK_H, r = rnd();
+  const line = (x0, z0, x1, z1, w) => {               // biała linia malowana
+    const l = Math.hypot(x1 - x0, z1 - z0) || 1, nx = -(z1 - z0) / l * w / 2, nz = (x1 - x0) / l * w / 2;
+    roundaboutPaintBuf.quad([x0 - nx, y + 0.035, z0 - nz], [x0 + nx, y + 0.035, z0 + nz], [x1 + nx, y + 0.035, z1 + nz], [x1 - nx, y + 0.035, z1 - nz], [0,0],[1,0],[1,1],[0,1]);
+  };
+  if (r < 0.75){
+    crossBuf.plane(cx, y + 0.02, cz, LOT - 3, LOT - 3, 3, 3);
+    /* boisko: pół kosza 9 × 9 w wolnym narożniku (bez filarów), reszta parkingu */
+    let court = null;
+    if (r >= 0.5) for (const q of [[1,1],[-1,-1],[1,-1],[-1,1]]){
+      const x = cx + q[0] * 6.8, z = cz + q[1] * 6.8;
+      if (!HWY_PIERS.some(p => Math.hypot(p.x - x, p.z - z) < 7 + p.size / 2) && deckClearAt(x, z) > 4.5){ court = { x: x, z: z, q: q }; break; }
+    }
+    if (court){
+      courtBuf.plane(court.x, y + 0.028, court.z, 9, 9, 1, 1);
+      const x0 = court.x - 4.5, x1 = court.x + 4.5, z0 = court.z - 4.5, z1 = court.z + 4.5;
+      line(x0, z0, x1, z0, 0.08); line(x1, z0, x1, z1, 0.08); line(x1, z1, x0, z1, 0.08); line(x0, z1, x0, z0, 0.08);
+      /* kosz po stronie dalszej od środka kwartału */
+      const hx = court.x + court.q[0] * 3.9, hz = court.z;
+      fenceBuf.box(hx + court.q[0] * 0.4, y + 1.55, hz, 0.12, 3.1, 0.12, 1, true);
+      fenceBuf.box(hx, y + 3.2, hz, 0.05, 1.05, 1.8, 1, true);
+      staticBox(hx + court.q[0] * 0.4, y + 1.55, hz, 0.15, 3.1, 0.15);
+      line(hx - court.q[0] * 4.6, z0, hx - court.q[0] * 4.6, z1, 0.08);
+      terrainLog.push({ kind: 'court', x: court.x, z: court.z, r: 6.4, h: 3.7 });
+    }
+    /* miejsca postojowe P-18: 3 rzędy po 10, stanowisko 2.5 × 5 m, pomijane przy filarach i boisku */
+    for (const zr of [-9, 0, 9]) for (let k = -5; k < 5; k++){
+      const x = cx + (k + 0.5) * 2.5, z = cz + zr;
+      if (nearPierXZ(x, z, 2.4) || (court && Math.abs(x - court.x) < 6 && Math.abs(z - court.z) < 7.5)) continue;
+      line(x - 1.25, z - 2.5, x - 1.25, z + 2.5, 0.1); line(x + 1.25, z - 2.5, x + 1.25, z + 2.5, 0.1);
+      line(x - 1.25, z + (zr < 0 ? -2.5 : 2.5), x + 1.25, z + (zr < 0 ? -2.5 : 2.5), 0.1);
+    }
+  } else {
+    /* zieleń z alejką i ławkami */
+    lawnBuf.plane(cx, y + 0.012, cz, LOT - 5, LOT - 5, 4, 4);
+    pathBuf.plane(cx, y + 0.024, cz, LOT - 5, 2.4, LOT / 4, 1);
+    pathBuf.plane(cx, y + 0.026, cz, 2.4, LOT - 5, 1, LOT / 4);
+    for (const o of [-8, 8]){ bench(cx + o, cz + 2.0, 0); bench(cx + 2.0, cz + o, Math.PI / 2); }
+    for (let t = 0; t < 6; t++){ const p = freeSpot(cx, cz, 11, (x, z) => Math.abs(x - cx) > 2.5 && Math.abs(z - cz) > 2.5 && !nearPierXZ(x, z, 1.5)); if (p) treeSpots.push({ x: p.x, z: p.z, type: randInt(0, 1), scale: rand(0.8, 1.2), rot: rnd() * TAU }); }
   }
 }
 for (let bi = 0; bi < GRID; bi++){
@@ -305,6 +437,7 @@ for (let bi = 0; bi < GRID; bi++){
     const cx = blockCenter(bi), cz = blockCenter(bj);
     const hwFrac = hwyBlockFrac(bi, bj);
     if (hwFrac > 0.5 || (hwFrac > 0 && specialCornerAt(bi, bj) && specialCornerAt(bi, bj).kind !== 'park')){ buildUnderpassBlock(cx, cz); continue; }
+    const icGreen = hwFrac > 0 && IC_ZONE(bi, bj);               // zieleń węzła zamiast zabudowy
 
     if (PARKING_BLOCKS.some(p => p[0] === bi && p[1] === bj)){ buildParkingBlock(cx, cz); continue; }
     const special = specialCornerAt(bi, bj);
@@ -325,10 +458,7 @@ for (let bi = 0; bi < GRID; bi++){
     /* dzielnice: centrum (wieżowce), handlowa (wzdłuż głównych arterii),
        przemysłowa (zachód/południowy zachód: niskie, duże hale), mieszkalna (reszta, na obrzeżach domki) */
     const dist = Math.hypot(cx, cz);
-    const district = dist < 165 ? 'center'
-                   : (cx < -115 && cz < 45) ? 'industrial'
-                   : (Math.abs(cz) < 56 || Math.abs(cx) < 56) ? 'commercial'
-                   : 'residential';
+    const district = districtAt(cx, cz);
     const POOL = { center:[3,5,1], commercial:[5,1,7,2], industrial:[6,3,0], residential:[0,2,4,7] }[district];
     const area = LOT - 6;             // 24 — pas chodnika 3 m dookoła
     const r = rnd();
@@ -342,7 +472,8 @@ for (let bi = 0; bi < GRID; bi++){
     const pSingle = { center: 0.60, commercial: 0.30, industrial: 0.70, residential: 0.10 }[district];
     const pPair   = { center: 0.40, commercial: 0.40, industrial: 0.25, residential: 0.25 }[district];
 
-    if (district === 'residential' && dist > 190){
+    if (icGreen) buildInterchangeGreen(cx, cz, bi, bj);
+    else if (district === 'residential' && dist > 190){
       /* obrzeża: 4 albo 6 domków z ogródkami */
       lawnBuf.plane(cx, WALK_H + 0.012, cz, LOT - 5, LOT - 5, 4, 4);
       const six = r < 0.45, floors = () => (rnd() < 0.5 ? 3.6 : 6.4);
@@ -370,7 +501,7 @@ for (let bi = 0; bi < GRID; bi++){
       }
     }
 
-    if ((district === 'center' || district === 'commercial') && rnd() < 0.30) buildBusStop(cx, cz, randInt(0, 3));
+    if (!icGreen && (district === 'center' || district === 'commercial') && rnd() < 0.30) buildBusStop(cx, cz, randInt(0, 3));
 
     /* detale na obrzeżu kwartału */
     const edge = LOT/2 - 1.3;
@@ -613,6 +744,13 @@ const roofMesh  = addMerged(roofBuf,  new THREE.MeshLambertMaterial({ map: texs.
 const grassMesh = addMerged(grassBuf, new THREE.MeshLambertMaterial({ color: 0x3e6a31 }), false, true);
 const apronMesh = addMerged(apronBuf, new THREE.MeshLambertMaterial({ color: 0x6b5a54 }), false, true);
 const lawnMesh  = addMerged(lawnBuf, new THREE.MeshLambertMaterial({ color: 0x4a7339 }), false, true);
+const waterMat = new THREE.MeshLambertMaterial({ color: 0x3b6f86 });
+const waterMesh = addMerged(waterBuf, waterMat, false, true);
+if (waterMesh) waterMesh.onBeforeRender = () => { const t = performance.now() * 0.001; waterMat.color.setRGB(0.22 + 0.02 * Math.sin(t * 0.9), 0.42 + 0.03 * Math.sin(t * 0.7 + 1), 0.52 + 0.02 * Math.sin(t * 1.1)); };
+addMerged(fenceBuf, new THREE.MeshLambertMaterial({ color: 0x5d6469 }), true, true);
+addMerged(courtBuf, new THREE.MeshLambertMaterial({ color: 0xa4543e }), false, true);
+addMerged(benchBuf, new THREE.MeshLambertMaterial({ color: 0x8a5a33 }), true, true);
+addMerged(pathBuf, new THREE.MeshLambertMaterial({ color: 0xcdbf9f }), false, true);
 HOUSE_WALLS.forEach((t, i) => addMerged(houseWallBufs[i], new THREE.MeshLambertMaterial({ map: t }), true, true));
 HOUSE_ROOFS.forEach((c, i) => addMerged(houseRoofBufs[i], new THREE.MeshLambertMaterial({ color: c }), true, true));
 const facadeMeshes = facadeBufs.map((b, i) => addMerged(b, facadeMats[i], true, true)).filter(Boolean);
