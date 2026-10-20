@@ -128,6 +128,9 @@ function buildWay(w){
       quadUV(hwConcBuf, [o0a[0], ya, o0a[1]], [o0b[0], yb, o0b[1]], [o0b[0], yb + 1, o0b[1]], [o0a[0], ya + 1, o0a[1]], [0,0],[1,0],[1,1],[0,1], inn);
       quadUV(hwConcBuf, [o1a[0], ya - 0.3, o1a[1]], [o1b[0], yb - 0.3, o1b[1]], [o1b[0], yb + 1, o1b[1]], [o1a[0], ya + 1, o1a[1]], [0,0],[1,0],[1,1],[0,1], out);
       quadUV(hwConcBuf, [o0a[0], ya + 1, o0a[1]], [o0b[0], yb + 1, o0b[1]], [o1b[0], yb + 1, o1b[1]], [o1a[0], ya + 1, o1a[1]], [0,0],[1,0],[1,1],[0,1], [0, 1, 0]);
+      /* spód bariery (zewnętrzna ścianka schodzi 0.3 m pod jezdnię) — bez niego od dołu widać przez barierę niebo */
+      quadUV(hwConcBuf, [o0a[0], ya - 0.3, o0a[1]], [o0b[0], yb - 0.3, o0b[1]], [o1b[0], yb - 0.3, o1b[1]], [o1a[0], ya - 0.3, o1a[1]], [0,0],[1,0],[1,1],[0,1], [0, -1, 0]);
+      quadUV(hwConcBuf, [o0a[0], ya - 0.3, o0a[1]], [o0b[0], yb - 0.3, o0b[1]], [o0b[0], yb, o0b[1]], [o0a[0], ya, o0a[1]], [0,0],[1,0],[1,1],[0,1], inn);
     });
     /* czoło nasypu: przejście płyta <-> nasyp zamknięte przekrojem od ziemi do spodu płyty */
     if (i > 0 && fill !== fillAt(i - 1)){

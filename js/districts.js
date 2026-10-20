@@ -320,11 +320,14 @@ function buildGasStation(){
   quadOut(CB(0x5d7f95), [sx - 3, 0.3, sz - 3.52], [sx + 3, 0.3, sz - 3.52], [sx + 3, 2.6, sz - 3.52], [sx - 3, 2.6, sz - 3.52], [0, 0, -1]);
   staticBox(sx, 1.8, sz, 9, 3.6, 7);
   buildings.push({ x: sx, z: sz, w: 9, d: 7 });
-  wordSignQuad('STACJA', '#c0392b', '#ffffff', [wx - 5, 5.0, wz - 5.12], [wx + 5, 5.0, wz - 5.12], [wx + 5, 5.7, wz - 5.12], [wx - 5, 5.7, wz - 5.12]);
+  wordSignQuad('STACJA', '#c0392b', '#ffffff', [wx + 5, 5.0, wz - 5.12], [wx - 5, 5.0, wz - 5.12], [wx - 5, 5.7, wz - 5.12], [wx + 5, 5.7, wz - 5.12]);
   /* pylon z nazwą przy drodze */
-  CB(0x5d6469).box(x0 + 1.5, 3, z0 + 2, 0.3, 6, 0.3, 1, false); staticBox(x0 + 1.5, 3, z0 + 2, 0.3, 6, 0.3);
-  wordSignQuad('PALIWA', '#1a4fa0', '#ffffff', [x0 + 1.5, 4.2, z0 + 0.6], [x0 + 1.5, 4.2, z0 + 3.4], [x0 + 1.5, 6.2, z0 + 3.4], [x0 + 1.5, 6.2, z0 + 0.6]);
-  wordSignQuad('PALIWA', '#1a4fa0', '#ffffff', [x0 + 1.52, 4.2, z0 + 3.4], [x0 + 1.52, 4.2, z0 + 0.6], [x0 + 1.52, 6.2, z0 + 0.6], [x0 + 1.52, 6.2, z0 + 3.4]);
+  /* pylon: słup schowany w skrzynce tablicy, napis na obu ścianach (każdy jednostronny, przodem na zewnątrz) */
+  const px = x0 + 1.5, pz = z0 + 2, t = 0.2;
+  CB(0x5d6469).box(px, 2.1, pz, 0.24, 4.2, 0.24, 1, false); staticBox(px, 3.1, pz, 0.3, 6.2, 2.9);
+  CB(0x1a3f80).box(px, 5.2, pz, 2 * t, 2.1, 2.9, 1, true);
+  wordSignQuad('PALIWA', '#1a4fa0', '#ffffff', [px + t + 0.01, 4.25, pz + 1.35], [px + t + 0.01, 4.25, pz - 1.35], [px + t + 0.01, 6.15, pz - 1.35], [px + t + 0.01, 6.15, pz + 1.35]);
+  wordSignQuad('PALIWA', '#1a4fa0', '#ffffff', [px - t - 0.01, 4.25, pz - 1.35], [px - t - 0.01, 4.25, pz + 1.35], [px - t - 0.01, 6.15, pz + 1.35], [px - t - 0.01, 6.15, pz - 1.35]);
   lampSpots.push({ x: x1 - 1, z: z0 + 1, rot: -Math.PI / 2, y: 0 }, { x: x1 - 1, z: cz, rot: -Math.PI / 2, y: 0 });
   terrainLog.push({ kind: 'station', x: cx, z: cz, r: 0, h: 0 });
 }
@@ -337,6 +340,6 @@ function finalizeDistricts(extraColored){
   const out = [];
   [[shopBuf, shopMat], [glassWallBuf, new THREE.MeshLambertMaterial({ map: texGlassWall() })], [corrBuf, new THREE.MeshLambertMaterial({ map: texCorrugated() })]].forEach(p => { const m = addMerged(p[0], p[1], true, true); if (m) out.push(m); });
   facadeMats.push(shopMat);                                                  // witryny świecą nocą jak okna (daynight.js)
-  wordSigns.forEach(s => { const m = addMerged(s.buf, new THREE.MeshLambertMaterial({ map: s.tex, side: THREE.DoubleSide }), false, false); });
+  wordSigns.forEach(s => { const m = addMerged(s.buf, new THREE.MeshLambertMaterial({ map: s.tex }), false, false); });   // jednostronne (bez migotania)
   return out;
 }
