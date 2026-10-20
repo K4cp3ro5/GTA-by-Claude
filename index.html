@@ -34,13 +34,17 @@
 
   .panel{
     position:absolute;
-    background:rgba(20,22,27,.72);
-    border:1px solid var(--line);
-    border-radius:3px;
-    padding:12px 14px;
-    backdrop-filter:blur(7px);
-    -webkit-backdrop-filter:blur(7px);
+    background:rgba(16,18,22,.58);
+    border:1px solid rgba(200,198,191,.10);
+    border-radius:6px;
+    padding:10px 12px;
+    backdrop-filter:blur(4px);
+    -webkit-backdrop-filter:blur(4px);
   }
+  /* ---- kompas (góra ekranu) ---- */
+  #compass{position:absolute;top:10px;left:50%;transform:translateX(-50%);padding:0;border-radius:6px;
+    background:linear-gradient(90deg,rgba(16,18,22,0),rgba(16,18,22,.55) 18%,rgba(16,18,22,.55) 82%,rgba(16,18,22,0));}
+  #compass canvas{display:block}
 
   /* ---- sterowanie ---- */
   #help{top:16px;left:16px;width:232px;font-size:12px;line-height:1.7}
@@ -58,20 +62,23 @@
   #help .sep{height:1px;background:var(--line);margin:9px 0}
 
   /* ---- status / zegar ---- */
-  #status{top:16px;right:16px;text-align:right;min-width:170px}
-  #mode{
-    font-size:15px;font-weight:600;letter-spacing:.03em;
-    display:flex;align-items:center;justify-content:flex-end;gap:8px;
-  }
-  #mode .dot{width:7px;height:7px;border-radius:50%;background:var(--sodium);box-shadow:0 0 9px var(--sodium)}
-  #clock{
-    font-size:30px;font-weight:200;letter-spacing:.02em;margin-top:2px;
-    font-variant-numeric:tabular-nums;line-height:1.05;
-  }
-  #phase{font-size:11px;color:#8d8b86;letter-spacing:.05em}
+  #status{top:12px;right:14px;text-align:right;min-width:120px;padding:8px 12px}
+  #clockrow{display:flex;align-items:baseline;justify-content:flex-end;gap:7px}
+  #clockIcon{font-size:13px;color:var(--sodium);opacity:.85}
+  #clock{font-size:22px;font-weight:300;letter-spacing:.02em;font-variant-numeric:tabular-nums;line-height:1.05}
+  #phase{font-size:10px;color:#8d8b86;letter-spacing:.06em;margin-top:1px}
+  #mode{font-size:10px;font-weight:500;letter-spacing:.08em;color:#a9a7a1;text-transform:uppercase;
+    display:flex;align-items:center;justify-content:flex-end;gap:6px;margin-top:4px}
+  #mode .dot{width:5px;height:5px;border-radius:50%;background:var(--sodium)}
 
   /* ---- minimapa ---- */
-  #map{bottom:16px;left:16px;padding:9px}
+  #map{bottom:14px;left:14px;padding:8px}
+  /* zdrowie i kondycja nad minimapą */
+  .vrow{display:flex;align-items:center;gap:7px;margin-bottom:5px}
+  .vrow .vic{font-style:normal;font-size:10px;width:10px;text-align:center;color:#8d8b86}
+  .vrow .vtrack{flex:1;height:4px;background:#23262c;border-radius:2px;overflow:hidden}
+  .vrow b{font-size:10px;font-weight:500;color:#a9a7a1;min-width:20px;text-align:right;font-variant-numeric:tabular-nums}
+  #vitals2{margin-bottom:3px}
   #map canvas{border-radius:2px;display:block;background:#0d0f13}
   #mapfoot{
     display:flex;justify-content:space-between;
@@ -81,12 +88,13 @@
 
   /* ---- prędkościomierz ---- */
   #speedo{
-    bottom:16px;right:16px;text-align:right;min-width:190px;
+    bottom:14px;right:14px;text-align:center;padding:8px 10px 8px;
     opacity:0;transform:translateY(8px);
     transition:opacity .25s ease,transform .25s ease;
   }
   #speedo.on{opacity:1;transform:none}
-  #carlbl{font-size:12px;letter-spacing:.08em;color:#c9c6bd;margin-bottom:2px;white-space:nowrap}
+  #carlbl{font-size:10px;letter-spacing:.1em;color:#a9a7a1;margin-bottom:2px;white-space:nowrap;text-transform:uppercase}
+  #speedCv{display:block;margin:0 auto}
   #carlbl.stolen{color:#e8a35a}
   #toast{position:fixed;left:50%;top:18%;transform:translateX(-50%);padding:8px 16px;border-radius:8px;background:rgba(20,22,27,.82);
     color:#f2f0ea;font:600 15px Inter,system-ui,sans-serif;opacity:0;transition:opacity .25s;pointer-events:none;z-index:30}
@@ -99,8 +107,8 @@
   #bar{height:3px;background:#2a2e37;border-radius:2px;overflow:hidden;margin-top:10px}
   #bar i{display:block;height:100%;width:0%;background:var(--sodium);transition:width .08s linear}
   #gear{
-    display:flex;justify-content:flex-end;gap:14px;
-    font-size:11px;color:#6d6b67;margin-top:9px;letter-spacing:.1em;
+    display:flex;justify-content:center;gap:14px;
+    font-size:10px;color:#6d6b67;margin-top:2px;letter-spacing:.1em;
   }
   #gear b{color:var(--paint);font-weight:500}
   #gear .hot{color:var(--brake)}
@@ -161,15 +169,9 @@
   #err{color:var(--brake);font-size:13px;max-width:520px;line-height:1.6;padding:0 24px}
 
   /* ---- zdrowie / stamina ---- */
-  #vitals{top:16px;left:16px;width:190px}
-  .vbar{margin-bottom:10px}
-  .vbar:last-child{margin-bottom:0}
-  .vbar .vlabel{display:flex;justify-content:space-between;font-size:10px;letter-spacing:.1em;color:#a9a7a1;margin-bottom:4px}
-  .vbar .vlabel b{color:var(--paint);font-weight:500}
-  .vtrack{height:7px;background:#23262c;border-radius:4px;overflow:hidden}
-  .vtrack i{display:block;height:100%;border-radius:4px;transition:width .15s ease}
-  #healthfill{background:linear-gradient(90deg,#c73a2f,#ff5a46);width:100%}
-  #staminafill{background:linear-gradient(90deg,#2f7a6f,#4fc7ad);width:100%}
+  .vtrack i{display:block;height:100%;border-radius:2px;transition:width .15s ease}
+  #healthfill{background:#b4483e;width:100%}
+  #staminafill{background:#4a9c8c;width:100%}
   .vtrack.low #healthfill{animation:pulse 1s infinite}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
 
@@ -278,28 +280,26 @@
 <body>
 
 <div id="hud">
-  <section class="panel" id="vitals">
-    <div class="vbar"><div class="vlabel"><span>Zdrowie</span><b id="healthval">100</b></div>
-      <div class="vtrack" id="healthtrack"><i id="healthfill"></i></div></div>
-    <div class="vbar"><div class="vlabel"><span>Kondycja</span><b id="staminaval">100</b></div>
-      <div class="vtrack"><i id="staminafill"></i></div></div>
-  </section>
+  <div id="compass"><canvas id="compassCv" width="420" height="34"></canvas></div>
 
   <section class="panel" id="status">
-    <div id="mode"><span class="dot"></span><span id="modetxt">Pieszo</span></div>
-    <div id="clock">09:00</div>
+    <div id="clockrow"><span id="clockIcon">☀</span><span id="clock">09:00</span></div>
     <div id="phase">poranek</div>
+    <div id="mode"><span class="dot"></span><span id="modetxt">Pieszo</span></div>
   </section>
 
   <section class="panel" id="map">
+    <div id="vitals2">
+      <div class="vrow" title="Zdrowie"><i class="vic">♥</i><div class="vtrack" id="healthtrack"><i id="healthfill"></i></div><b id="healthval">100</b></div>
+      <div class="vrow" title="Kondycja"><i class="vic">»</i><div class="vtrack"><i id="staminafill"></i></div><b id="staminaval">100</b></div>
+    </div>
     <canvas id="minimap" width="180" height="180"></canvas>
     <div id="mapfoot"><span>GTA by Claude</span><i id="coords">0, 0</i></div>
   </section>
 
   <section class="panel" id="speedo">
     <div id="carlbl">Twój samochód · Zwykły</div>
-    <div id="kmh">0<span>KM/H</span></div>
-    <div id="bar"><i id="barfill"></i></div>
+    <canvas id="speedCv" width="200" height="124"></canvas>
     <div id="gear">
       <span id="ghand">RĘCZNY</span>
       <span>BIEG <b id="gval">N</b></span>

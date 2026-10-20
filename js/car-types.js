@@ -23,6 +23,7 @@ const CAR_TYPE_IDS = ['sedan', 'pickup', 'sport'];
 Object.keys(CAR_TYPES).forEach(k => {
   const T = CAR_TYPES[k], g = 9.82;
   T.id = k;
+  T.gauge = k === 'sport' ? 280 : k === 'pickup' ? 180 : 200;                 // skala prędkościomierza
   T.dy = (T.wheelR - 0.36) + (T.rest - g / (4 * T.stiff)) - (0.36 - g / 160) - (T.connY - 0.11);
   T.restY = 0.48 + T.dy;
 });
