@@ -364,7 +364,9 @@ function hwyTripPoints(cwInName, cwOutName, lane){
   const cin = CW[cwInName], cout = CW[cwOutName], lo = lane === 1 ? HP.laneL : HP.laneR;
   const v = HP.vmax * (lane === 1 ? 1 : 0.85), aux = HP.auxOff - HP.cwOff, step = 6;
   const ease = (d, a, b, o0, o1) => lerp(o0, o1, smooth01((d - a) / (b - a)));
-  if (cwInName === cwOutName) return wayLane(cin, 0, cin.len, () => lo, step, v);
+  /* prosto: lewy pas tylko w środku jezdni — wjazd z terminalu i zjazd na terminal są z prawego pasa,
+     więc zmiana pasa płynnie na 140 m przy obu końcach (bez skoku w bok) */
+  if (cwInName === cwOutName) return wayLane(cin, 0, cin.len, d => lane !== 1 ? lo : (d < 200 ? ease(Math.max(d, 60), 60, 200, HP.laneR, HP.laneL) : d > cin.len - 200 ? ease(Math.min(d, cin.len - 60), cin.len - 200, cin.len - 60, HP.laneL, HP.laneR) : HP.laneL), step, v);
   const rp = HWY_RAMPS.find(r => r.from === cwInName && r.to === cwOutName);
   const w = rp.way, out = [];
   if (rp.kind === 'loop'){

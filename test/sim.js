@@ -286,10 +286,28 @@ function __sim(seconds){
   redLightAhead = (...a) => { const v = _r(...a); if (v){ cnt.red++; if (late) cnt.red2++; } return v; };
   stopSignAhead = (...a) => { const v = _s(...a); if (v){ cnt.stop++; if (late) cnt.stop2++; } return v; };
   roundaboutYield = (...a) => { const v = _y(...a); if (v) cnt.yield++; return v; };
+  /* scenariusz: dwa auta zaparkowane na pasach pętli miejskich (środek długiego prostego odcinka) — objazdy */
+  const obstPaths = new Set();
+  [3, 11].forEach(li => {
+    const P = LOOPS[li];
+    for (let k = 0; k < P.length; k++){
+      const a = P[k], b = P[(k + 1) % P.length], l = Math.hypot(b.x - a.x, b.z - a.z);
+      if (l < 34 || a.rb !== undefined || b.rb !== undefined || a.hwy || b.hwy) continue;
+      /* środek kwartału wzdłuż ulicy (poza skrzyżowaniem i przejściami) */
+      const na = v => { let m = 1e9; for (let i = 0; i <= GRID; i++) m = Math.min(m, Math.abs(v - L(i))); return m; };
+      const ts = [0.5, 0.35, 0.65, 0.2, 0.8].find(t => { const x = lerp(a.x, b.x, t), z = lerp(a.z, b.z, t); return Math.abs(b.x - a.x) > Math.abs(b.z - a.z) ? na(x) > 19 : na(z) > 19; });
+      if (ts === undefined) continue;
+      const x = lerp(a.x, b.x, ts), z = lerp(a.z, b.z, ts);
+      if (npcs.some(n => Math.hypot(n.pos.x - x, n.pos.y - z) < 12)) continue;
+      addParked('stolen', 'sedan', 0x777777, x, 0, z, Math.atan2(b.x - a.x, b.z - a.z)); obstPaths.add(P); break;
+    }
+  });
+  NPC_LOD_DIST = 300;                     // gracz daleko: wszystkie auta liczone co drugą klatkę (test LOD)
   const stuck = new Map(), report = { stuckMax:0, stuckIds:[], overlaps:0, overlapPairs:new Set(), minSpeedSamples:0 };
   for (let s = 0; s < steps; s++){
     late = s > steps / 2;
     updateTrafficLights(dt); updateNpcs(dt); updatePedestrians(dt);
+    if (s > 0 && s % Math.round(60 / dt) === 0 && Pedestrians.list.length){ const q = Pedestrians.list[s % Pedestrians.list.length]; Pedestrians.scare(q.pos.x, q.pos.y, 30); npcPanicAt(q.pos.x, q.pos.y); }
     for (const p of Pedestrians.list){
       if (p.state === 'wait') cnt.pedWaitMax = Math.max(cnt.pedWaitMax, p.waitT);
       if (!pedOnRoad(p)) continue;
@@ -304,11 +322,15 @@ function __sim(seconds){
       const rk = n.path[n.wp].rk;
       if (rk !== n.__rk){ if (rk === 'loop') cnt.loopPass = (cnt.loopPass || 0) + 1; if (rk === 'conn') cnt.connPass = (cnt.connPass || 0) + 1; if (rk === 'enter') cnt.hwyEnter = (cnt.hwyEnter || 0) + 1; n.__rk = rk; }
       if ((n.y || 0) > 1) cnt.hwyMax = Math.max(cnt.hwyMax, n.speed);
+      /* zjazd z odcinka wyprzedzania na lewym pasie (ma być 0) */
+      const tgo = n.path[n.wp];
+      if (n.__ovt && !tgo.ovt && tgo.hwy && (n.lat || 0) > 0.5) cnt.leftExit = (cnt.leftExit || 0) + 1;
+      n.__ovt = !!tgo.ovt;
       /* przepisy: limit prędkości strefy (z tolerancją 10%), jednokierunkowe */
       /* na autostradzie / łącznicy limitem jest vmax punktu trasy (znaki B-33 przy rampach), ulice pod estakadą nie liczą się */
       const tg = n.path[n.wp], onHwy = tg.hwy || (n.y || 0) > 1;
       const tp = n.path[(n.wp - 1 + n.path.length) % n.path.length];   // limit odcinka: większy z jego końców (hamowanie trwa)
-      const lim = onHwy ? (tg.vmax !== undefined && tp.vmax !== undefined ? Math.max(tg.vmax, tp.vmax) : tg.vmax) : speedLimitAt(n.pos.x, n.pos.y);
+      const lim = onHwy ? (((n.latT || 0) > 1 || (n.lat || 0) > 0.3) && tg.ovt ? HP.vmax : (tg.vmax !== undefined && tp.vmax !== undefined ? Math.max(tg.vmax, tp.vmax) : tg.vmax)) : speedLimitAt(n.pos.x, n.pos.y);   // lewy pas odcinka wyprzedzania: 100 km/h
       if (lim && n.speed > lim * 1.1 + 0.3) cnt.overLimit++;
       if (!onHwy && inZone30(n.pos.x, n.pos.y)) cnt.v30 = Math.max(cnt.v30, n.speed);
       else if (!onHwy && lim) cnt.v50 = Math.max(cnt.v50, n.speed);
@@ -337,6 +359,9 @@ function __sim(seconds){
     report.dump = npcs.map((m,i)=>({i, x:+m.pos.x.toFixed(1), z:+m.pos.y.toFixed(1), h:+m.heading.toFixed(2), sp:+Math.hypot(m.body.velocity.x,m.body.velocity.z).toFixed(2), blk:m.blocked, sp2:m.stopPass, hold:m.stopHold, wp:m.wp}))
       .filter(m => Math.hypot(m.x-sn.pos.x, m.z-sn.pos.y) < 20);
   }
+  report.g7 = { objazdy: npcs.reduce((a, n) => a + (n.bypassCount || 0), 0), maksCzekaniePrzedPrzeszkoda: +Math.max(0, ...npcs.map(n => n.obstMax || 0)).toFixed(1),
+                 wyprzedzenia: npcs.reduce((a, n) => a + (n.ovtCount || 0), 0), zjazdyZLewegoPasa: cnt.leftExit || 0, ucieczkiPieszych: Pedestrians.fled,
+                 profile: npcs.reduce((a, n) => (a[n.profile] = (a[n.profile] || 0) + 1, a), {}), typy: npcs.reduce((a, n) => (a[n.type] = (a[n.type] || 0) + 1, a), {}) };
   report.cnt = cnt;
   report.hwyRun = { nakładaniaNaAutostradzie: cnt.hwyOverlap || 0, przejazdyPętli: cnt.loopPass || 0, przejazdyŁącznic: cnt.connPass || 0, wjazdyZPrzekątnych: cnt.hwyEnter || 0, maksKmh: +(cnt.hwyMax*3.6).toFixed(0), poniżejPomostu: cnt.underDeck || 0 };
   report.npcCount = npcs.length;
@@ -373,4 +398,5 @@ console.log('Ronda: klatki z nadwoziem na wyspie:', r.cnt.rbNear, '| jazda pod p
 console.log('Piesi:', r.peds, 'przejść przez jezdnię:', r.crossings, '| przejścia używane przez pieszych:', r.pedCw, '| najdłuższe czekanie:', r.cnt.pedWaitMax.toFixed(1), 's | najbliżej auta NPC (pieszy na jezdni):', r.cnt.pedMinD.toFixed(2), 'm | klatki < 2.2 m (środek–środek):', r.cnt.pedHit);
 console.log('Przepisy: klatki z przekroczeniem limitu >10%:', r.cnt.overLimit, '| maks. w strefie 30:', (r.cnt.v30*3.6).toFixed(0), 'km/h | maks. w mieście (50):', (r.cnt.v50*3.6).toFixed(0), 'km/h | maks. na autostradzie:', (r.cnt.hwyMax*3.6).toFixed(0), 'km/h | jazda pod prąd po jednokierunkowej:', r.cnt.wrongWay);
 console.log('Postawionych znaków/sygnalizatorów:', r.signs, '| stojących w budynku:', r.signsInBuildings.length, r.signsInBuildings.slice(0,6));
+console.log('NPC (G7):', JSON.stringify(r.g7));
 console.log('Autostrady (ruch):', JSON.stringify(r.hwyRun));

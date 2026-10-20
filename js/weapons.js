@@ -75,6 +75,8 @@ const Weapons = {
       this.recoil = 1;
       this.cooldown = d.cooldown;
       Sound.shoot();
+      Pedestrians.scare(player.body.position.x, player.body.position.z, 40);
+      npcPanicAt(player.body.position.x, player.body.position.z);
       this._rayHit(d);
     }
   },

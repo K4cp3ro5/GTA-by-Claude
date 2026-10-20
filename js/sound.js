@@ -230,4 +230,5 @@ chassisBody.addEventListener('collide', e => {
   if (v > 3.2) Sound.thud(v);
   if (mode === 'car' && v > 10) damagePlayer((v - 10) * 4, 'kraksa');
   if (e.body && e.body.isPed && v > 2.2) Pedestrians.hit(e.body.pedRef, v);   // body.pedRef = obiekt pieszego (samo ciało nie ma group/state)
+  if (e.body && e.body.npcRef && v > 5.6) npcHitByPlayer(e.body.npcRef, v);    // > 20 km/h: NPC staje ze światłami awaryjnymi
 });

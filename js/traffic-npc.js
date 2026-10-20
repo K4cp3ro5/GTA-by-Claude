@@ -83,11 +83,20 @@ function hwyRoute(startK, moves, lane){
   if (k !== startK) throw new Error('trasa autostradowa nie jest zamknięta');
   pts.forEach(p => { if (p.hwy && p.y < 0.3) p.vmax = Math.min(p.vmax === undefined ? 99 : p.vmax, 50 / 3.6); });   // rampy w pasie podmiejskim: 50 km/h jak ulica
   smoothVmax(pts, 2.5);
+  /* odcinki jezdni głównej prawym pasem (poza węzłem i końcami) — tam wolno wyprzedzać lewym pasem;
+     ovtLeft = ile metrów takiego odcinka zostało (powrót na prawy pas zawczasu przed zjazdem) */
+  pts.forEach(p => {
+    if (!p.hwy) return;
+    const ax = hwyAxisOf(p.x, p.z);
+    p.ovt = Math.abs(Math.abs(ax.off) - (HP.cwOff + HP.laneR)) < 0.05 && Math.abs(ax.s) > 60 && Math.abs(ax.s) < HP.sSplit - 25 && Math.abs(p.y - hwyY(ax.id, ax.s)) < 0.05;
+  });
+  let left = 0;
+  for (let k = pts.length - 1; k >= 0; k--){ const p = pts[k], q = pts[(k + 1) % pts.length]; left = p.ovt ? left + Math.hypot(q.x - p.x, q.z - p.z) : 0; p.ovtLeft = left; }
   pts.hwyRoute = true;
   return pts;
 }
 const HWY_LOOPS = [
-  [hwyRoute(0, ['s','s','s','s'], 0), 3], [hwyRoute(2, ['s','s','s','s'], 1), 3],
+  [hwyRoute(0, ['s','s','s','s'], 0), 6], [hwyRoute(2, ['s','s','s','s'], 1), 3],
   [hwyRoute(0, ['l'], 0), 1], [hwyRoute(1, ['l'], 0), 1], [hwyRoute(2, ['l'], 0), 1], [hwyRoute(3, ['l'], 0), 1],
   [hwyRoute(0, ['r','r'], 0), 2], [hwyRoute(1, ['r','r'], 0), 2]
 ];
@@ -112,28 +121,26 @@ function pathSpot(path, f, tries){
    geometria wspólna dla wszystkich aut danego koloru (cache) */
 const _npcGeoCache = {};
 const _npcMatBody  = new THREE.MeshPhongMaterial({ vertexColors: true, shininess: 60 });
-const _npcMatGlass = new THREE.MeshPhongMaterial({ color: 0x141d22, shininess: 100, transparent: true, opacity: 0.8 });
 const _npcMatLamp  = new THREE.MeshBasicMaterial({ vertexColors: true });
-/* model NPC z tych samych brył co auto gracza (car-types.js: carParts) — trzy siatki: lakier+detale
-   (kolory wierzchołków), szyby, światła; koła wg typu. Cache na (typ, kolor). */
+/* model NPC z tych samych brył co auto gracza (car-types.js: carParts) — dwie siatki: nadwozie z szybami
+   (kolory wierzchołków, szyby ciemne nieprzezroczyste) i światła; koła wg typu. Cache na (typ, kolor). */
 function npcGeometries(color, type){
   const key = (type || 'sedan') + color;
   if (_npcGeoCache[key]) return _npcGeoCache[key];
   const T = CAR_TYPES[type || 'sedan'], B = (w,h,d) => new THREE.BoxGeometry(w,h,d);
   const tg = new THREE.CylinderGeometry(T.wheelR, T.wheelR, 0.26, 12); tg.rotateZ(Math.PI/2);
   const COL = { paint: color, dark: 0x15171b, chrome: 0xb9bec6, lampF: 0xfff3d0, lampR: 0x5a1512 };
-  const body = [], lamps = [], glass = [];
+  const body = [], lamps = [];
   carParts(T.id).forEach(q => {
     const part = { geo: B(q[0], q[1], q[2]), color: COL[q[3]] || 0x141d22, x: q[4], y: q[5], z: q[6], rx: q[7] };
-    (q[3] === 'glass' ? glass : (q[3] === 'lampF' || q[3] === 'lampR') ? lamps : body).push(part);
+    ((q[3] === 'lampF' || q[3] === 'lampR') ? lamps : body).push(part);
   });
   [[T.track, -T.wbF], [-T.track, -T.wbF], [T.track, -T.wbR], [-T.track, -T.wbR]].forEach(p => body.push({ geo: tg, color: 0x141518, x: p[0], y: T.wheelR, z: p[1] }));
-  return (_npcGeoCache[key] = { body: mergeColored(body), lamps: mergeColored(lamps), glass: mergeColored(glass) });
+  return (_npcGeoCache[key] = { body: mergeColored(body), lamps: mergeColored(lamps) });
 }
 function buildNpcModel(color, type){
   const g = new THREE.Group(), G = npcGeometries(color, type);
   const body = new THREE.Mesh(G.body, _npcMatBody); body.castShadow = true; g.add(body);
-  g.add(new THREE.Mesh(G.glass, _npcMatGlass));
   g.add(new THREE.Mesh(G.lamps, _npcMatLamp));
   scene.add(g);
   return g;
@@ -160,11 +167,18 @@ function spawnNpcCar(path, colorHex, startIdx, frac, type){
     type: type, halfW: TN.hw, halfL: TN.hl, halfH: TN.hh, accel: TN.accel,   // wymiary nadwozia i przyspieszenie wg typu
     body: null,
     blocked: false,
-    obey: rand(0.9, 1.05)              // jak dokładnie trzyma się limitów prędkości
+    obey: 1
   };
+  /* profil kierowcy: ostrożny (30%), zwykły (50%), dynamiczny (20%) — trzymanie się limitu, odstęp,
+     czas reakcji na zielone, przyspieszenie, prędkość docelowa */
+  const pr = rnd(), P = pr < 0.3 ? { k: 'ostrożny', obey: [0.88, 0.96], v: 0.92, a: 0.85, gap: 1.0, react: 0.9 }
+                   : pr < 0.8 ? { k: 'zwykły', obey: [0.95, 1.02], v: 1.0, a: 1.0, gap: 0, react: 0.45 }
+                   : { k: 'dynamiczny', obey: [1.0, 1.05], v: 1.06, a: 1.15, gap: -0.3, react: 0.15 };
+  n.profile = P.k; n.obey = rand(P.obey[0], P.obey[1]); n.target *= P.v; n.hwyF = P.v; n.accel *= P.a; n.gapX = P.gap; n.react = P.react;
   const b = new CANNON.Body({ mass: 0, type: CANNON.Body.KINEMATIC, material: matCar });
   b.addShape(new CANNON.Box(new CANNON.Vec3(TN.hw + 0.02, TN.hh, TN.hl + 0.05)));
   b.position.set(n.pos.x, n.y + TN.hh + 0.1, n.pos.y);
+  b.npcRef = n;                              // zderzenie z autem gracza (sound.js) -> npcHitByPlayer
   b.collisionFilterGroup = G_CAR;
   b.collisionFilterMask = -1;
   b.allowSleep = false;
@@ -190,6 +204,7 @@ function spawnRandomNpcCar(){
   return spawnNpcCar(path, NPC_COLORS[randInt(0, NPC_COLORS.length - 1)], idx, frac);
 }
 function removeNpcCar(n){
+  npcHazardOff(n);
   delBody(n.body);
   scene.remove(n.mesh);
   const idx = npcs.indexOf(n);
