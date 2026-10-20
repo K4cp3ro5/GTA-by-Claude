@@ -36,7 +36,7 @@ function updateNpc(n, i, dt, honk){
     n.body.position.y = n.y + n.halfH + 0.1;
     n.mesh.position.set(n.pos.x, n.y, n.pos.y);
     n.mesh.rotation.order = 'YXZ';
-    n.mesh.rotation.set(-Math.atan(n.slope), n.heading, 0);                 // nos w górę pod górę
+    n.mesh.rotation.set(-Math.atan(n.slope), n.heading, n.hitT > 0 && n.type === 'bike' ? n.mesh.rotation.z : 0);   // nos w górę pod górę; rowerzysta leży po kolizji
     const low = n.y < 1;                                                     // auto na poziomie ulic (nie na estakadzie)
     /* rondo: 'approach' = cel to punkt trasy ronda, auto jeszcze przed pasem okrężnym; 'ring' = wlot, rondo, wylot */
     if (tgt.rb !== undefined){
@@ -50,6 +50,12 @@ function updateNpc(n, i, dt, honk){
     } else { n.rb = -1; n.rbPhase = null; }
     let dx = tgt.x - n.pos.x, dz = tgt.z - n.pos.y;
     let d = Math.hypot(dx, dz);
+    if (n.type === 'bike'){
+      /* przy prawej krawędzi tylko w środku kwartału: ~18 m przed skrzyżowaniem i 30 m przed rondem z powrotem w osi toru */
+      const nearJ = _nearAxis(n.pos.x) < ROAD_H + 11 && _nearAxis(n.pos.y) < ROAD_H + 11;
+      const nearRb = tgt.rb !== undefined || ROUNDABOUT_PTS.some(p => Math.hypot(n.pos.x - L(p[0]), n.pos.y - L(p[1])) < 30);
+      n.latT = (nearJ || nearRb) ? 0 : -2.3; n.latRate = 0.8;
+    }
     /* przesunięcie boczne toru (objazd przeszkody, zmiana pasa na autostradzie): n.lat m w lewo, dochodzi do n.latT */
     if (n.lat || n.latT){
       n.lat = approach(n.lat || 0, n.latT || 0, (n.latRate || 1.0) * dt);
@@ -118,6 +124,9 @@ function updateNpc(n, i, dt, honk){
         if (r < cap) cap = r;
       }
     }
+    /* tor przez najbliższe ~8 m (także za zakrętem): stojące auto w miejscu, gdzie znajdzie się moje nadwozie — stop
+       (logika przecięć celowo pomija auta stojące; bez tego auto skręcało prosto w auto czekające w skrzyżowaniu) */
+    if (!block){ const m = npcPathSweep(n); if (m){ block = true; why = 'tor:' + m.id; } }
     if (n.ignoreNpcT > 0) n.ignoreNpcT -= dt;
     n.waitT = (blockedByNpc && n.speed < 0.3) ? (n.waitT || 0) + dt : 0;
     if (n.waitT > 9){ n.ignoreNpcT = 2.5; n.waitT = 0; }
@@ -129,6 +138,7 @@ function updateNpc(n, i, dt, honk){
     /* stłuczka z autem gracza: postój 3–5 s ze światłami awaryjnymi */
     if (n.hitT > 0){
       n.hitT -= dt; block = true; why = 'kolizja';
+      if (n.type === 'bike'){ n.mesh.rotation.z = Math.min(1.35, (n.mesh.rotation.z || 0) + dt * 5); if (n.hitT <= 0) n.mesh.rotation.z = 0; }
       if (n.haz) n.haz.color.setHex(Math.floor(n.hitT * 2.6) % 2 ? 0xffa21a : 0x3a2a0a);
       if (n.hitT <= 0) npcHazardOff(n);
     }
@@ -189,6 +199,40 @@ function updateNpc(n, i, dt, honk){
   }
 }
 
+/* czy po mojej trasie (próbki co 1.5 m do 8 m) moje nadwozie zahaczy o auto stojące (v < 1 m/s) obok */
+function npcPathSweep(n){
+  let cand = null;
+  for (const m of npcs){
+    if (m === n || m.speed > 1 || Math.abs((m.y || 0) - n.y) > 2.5) continue;
+    if (Math.hypot(m.pos.x - n.pos.x, m.pos.y - n.pos.y) > 12) continue;
+    if (m.why === 'tor:' + n.id) continue;                                   // ono czeka na mnie — jadę
+    (cand || (cand = [])).push(m);
+  }
+  if (!cand) return null;
+  let x0 = n.pos.x, z0 = n.pos.y, t = 0, wp = n.wp;
+  for (let seg = 0; seg < 4 && t < 8; seg++){
+    const q = n.path[wp], lx = q.x - x0, lz = q.z - z0, len = Math.hypot(lx, lz) || 1, ux = lx / len, uz = lz / len;
+    for (let u = 1.5; u <= len && t + u <= 8; u += 1.5){
+      const px = x0 + ux * u, pz = z0 + uz * u, h = Math.atan2(ux, uz);
+      for (const m of cand) if (__rectsOverlap(px, pz, h, (n.halfW || 0.93), (n.halfL || 2.05), m.pos.x, m.pos.y, m.heading, (m.halfW || 0.93), (m.halfL || 2.05))) return m;
+    }
+    /* narożnik trasy: nadwozie w punkcie zakrętu z kursem przed i po skręcie */
+    if (t + len <= 8){ const r = n.path[(wp + 1) % n.path.length], hN = Math.atan2(r.x - q.x, r.z - q.z);
+      for (const h of [Math.atan2(ux, uz), hN]) for (const m of cand) if (__rectsOverlap(q.x, q.z, h, (n.halfW || 0.93), (n.halfL || 2.05), m.pos.x, m.pos.y, m.heading, (m.halfW || 0.93), (m.halfL || 2.05))) return m; }
+    t += len; x0 = q.x; z0 = q.z; wp = (wp + 1) % n.path.length;
+  }
+  return null;
+}
+/* SAT dwóch prostokątów (środek, kurs, półszerokość, półdługość) */
+function __rectsOverlap(ax, az, ah, aw, al, bx, bz, bh, bw, bl){
+  const axes = [ah, ah + Math.PI / 2, bh, bh + Math.PI / 2], dx = bx - ax, dz = bz - az;
+  for (const h of axes){
+    const ux = Math.sin(h), uz = Math.cos(h);
+    const ext = (oh, w, l) => Math.abs(Math.sin(oh) * ux + Math.cos(oh) * uz) * l + Math.abs(Math.cos(oh) * ux - Math.sin(oh) * uz) * w;
+    if (Math.abs(dx * ux + dz * uz) > ext(ah, aw, al) + ext(bh, bw, bl)) return false;
+  }
+  return true;
+}
 /* punkt celowania: La m wzdłuż trasy od rzutu auta (przez kolejne punkty), przesunięty w lewo o n.lat */
 function npcAim(n, prv, tgt, along, La){
   let a = prv, b = tgt, wp = n.wp, s = along + La;
@@ -216,7 +260,7 @@ const _nearAxis = v => { let m = 1e9; for (let i = 0; i <= GRID; i++) m = Math.m
 /* objazd lewą stroną: przesunięcie = lewa krawędź przeszkody + pół auta + 0.45 m (maks. 4.2 m — reszta
    przeciwnego pasa wolna), cały odcinek objazdu poza skrzyżowaniami i bez aut z naprzeciwka */
 function npcTryBypass(n, o, dx, dz, tgt){
-  if (n.y > 1 || n.rb >= 0 || tgt.hwy || n.lat) return;
+  if (n.y > 1 || n.rb >= 0 || tgt.hwy || n.lat || n.type === 'bike') return;
   const need = o.lMax + (n.halfW || 0.93) + 0.45;
   if (need > 4.2 || need < 0.3) return;
   const end = o.aMax + (n.halfL || 2.05) + 1.5;
@@ -266,6 +310,7 @@ function npcHwyLanes(n, dx, dz, tgt){
 const _hazGeo = new THREE.BoxGeometry(0.2, 0.1, 0.07);
 function npcHitByPlayer(n, v){
   n.hitT = rand(3, 5); n.hits = (n.hits || 0) + 1;
+  if (n.type === 'bike'){ n.hitT = rand(5, 7); return; }                     // rowerzysta przewraca się
   if (n.haz) return;
   n.haz = new THREE.MeshBasicMaterial({ color: 0xffa21a });
   const hw = (n.halfW || 0.93) - 0.12, hl = (n.halfL || 2.05) + 0.02;
@@ -324,7 +369,8 @@ function npcConflict(n, m, dx, dz, onlyClose){
     /* obok siebie przy włączaniu / zmianie pasa: jedno (wyższe id) zwalnia i wjeżdża za drugie */
     if (lat < 3.0 && ahead > -1.5 && ahead < 0.5) return n.id > m.id ? m.speed * 0.75 : Infinity;
     const look = Math.max(13, n.speed * 1.8);                      // przy 100 km/h ~50 m
-    if (ahead < 0.5 || ahead > look || lat > 2.6) return Infinity;
+    const latLim = (n.type === 'bike' || m.type === 'bike') ? (n.halfW || 0.93) + (m.halfW || 0.93) + 0.45 : 2.6;   // rower: wymijanie z odstępem ~1 m
+    if (ahead < 0.5 || ahead > look || lat > latLim) return Infinity;
     const gx = n.gapX || 0;                                          // profil kierowcy: ostrożny +1 m, dynamiczny −0.3 m
     if (ahead < gapL + 1.4 + gx) return true;
     return ahead < Math.max(gapL + 3.9 + gx, n.speed * (0.9 + gx * 0.1)) ? m.speed * 0.7 : m.speed;
@@ -337,9 +383,11 @@ function npcConflict(n, m, dx, dz, onlyClose){
   const cr = dx*mdz - dz*mdx;
   const t = (rx*mdz - rz*mdx) / cr, s = (rx*dz - rz*dx) / cr;
   const vn = Math.max(n.speed, 1), vm = Math.max(m.speed, 0.1);
-  const nL = n.halfL || 2.05, mL = m.halfL || 2.05;               // półdługości (sedan 2.05: progi 2.6 / 3.2 jak dawniej)
-  if (t < -(nL + 0.55) || t > Math.max(14, vn*3) || s < -(mL + 0.55) || s > Math.max(14, vm*3)) return Infinity;   // minięte (z tyłem auta) albo daleko
-  const mIn = s < mL + 1.15, nIn = t < nL + 1.15;                  // w strefie konfliktu (lub tuż przed nią)
+  /* strefa konfliktu wg wymiarów obu pojazdów: moja półdługość + półszerokość drugiego (+0.3 m) — dla dwóch
+     sedanów ~3.3 m jak dawniej; mały rower nie „mija” toru pickupa za wcześnie */
+  const nL = n.halfL || 2.05, mL = m.halfL || 2.05, nW = n.halfW || 0.93, mW = m.halfW || 0.93;
+  if (t < -(nL + mW + 0.3) || t > Math.max(14, vn*3) || s < -(mL + nW + 0.3) || s > Math.max(14, vm*3)) return Infinity;   // minięte (z tyłem auta) albo daleko
+  const mIn = s < mL + nW + 0.3, nIn = t < nL + mW + 0.3;          // w strefie konfliktu (lub tuż przed nią)
   if (nIn && !mIn) return Infinity;                                // jestem już w środku — jadę dalej
   if (mIn && !nIn) return true;                                    // ono jest w środku — czekam
   if (mIn && nIn) return t > s ? true : Infinity;                  // oba w środku: dalsze od punktu ustępuje
