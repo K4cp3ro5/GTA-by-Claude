@@ -1,7 +1,7 @@
 /* ---------------------------------------------------------------
    7e. ORGANIZACJA RUCHU — strefy prędkości, droga z pierwszeństwem,
    jednokierunkowa obwodnica przy murze i ich oznakowanie. Wszystko
-   tu działa na NPC (update-npc.js, highway.js), znaki tylko to pokazują.
+   tu działa na NPC (update-npc.js, traffic-npc.js), znaki tylko to pokazują.
    - miasto = obszar zabudowany: 50 km/h (D-42 / D-43 na łącznicach),
      "Stare Miasto" (ulice wewnątrz kwadratu i,j = 4..8, między rondami): strefa 30 (B-43 / B-44),
      droga serwisowa w strefie wschodniej: 40 km/h (B-33),

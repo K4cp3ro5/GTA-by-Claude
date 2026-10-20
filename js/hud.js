@@ -55,7 +55,7 @@ const mapStatic = mkCanvas(Math.ceil(MAP_W * MAP_SCALE), Math.ceil(MAP_H * MAP_S
     g.beginPath(); g.moveTo(wx(-CITY_EDGE), wz(L(i))); g.lineTo(wx(CITY_EDGE), wz(L(i))); g.stroke();
   }
   g.setLineDash([]);
-  /* autostrada, łącznice, ulica pod estakadą, droga serwisowa, plac i hale (highway.js) */
+  /* autostrady A1/A2, koniczyna, łącznice i zjazdy w pasie podmiejskim (highways.js) */
   mapExtras.forEach(e => {
     g.fillStyle = e.c; g.strokeStyle = e.c;
     if (e.t === 'rect') g.fillRect(wx(e.x0), wz(e.z0), (e.x1 - e.x0) * MAP_SCALE, (e.z1 - e.z0) * MAP_SCALE);
