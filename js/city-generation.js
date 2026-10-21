@@ -588,6 +588,7 @@ for (let bi = 0; bi < GRID; bi++){
 
 buildGasStation();
 buildAirport();
+buildHospital();
 
 /* --- bariera betonowa: JEDEN obwód dookoła świata (miasto + pas podmiejski), x, z = ±WALL_X --- */
 (function barrier(){

@@ -7,6 +7,7 @@ physics-world.js
 signs.js
 districts.js
 airport.js
+hospital.js
 city-generation.js
 highways.js
 traffic-lights.js

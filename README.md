@@ -55,6 +55,8 @@ Klawisze można zmienić w menu (**STEROWANIE**). `Esc` w trakcie gry to pauza �
 | `A` / `D` | kołowanie po ziemi |
 | `Spacja` | hamulce kół |
 | `F` | wysiądź na ziemi, **w locie — skok ze spadochronem** |
+
+**Na spadochronie**: `A` / `D` — skręt (czasza się przechyla), `W` — szybciej i stromiej, `S` — hamowanie (wolniej i łagodniej). Lądowanie jest bezpieczne.
 | mysz | rozglądanie się (kamera wraca za ogon) |
 
 Jak wystartować: ustaw samolot na pasie, trzymaj `W`, a gdy prędkościomierz pokaże ok. 160 km/h (awionetka ok. 85 km/h) — `↑`. Jak wylądować: podejdź nad pas na kilkadziesiąt metrów, zdejmij gaz (`S`) i puść strzałki — asystent lądowania sam zniży lot i łagodnie przyziemi, potem `Spacja`.
@@ -87,12 +89,12 @@ Jak wystartować: ustaw samolot na pasie, trzymaj `W`, a gdy prędkościomierz p
 
 ### Ty
 
-| HUD w aucie | W nocy |
-|---|---|
-| ![HUD](screenshots/hud-auto.jpg) | ![Noc w aucie](screenshots/hud-noc.jpg) |
+| HUD w aucie | W nocy | Szpital |
+|---|---|---|
+| ![HUD](screenshots/hud-auto.jpg) | ![Noc w aucie](screenshots/hud-noc.jpg) | ![Szpital](screenshots/szpital.jpg) |
 
 - Jazda z fizyką zawieszenia. Trzy typy aut: zwykły (0–100 km/h w 4,4 s, 181 km/h), pickup (6,9 s, 160 km/h), sportowy (3,0 s, 250 km/h), do tego rower. Twoje auto przywołujesz menu `V`, skradzione zostają tam, gdzie je porzucisz.
-- Broń (pięści, kij, pistolet), zdrowie i kondycja, upadki z wysokości.
+- Broń (pięści, kij, pistolet), zdrowie i kondycja, upadki z wysokości. Po śmierci odradzasz się przed **szpitalem** w południowym pasie zieleni (dojazd z obwodnicy, lądowisko na dachu, karetki, parking).
 - HUD: kompas, zegarowy prędkościomierz, zegar, minimapa z całym światem.
 
 ### Lotnisko i samoloty
@@ -107,8 +109,8 @@ Jak wystartować: ustaw samolot na pasie, trzymaj `W`, a gdy prędkościomierz p
 
 - Lotnisko na północ od miasta: pas startowy 336 × 30 m, droga kołowania, płyta z rękawami, terminal, wieża, hangar, parking.
 - Dwa samoloty: szybki odrzutowiec i zwrotna awionetka. Sterowanie strzałkami z autopoziomowaniem, ochroną przed przeciągnięciem i asystentem lądowania.
-- `F` w locie — wyskakujesz, otwiera się spadochron (sterowanie `W A S D`), a samolot bez pilota nurkuje i rozbija się.
-- Zderzenie z budynkiem albo twarde lądowanie to katastrofa: kula ognia przechodząca w dym, błysk, odłamki, płonący wrak, wstrząs kamery i huk. Pilot nie przeżywa. Po kilkunastu sekundach samolot wraca na lotnisko.
+- `F` w locie — wyskakujesz, otwiera się prostokątna czasza (skręty `A`/`D`, `W` szybciej, `S` hamowanie), a samolot bez pilota nurkuje i rozbija się.
+- Zderzenie z budynkiem albo twarde lądowanie to katastrofa: kula ognia przechodząca w dym, błysk, odłamki, płonący wrak, wstrząs kamery i huk. Pilot nie przeżywa (z nieśmiertelnością z menu debug ląduje obok wraku). Po kilkunastu sekundach samolot wraca na lotnisko — gdy jego stanowisko jest wolne.
 
 ### Menu debug (`` ` ``)
 
@@ -119,7 +121,7 @@ Liczba aut i pieszych, pora dnia, nieśmiertelność, amunicja, teleporty (start
 ## Jak to jest zrobione
 
 - **Three.js r128** (grafika) i **cannon.js 0.6.2** (fizyka) z CDN, reszta to czysty JavaScript bez frameworków. Dźwięk syntezuje Web Audio, tekstury rysuje Canvas 2D.
-- 30 zwykłych skryptów ze wspólnym zakresem globalnym, ładowanych w kolejności z `loadorder.txt` (bez bundlera, więc gra działa z `file://`).
+- 31 zwykłych skryptów ze wspólnym zakresem globalnym, ładowanych w kolejności z `loadorder.txt` (bez bundlera, więc gra działa z `file://`).
 - Geometria miasta scalana w kilkadziesiąt siatek (ok. 200 wywołań rysowania), statyczne kolizje w komórkach 48 m.
 - Auta NPC to ciała kinematyczne na trasach z punktów; skrzyżowania rozstrzygane wg czasu dojazdu, ronda, światła, kolejki, objazdy i zmiana pasa.
 

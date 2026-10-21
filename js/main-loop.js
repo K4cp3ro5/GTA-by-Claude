@@ -57,6 +57,7 @@ function frame(now){
     player.body.velocity.x = damp(player.body.velocity.x, 0, 10, dt);
     player.body.velocity.z = damp(player.body.velocity.z, 0, 10, dt);
   }
+  updateParachute(dt);                         // po updatePlayer: nadpisuje prędkość i obrót postaci pod czaszą
   Weapons.updatePose(dt);
   updateWheel();
   pruneParked();

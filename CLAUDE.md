@@ -24,6 +24,7 @@ Brak bundlera: `index.html` ładuje zwykłe `<script>` w kolejności z `loadorde
 | signs.js | znaki drogowe: tarcze, słupki, `placeSign`, `signSpotFree` |
 | car-types.js | typy aut (CAR_TYPES: sedan, pickup, sport, bike) — napęd, zawieszenie, bryła, części modelu (carParts; spojler tylko sport), kierunkowskazy (`addIndicators`, `indBlinkOn`) |
 | airport.js | lotnisko w północnym pasie podmiejskim (`AIRPORT`): pas, kołowanie, płyta, terminal, parking, dojazd z i=5; miejsca samolotów w `AIRPORT_PLANES` |
+| hospital.js | szpital w południowym pasie podmiejskim (`HOSPITAL`): dojazd z i=4, budynek, lądowisko, karetki, parking; odrodzenie gracza `HOSPITAL_SPAWN` (`respawnPlayer`) |
 | districts.js | zabudowa dzielnic (wieżowce, bloki, domki z działkami, parki, plac, galeria, stacja, przemysł); CB(kolor) = bufory scalane w jedną siatkę z kolorami wierzchołków |
 | city-generation.js | ulice, chodniki, przejścia, ronda, układ dzielnic, teren węzła (kopce, stawy, parkingi pod estakadą), pas podmiejski, mur |
 | highways.js | budowa autostrad z planu: pomosty, nasypy, bariery, filary, latarnie, znaki |
@@ -37,7 +38,7 @@ Brak bundlera: `index.html` ładuje zwykłe `<script>` w kolejności z `loadorde
 | controls.js | klawisze (przebindowywalne, localStorage), mysz, menu |
 | sound.js | synteza dźwięku |
 | vehicle-entry.js | wsiadanie, wysiadanie, kradzież, atrapa głównego auta |
-| planes.js | samoloty (`PLANE_TYPES` jet/prop, `planes`): modele, ciało kinematyczne G_PLANE, `enterPlane`/`exitPlane`, lot `planeStep` (W/S gaz, strzałki = docelowe pochylenie/przechył, asystent lądowania), skok `bailOut` + `updateParachute`, samolot bez pilota (`p.free`), katastrofa `planeCrash` (efekty `fxList`/`updateFx`, wrak `wreckEmit`, `camShake`, `Sound.boom`; pilot ginie) |
+| planes.js | samoloty (`PLANE_TYPES` jet/prop, `planes`): modele, ciało kinematyczne G_PLANE, `enterPlane`/`exitPlane`, lot `planeStep` (W/S gaz, strzałki = docelowe pochylenie/przechył, asystent lądowania), skok `bailOut` + `updateParachute` (prostokątna czasza, A/D skręt, W/S szybciej/hamowanie; wołane w main-loop po `updatePlayer`, kompensuje grawitację świata −20), samolot bez pilota (`p.free`), katastrofa `planeCrash` (gracz na wolne miejsce `safeSpot`, efekty `fxList`/`updateFx`, wrak `wreckEmit`, `camShake`, `Sound.boom`; pilot ginie) |
 | daynight.js | cykl dobowy |
 | update-player.js / update-vehicle.js / update-npc.js | logika na klatkę |
 | camera.js / hud.js | kamera TPP / HUD, minimapa, mapa |
