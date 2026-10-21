@@ -136,6 +136,14 @@
   #deadScreen.on{opacity:1;background:rgba(10,4,4,.72)}
   #deadScreen span{font-size:34px;font-weight:200;letter-spacing:.1em;color:var(--brake)}
 
+  /* ---- plama od ptaka na ekranie ---- */
+  #birdSplat{position:fixed;z-index:30;width:260px;height:200px;margin:-100px 0 0 -130px;pointer-events:none;opacity:0;transition:opacity 1.2s ease;
+    background:radial-gradient(closest-side at 45% 50%,rgba(250,250,245,.95),rgba(240,240,232,.85) 55%,rgba(230,230,220,0) 100%),
+               radial-gradient(closest-side at 75% 30%,rgba(250,250,245,.9),rgba(250,250,245,0) 100%),
+               radial-gradient(closest-side at 25% 75%,rgba(250,250,245,.85),rgba(250,250,245,0) 100%);
+    border-radius:47% 53% 44% 56% / 52% 41% 59% 48%}
+  #birdSplat.on{opacity:1;transition:opacity .08s ease}
+
   /* ---- pełna mapa (M) ---- */
   #bigmap{position:fixed;inset:0;z-index:45;display:none;background:#16384b;cursor:grab}
   #bigmap.on{display:block}
@@ -304,7 +312,7 @@
 
 <!-- ekran ładowania: pasek liczy wczytane skrypty (data-scripts = 2 biblioteki + pliki z loadorder.txt, sprawdza harness);
      main-loop.js woła LOADER.finish(), błąd podczas ładowania odsłania menu z komunikatem (#err) -->
-<div id="loader" data-scripts="37">
+<div id="loader" data-scripts="38">
   <div class="ltitle">GTA by <em>Claude</em></div>
   <div class="lbar"><i id="lfill"></i></div>
   <div id="lstat">Wczytywanie bibliotek…</div>
@@ -372,6 +380,7 @@ var LOADER = (function(){
 
 <div id="bigmap"><canvas id="bigmapCv"></canvas></div>
 <div id="hurtFlash"></div>
+<div id="birdSplat"></div>
 <div id="deadScreen"><span>ROZBITY</span></div>
 
 <div id="wheelWrap"><canvas id="wheelCanvas" width="360" height="360"></canvas></div>
@@ -498,6 +507,7 @@ var LOADER = (function(){
 <script src="js/vehicle-entry.js"></script>
 <script src="js/planes.js"></script>
 <script src="js/boats.js"></script>
+<script src="js/birds.js"></script>
 <script src="js/daynight.js"></script>
 <script src="js/update-player.js"></script>
 <script src="js/update-vehicle.js"></script>
