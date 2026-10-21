@@ -104,7 +104,7 @@ function navUpdate(dt){
   _navT -= dt;
   if (_navT <= 0){ _navT = 0.4; navCompute(); }
   const p = playerWorldPos();
-  if (Math.hypot(p.x - waypoint.x, p.z - waypoint.z) < (mode === 'plane' ? 60 : 12)){ setWaypoint(null); hudToast('Dotarłeś do celu'); }
+  if (Math.hypot(p.x - waypoint.x, p.z - waypoint.z) < (mode === 'plane' ? 150 : mode === 'car' || mode === 'boat' ? 35 : 25)){ setWaypoint(null); hudToast('Dotarłeś do celu'); }
 }
 /* trasa i znacznik na minimapie (znacznik poza kadrem — przy krawędzi) */
 function navDrawMinimap(g, toMap, MM){

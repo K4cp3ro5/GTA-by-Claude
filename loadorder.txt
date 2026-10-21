@@ -9,6 +9,7 @@ districts.js
 airport.js
 hospital.js
 islands.js
+landmarks.js
 city-generation.js
 highways.js
 traffic-lights.js
@@ -24,6 +25,7 @@ sound.js
 vehicle-entry.js
 planes.js
 boats.js
+birds.js
 daynight.js
 update-player.js
 update-vehicle.js

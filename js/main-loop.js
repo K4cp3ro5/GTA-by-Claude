@@ -52,8 +52,9 @@ function frame(now){
   updatePlanesIdle(dt);
   const boatKmh = mode === 'boat' ? updateBoat(dt) : 0;
   updateBoatsIdle(dt);
+  updateBirds(dt);
   const vehKmh = mode === 'plane' ? planeKmh : mode === 'boat' ? boatKmh : carState.kmh;
-  if (mode === 'foot' && pointerLocked) updatePlayer(dt);
+  if (mode === 'foot' && pointerLocked){ if (!(parachute.on && parachute.t > 0.7)) updatePlayer(dt); }   // pod otwartą czaszą steruje updateParachute
   else if (mode === 'foot') {
     /* pauza sterowania przy zwolnionym kursorze — postać wciąż stoi na fizyce */
     player.body.velocity.x = damp(player.body.velocity.x, 0, 10, dt);
@@ -72,6 +73,7 @@ function frame(now){
   if (mode === 'foot'){
     const b = player.body;
     player.mesh.position.set(lerp(b._p0.x, b.position.x, alpha), lerp(b._p0.y, b.position.y, alpha) - 0.85, lerp(b._p0.z, b.position.z, alpha));
+    syncParachute();
   }
   for (const n of npcs){                       // auta NPC: model między dwoma ostatnimi krokami fizyki
     const b = n.body;
