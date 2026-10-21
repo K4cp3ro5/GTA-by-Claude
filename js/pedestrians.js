@@ -159,14 +159,18 @@ function updatePedestrians(dt){
       /* auto tuż przed pieszym na jego drodze (np. wjechało na pasy) — pieszy przystaje, nie przechodzi przez nie */
       const wx = n.cwTo.x - n.pos.x, wz = n.cwTo.z - n.pos.y, wl = Math.hypot(wx, wz) || 1;
       const blockedBy = (x, z) => { const ox = x - n.pos.x, oz = z - n.pos.y, a = (ox*wx + oz*wz)/wl; return a > 0 && a < 3.2 && Math.abs(ox*wz - oz*wx)/wl < 2.3; };
-      if (npcs.some(m => blockedBy(m.pos.x, m.pos.y)) || blockedBy(chassisBody.position.x, chassisBody.position.z)) moving = false;
-      else if (pedStepTo(n, n.cwTo.x, n.cwTo.z, PED_CROSS * (run > 1 ? 1.8 : 1), dt)){
+      /* czeka tylko na pojazd w ruchu albo krótko (≤ 2 s) — przed stojącym (np. rowerem czekającym na niego) przechodzi dalej */
+      if ((n.crossWaitT || 0) > 2) n.crossPass = true;                        // po 2 s przed stojącym — idzie do końca przejścia
+      const stopIt = npcs.some(m => (m.speed > 0.5 || !n.crossPass) && blockedBy(m.pos.x, m.pos.y)) || blockedBy(chassisBody.position.x, chassisBody.position.z);
+      n.crossWaitT = stopIt ? (n.crossWaitT || 0) + dt : 0;
+      if (stopIt) moving = false;
+      if (moving && pedStepTo(n, n.cwTo.x, n.cwTo.z, PED_CROSS * (run > 1 ? 1.8 : 1), dt)){
         /* po drugiej stronie: pętla nowego kwartału od najbliższego narożnika */
         n.block = n.cwBlock;
         n.path = pedLoopFor(n.block[0], n.block[1]);
         let best = 0, bd = 1e9;
         n.path.forEach((p, k) => { const d = Math.hypot(p.x - n.pos.x, p.z - n.pos.y); if (d < bd){ bd = d; best = k; } });
-        n.wp = best; n.state = 'walk'; n.cw = null; n.dir = 1;
+        n.wp = best; n.state = 'walk'; n.cw = null; n.dir = 1; n.crossPass = false; n.crossWaitT = 0;
         Pedestrians.crossings = (Pedestrians.crossings || 0) + 1;
       }
     }

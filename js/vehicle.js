@@ -49,7 +49,7 @@ function buildCarModel(paintHex, staticWheels, type){
 
   /* koła: opona + felga ze szprychami (2 siatki na koło) */
   const wheels = [];
-  const WG = carWheelGeoFor(T.wheelR);
+  const WG = carWheelGeoFor(T.wheelR, T.wheelW);
   for (let i = 0; i < 4; i++){
     const wg = new THREE.Group();
     const tire = new THREE.Mesh(WG.tire, carWheelMat.tire); tire.castShadow = true; wg.add(tire);
@@ -62,20 +62,31 @@ function buildCarModel(paintHex, staticWheels, type){
     wheels.push(wg);
   }
 
+  /* rower prowadzony przez gracza: postać gracza na siodełku (pedałuje w syncCar) */
+  let rider = null;
+  if (T.bike && !staticWheels){
+    rider = buildHumanoid(PLAYER_PALETTE);
+    rider.group.position.set(0, 0.14, -0.22); rider.group.rotation.x = 0.32;
+    rider.armL.rotation.x = rider.armR.rotation.x = -1.05;
+    body.add(rider.group);
+  }
+  const ind = staticWheels ? null : addIndicators(body, T.id);
   scene.add(root);
-  return { root: root, body: body, wheels: wheels, spots: spots, type: T.id,
+  return { root: root, body: body, wheels: wheels, spots: spots, type: T.id, rider: rider, ind: ind,
            tailMat: lampR, headMat: lampF, paintMat: paint, mats: [paint, dark, glass, chrome, lampF, lampR] };
 }
 /* koła wg promienia (cache — wspólne dla modeli tego samego typu) */
 const _wheelGeo = {};
-function carWheelGeoFor(R){
-  if (_wheelGeo[R]) return _wheelGeo[R];
-  const tire = new THREE.CylinderGeometry(R, R, 0.30, 16); tire.rotateZ(Math.PI/2);
-  const rim = new THREE.CylinderGeometry(R*0.62, R*0.62, 0.32, 10); rim.rotateZ(Math.PI/2);
+function carWheelGeoFor(R, W){
+  W = W || 0.30;
+  const key = R + '/' + W;
+  if (_wheelGeo[key]) return _wheelGeo[key];
+  const tire = new THREE.CylinderGeometry(R, R, W, 16); tire.rotateZ(Math.PI/2);
+  const rim = new THREE.CylinderGeometry(R*0.62, R*0.62, W + 0.02, 10); rim.rotateZ(Math.PI/2);
   const sp = new THREE.BoxGeometry(0.33, 0.07, R*1.1);
   const rimParts = [{ geo: rim, color: 0xffffff }];
   for (let s = 0; s < 3; s++) rimParts.push({ geo: sp, color: 0xffffff, rx: s * Math.PI / 3 });
-  return (_wheelGeo[R] = { tire: tire, rim: mergeColored(rimParts) });
+  return (_wheelGeo[key] = { tire: tire, rim: mergeColored(rimParts) });
 }
 /* usunięcie modelu ze sceny i zwolnienie jego geometrii/materiałów (koła — wspólne, zostają) */
 function disposeCarModel(m){

@@ -113,7 +113,16 @@ function mergeColored(parts){
     _mcC.setHex(pt.color);
     const p = g.attributes.position.array, n = g.attributes.normal.array;
     for (let i = 0; i < p.length; i++){ P.push(p[i]); N.push(n[i]); }
-    for (let i = 0; i < p.length / 3; i++) C.push(_mcC.r, _mcC.g, _mcC.b);
+    if (pt.colorFn){                                    // kolor na trójkąt wg środka (w układzie modelu): okna, pasy malowania na bryle
+      const step = pt.quads ? 18 : 9;                 // quads: kolejne pary trójkątów to czworokąt (LatheGeometry) — jeden kolor, równe krawędzie okien
+      for (let i = 0; i < p.length; i += step){
+        const e = Math.min(p.length, i + step), nv = (e - i) / 3; let cx = 0, cy = 0, cz = 0;
+        for (let k = i; k < e; k += 3){ cx += p[k]; cy += p[k+1]; cz += p[k+2]; }
+        const h = pt.colorFn(cx / nv, cy / nv, cz / nv);
+        _mcC.setHex(h === undefined || h === null ? pt.color : h);
+        for (let k = 0; k < nv; k++) C.push(_mcC.r, _mcC.g, _mcC.b);
+      }
+    } else for (let i = 0; i < p.length / 3; i++) C.push(_mcC.r, _mcC.g, _mcC.b);
     g.dispose();
   }
   const out = new THREE.BufferGeometry();

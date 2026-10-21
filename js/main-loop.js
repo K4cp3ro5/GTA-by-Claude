@@ -38,13 +38,19 @@ function frame(now){
   let dt = (now - last) / 1000;
   last = now;
   if (dt > 0.1) dt = 0.1;
+  /* pauza: menu otwarte klawiszem Esc po starcie gry (debug menu nie zatrzymuje świata) — tylko render */
+  if (gameStarted && !pointerLocked && !debugOpen){ renderer.render(scene, camera); return; }
   clock += dt;
+  indBlinkOn = (clock * 1.4) % 1 < 0.5;
 
   updateSky(dt);
   updateTrafficLights(dt);
   updateNpcs(dt);
   updatePedestrians(dt);
   const carState = updateCar(dt);
+  const planeKmh = mode === 'plane' ? updatePlane(dt) : 0;
+  updatePlanesIdle(dt);
+  const vehKmh = mode === 'plane' ? planeKmh : carState.kmh;
   if (mode === 'foot' && pointerLocked) updatePlayer(dt);
   else if (mode === 'foot') {
     /* pauza sterowania przy zwolnionym kursorze — postać wciąż stoi na fizyce */
@@ -66,9 +72,9 @@ function frame(now){
     if (b._hasPrev === true) n.mesh.position.set(lerp(b._p0.x, b.position.x, alpha), n.y || 0, lerp(b._p0.z, b.position.z, alpha));
   }
   syncCar(alpha);
-  updateCamera(dt, carState.kmh);
+  updateCamera(dt, vehKmh);
   updateLampLights();
-  updateHud(dt, carState.kmh);
+  updateHud(dt, vehKmh);
 
   renderer.render(scene, camera);
 }
@@ -87,5 +93,6 @@ updateSky(0);
 goBtn.disabled = false;
 goBtn.textContent = 'WEJDŹ DO MIASTA';
 goBtn.focus();
+if (typeof LOADER !== 'undefined') LOADER.finish();
 
 requestAnimationFrame(frame);

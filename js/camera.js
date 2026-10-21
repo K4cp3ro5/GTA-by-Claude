@@ -9,8 +9,25 @@ const rayCaster = new THREE.Raycaster();
 let camFov = 66, camKmh = 0, camDist = 7.6;
 const _camEuler = new THREE.Euler();
 
+const _cpF = new THREE.Vector3(), _cpW = new THREE.Vector3(), _cpL = new THREE.Vector3();
 function updateCamera(dt, kmh){
   let dist, height, tx, ty, tz;
+  if (mode === 'plane' && curPlane){
+    /* kamera pościgowa: za ogonem i nad samolotem, patrzy przed nos; płynnie, bez wysięgnika kolizyjnego */
+    const p = curPlane, T = p.T;
+    _cpF.set(0, 0, 1).applyQuaternion(p.quat);
+    _cpW.copy(p.pos).addScaledVector(_cpF, -T.camDist); _cpW.y += T.camH;
+    const gy = planeGroundY(_cpW.x, _cpW.z, _cpW.y + 5) + 1.5; if (_cpW.y < gy) _cpW.y = gy;
+    camCur.x = damp(camCur.x, _cpW.x, 5, dt); camCur.y = damp(camCur.y, _cpW.y, 5, dt); camCur.z = damp(camCur.z, _cpW.z, 5, dt);
+    camera.position.copy(camCur);
+    _cpL.copy(p.pos).addScaledVector(_cpF, 25); camera.lookAt(_cpL);
+    camFov = damp(camFov, 70 + clamp(kmh / 400, 0, 1) * 10, 2, dt);
+    if (Math.abs(camera.fov - camFov) > 0.01){ camera.fov = camFov; camera.updateProjectionMatrix(); }
+    sun.target.position.set(p.pos.x, 0, p.pos.z);
+    sun.position.set(p.pos.x + lightDir.x * 95, lightDir.y * 95 + 2, p.pos.z + lightDir.z * 95);
+    camYaw = Math.atan2(-_cpF.x, -_cpF.z);
+    return;
+  }
 
   camKmh = damp(camKmh, kmh, 3, dt);                 // prędkość dla kamery bez drgań z fizyki
   if (mode === 'car'){

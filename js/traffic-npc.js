@@ -1,6 +1,7 @@
 /* ---------------------------------------------------------------
    11. RUCH DROGOWY (NPC)
    --------------------------------------------------------------- */
+const PIRATE_COLOR = 0x7cff2e;                 // piraci drogowi: kwasowa zieleń (nie występuje w zwykłym ruchu)
 const NPC_COLORS = [0x2e4d8f, 0xd9d4c8, 0x2f6f4e, 0x8a8f96, 0xe0a52c, 0x6b3a8f];
 const npcs = [];
 let npcIdSeq = 0;
@@ -129,12 +130,22 @@ function npcGeometries(color, type){
   if (_npcGeoCache[key]) return _npcGeoCache[key];
   const T = CAR_TYPES[type || 'sedan'], B = (w,h,d) => new THREE.BoxGeometry(w,h,d);
   const tg = new THREE.CylinderGeometry(T.wheelR, T.wheelR, 0.26, 12); tg.rotateZ(Math.PI/2);
-  const COL = { paint: color, dark: 0x15171b, chrome: 0xb9bec6, lampF: 0xfff3d0, lampR: 0x5a1512 };
+  const COL = { paint: T.bike ? 0x4a5058 : color, dark: 0x15171b, chrome: 0xb9bec6, lampF: 0xfff3d0, lampR: 0x5a1512 };
   const body = [], lamps = [];
   carParts(T.id).forEach(q => {
     const part = { geo: B(q[0], q[1], q[2]), color: COL[q[3]] || 0x141d22, x: q[4], y: q[5], z: q[6], rx: q[7] };
     ((q[3] === 'lampF' || q[3] === 'lampR') ? lamps : body).push(part);
   });
+  if (T.bike){
+    const tb = new THREE.CylinderGeometry(T.wheelR, T.wheelR, 0.06, 14); tb.rotateZ(Math.PI/2);
+    [-T.wbF, -T.wbR].forEach(z => body.push({ geo: tb, color: 0x141518, x: 0, y: T.wheelR, z: z }));
+    const skin = [0xd9a882, 0xc48f6a, 0xe8c39e, 0x8a6349][Math.abs(color) % 4], pants = 0x2c2f36;
+    [[-0.12], [0.12]].forEach(q => body.push({ geo: B(0.13, 0.62, 0.13), color: pants, x: q[0], y: 0.66, z: -0.08, rx: -0.55 }));
+    body.push({ geo: B(0.4, 0.56, 0.24), color: color, y: 1.28, z: -0.12, rx: 0.38 });     // tułów (koszulka w kolorze)
+    body.push({ geo: B(0.22, 0.24, 0.22), color: skin, y: 1.66, z: 0.04 });               // głowa
+    body.push({ geo: B(0.24, 0.1, 0.26), color: 0x22252b, y: 1.8, z: 0.04 });             // kask
+    [-0.21, 0.21].forEach(x => body.push({ geo: B(0.09, 0.48, 0.09), color: color, x: x, y: 1.24, z: 0.2, rx: -1.0 }));
+  } else
   [[T.track, -T.wbF], [-T.track, -T.wbF], [T.track, -T.wbR], [-T.track, -T.wbR]].forEach(p => body.push({ geo: tg, color: 0x141518, x: p[0], y: T.wheelR, z: p[1] }));
   return (_npcGeoCache[key] = { body: mergeColored(body), lamps: mergeColored(lamps) });
 }
@@ -171,14 +182,24 @@ function spawnNpcCar(path, colorHex, startIdx, frac, type){
   };
   /* profil kierowcy: ostrożny (30%), zwykły (50%), dynamiczny (20%) — trzymanie się limitu, odstęp,
      czas reakcji na zielone, przyspieszenie, prędkość docelowa */
-  const pr = rnd(), P = pr < 0.3 ? { k: 'ostrożny', obey: [0.88, 0.96], v: 0.92, a: 0.85, gap: 1.0, react: 0.9 }
-                   : pr < 0.8 ? { k: 'zwykły', obey: [0.95, 1.02], v: 1.0, a: 1.0, gap: 0, react: 0.45 }
-                   : { k: 'dynamiczny', obey: [1.0, 1.05], v: 1.06, a: 1.15, gap: -0.3, react: 0.15 };
+  const PIR = { k: 'pirat', obey: [1.35, 1.6], v: 1.25, a: 2.0, gap: -0.5, react: 0 };   // pirat drogowy: nie trzyma się żadnych zasad
+  const pr = rnd();
+  let P = pr < 0.08 ? PIR
+        : pr < 0.32 ? { k: 'ostrożny', obey: [0.88, 0.96], v: 0.92, a: 0.85, gap: 1.0, react: 0.9 }
+        : pr < 0.8 ? { k: 'zwykły', obey: [0.95, 1.02], v: 1.0, a: 1.0, gap: 0, react: 0.45 }
+        : { k: 'dynamiczny', obey: [1.0, 1.05], v: 1.06, a: 1.15, gap: -0.3, react: 0.15 };
+  if (type !== 'bike' && !path.hwyRoute && !path.some(q => q.rb !== undefined) && n.id % 7 === 3) P = PIR;   // kilku stałych piratów w mieście (pętle bez rond — te same, co rowerzystów)
+  if (type === 'bike' && P === PIR) P = { k: 'zwykły', obey: [1, 1], v: 1, a: 1, gap: 0, react: 0.45 };
   n.profile = P.k; n.obey = rand(P.obey[0], P.obey[1]); n.target *= P.v; n.hwyF = P.v; n.accel *= P.a; n.gapX = P.gap; n.react = P.react;
+  if (P === PIR){                                                                             // jaskrawy lakier, szybko także w centrum
+    n.target = Math.max(n.target, 13); n.color = PIRATE_COLOR;
+    scene.remove(n.mesh); n.mesh = buildNpcModel(PIRATE_COLOR, type);
+  }
   const b = new CANNON.Body({ mass: 0, type: CANNON.Body.KINEMATIC, material: matCar });
   b.addShape(new CANNON.Box(new CANNON.Vec3(TN.hw + 0.02, TN.hh, TN.hl + 0.05)));
   b.position.set(n.pos.x, n.y + TN.hh + 0.1, n.pos.y);
   b.npcRef = n;                              // zderzenie z autem gracza (sound.js) -> npcHitByPlayer
+  n.indMeshes = addIndicators(n.mesh, type);
   b.collisionFilterGroup = G_CAR;
   b.collisionFilterMask = -1;
   b.allowSleep = false;
@@ -202,6 +223,52 @@ function spawnRandomNpcCar(){
     break;
   }
   return spawnNpcCar(path, NPC_COLORS[randInt(0, NPC_COLORS.length - 1)], idx, frac);
+}
+/* rowerzyści NPC: 16–20 km/h na własnej kopii pętli miejskiej przesuniętej 2.3 m w prawo (przy krawędzi jezdni),
+   tylko pętle bez rond (logika ronda opiera się na osi toru); narożniki przesunięte po dwusiecznej */
+const NPC_BIKE_COUNT = 8;
+function offsetLoop(P, off){
+  const Q = P.filter((p, i) => { const q = P[(i + 1) % P.length]; return Math.hypot(q.x - p.x, q.z - p.z) > 0.05; }), n = Q.length;
+  return Q.map((b, i) => {
+    const a = Q[(i - 1 + n) % n], c = Q[(i + 1) % n];
+    const l1 = Math.hypot(b.x - a.x, b.z - a.z), l2 = Math.hypot(c.x - b.x, c.z - b.z);
+    const r1x = -(b.z - a.z) / l1, r1z = (b.x - a.x) / l1, r2x = -(c.z - b.z) / l2, r2z = (c.x - b.x) / l2;
+    let mx = r1x + r2x, mz = r1z + r2z; const ml = Math.hypot(mx, mz) || 1; mx /= ml; mz /= ml;
+    const k = off / Math.max(0.4, mx * r1x + mz * r1z);
+    return Object.assign({}, b, { x: b.x + mx * k, z: b.z + mz * k });
+  });
+}
+/* menu debug: istniejące auto staje się piratem (profil jak przy spawnie, nowy lakier i kierunkowskazy na nowym modelu) */
+function npcMakePirate(n){
+  if (n.type === 'bike' || n.profile === 'pirat') return false;
+  n.profile = 'pirat'; n.obey = rand(1.35, 1.6); n.target = Math.max(n.target * 1.25, 13); n.hwyF = 1.25;
+  n.accel = CAR_TYPES[n.type].npc.accel * 2.0; n.gapX = -0.5; n.react = 0; n.color = PIRATE_COLOR;
+  npcHazardOff(n);
+  const old = n.mesh; n.mesh = buildNpcModel(PIRATE_COLOR, n.type);
+  n.mesh.position.copy(old.position); n.mesh.quaternion.copy(old.quaternion); scene.remove(old);
+  n.indMeshes = addIndicators(n.mesh, n.type);
+  return true;
+}
+const _bikeLoops = new Map();
+function bikeLoopOf(P){ if (!_bikeLoops.has(P)) _bikeLoops.set(P, offsetLoop(P, 2.3)); return _bikeLoops.get(P); }
+function spawnNpcBikes(){
+  const noRb = P => !P.hwyRoute && !P.some(p => p.rb !== undefined);
+  const city = LOOPS.filter(noRb), pirLoops = npcs.filter(n => n.profile === 'pirat' && noRb(n.path)).map(n => n.path);
+  for (let k = 0; k < NPC_BIKE_COUNT; k++){
+    spawnNpcBike(bikeLoopOf(k < pirLoops.length && k < 3 ? pirLoops[k] : city[(k * 5 + 2) % city.length]), k);
+  }
+}
+const BIKE_COLORS = [0xc0392b, 0x2a6cb8, 0xe8b923, 0x2f8a4c, 0xd35fa0, 0xeeeeea];
+function spawnNpcBike(P, k){
+  for (let t = 0; t < 30; t++){
+    const sp = pathSpot(P, rnd()), a = P[sp.idx], b = P[(sp.idx + 1) % P.length];
+    const x = lerp(a.x, b.x, sp.frac), z = lerp(a.z, b.z, sp.frac);
+    if (npcs.some(m => Math.hypot(m.pos.x - x, m.pos.y - z) < 12)) continue;
+    const n = spawnNpcCar(P, BIKE_COLORS[k % 6], sp.idx, sp.frac, 'bike');
+    n.target = rand(4.4, 5.6); n.obey = 1; n.profile = 'rowerzysta';
+    return n;
+  }
+  return null;
 }
 function removeNpcCar(n){
   npcHazardOff(n);
@@ -228,4 +295,5 @@ for (let i = 0; i < ALL_LOOPS.length; i++){
     if (sp) spawnNpcCar(ALL_LOOPS[i][0], NPC_COLORS[(i + 3*k) % NPC_COLORS.length], sp.idx, sp.frac);   // brak wolnego miejsca: auto nie powstaje
   });
 }
+spawnNpcBikes();
 

@@ -5,8 +5,7 @@ const el = {
   modetxt: document.getElementById('modetxt'),
   clock:   document.getElementById('clock'),
   phase:   document.getElementById('phase'),
-  kmh:     document.getElementById('kmh'),
-  barfill: document.getElementById('barfill'),
+  clockIcon: document.getElementById('clockIcon'),
   speedo:  document.getElementById('speedo'),
   gval:    document.getElementById('gval'),
   ghand:   document.getElementById('ghand'),
@@ -24,6 +23,11 @@ const el = {
   hurtFlash:   document.getElementById('hurtFlash'),
   deadScreen:  document.getElementById('deadScreen'),
   carlbl:      document.getElementById('carlbl'),
+  carlblTxt:   document.getElementById('carlblTxt'),
+  indLh:       document.getElementById('indLh'),
+  indRh:       document.getElementById('indRh'),
+  stick:       document.getElementById('stick'),
+  stickDot:    document.getElementById('stickDot'),
   toast:       document.getElementById('toast')
 };
 /* krótki komunikat na środku ekranu */
@@ -80,8 +84,8 @@ const mg = mm.getContext('2d');
 const MM = mm.width;
 
 function drawMinimap(){
-  const px = mode === 'car' ? chassisBody.position.x : player.body.position.x;
-  const pz = mode === 'car' ? chassisBody.position.z : player.body.position.z;
+  const px = mode === 'car' ? chassisBody.position.x : mode === 'plane' && curPlane ? curPlane.pos.x : player.body.position.x;
+  const pz = mode === 'car' ? chassisBody.position.z : mode === 'plane' && curPlane ? curPlane.pos.z : player.body.position.z;
   const cx = (px - MAP_X0) * MAP_SCALE;
   const cz = (pz - MAP_Z0) * MAP_SCALE;
 
@@ -118,6 +122,13 @@ function drawMinimap(){
   mg.closePath(); mg.fill();
   mg.restore();
 
+  /* samolot gracza */
+  if (mode === 'plane' && curPlane){
+    _cpF.set(0, 0, 1).applyQuaternion(curPlane.quat);
+    mg.save(); mg.translate(MM / 2, MM / 2); mg.rotate(-Math.atan2(_cpF.x, _cpF.z) + Math.PI);
+    mg.fillStyle = '#f2f0ea'; mg.beginPath(); mg.moveTo(0, -7); mg.lineTo(1.4, -1); mg.lineTo(7, 1.5); mg.lineTo(1.4, 1.5); mg.lineTo(0.9, 5); mg.lineTo(3, 6.5); mg.lineTo(-3, 6.5); mg.lineTo(-0.9, 5); mg.lineTo(-1.4, 1.5); mg.lineTo(-7, 1.5); mg.lineTo(-1.4, -1); mg.closePath(); mg.fill();
+    mg.restore();
+  }
   /* gracz */
   if (mode === 'foot'){
     const pp = toMap(player.body.position.x, player.body.position.z);
@@ -158,21 +169,97 @@ function phaseName(t){
   return name;
 }
 
+/* --- kompas: pasek kierunków (kierunek patrzenia kamery), znacznik twojego auta --- */
+const compassCv = document.getElementById('compassCv'), cctx = compassCv.getContext('2d');
+const _cDir = new THREE.Vector3();
+const COMPASS_LBL = { 0: 'PN', 45: 'PN-WSCH', 90: 'WSCH', 135: 'PD-WSCH', 180: 'PD', 225: 'PD-ZACH', 270: 'ZACH', 315: 'PN-ZACH' };
+function bearingTo(dx, dz){ return (Math.atan2(dx, -dz) * 180 / Math.PI + 360) % 360; }   // 0 = północ (−Z), 90 = wschód
+function drawCompass(){
+  const W = compassCv.width, Hh = compassCv.height, ppd = 2.1, c = cctx;
+  camera.getWorldDirection(_cDir);
+  const b = bearingTo(_cDir.x, _cDir.z);
+  c.clearRect(0, 0, W, Hh);
+  c.textAlign = 'center'; c.textBaseline = 'alphabetic';
+  for (let d = Math.ceil((b - 100) / 5) * 5; d <= b + 100; d += 5){
+    const x = W / 2 + (d - b) * ppd, n = ((d % 360) + 360) % 360, edge = 1 - Math.min(1, Math.abs(x - W / 2) / (W / 2));
+    c.globalAlpha = 0.25 + edge * 0.75;
+    const major = n % 45 === 0, h = major ? 8 : n % 15 === 0 ? 5 : 3;
+    c.fillStyle = n % 90 === 0 ? '#f2f0ea' : '#9a978f';
+    c.fillRect(Math.round(x), Hh - 4 - h, 1, h);
+    if (major){
+      c.font = (n % 90 === 0 ? '600 11px ' : '500 8px ') + 'Inter, system-ui, sans-serif';
+      c.fillStyle = n === 0 ? '#ffb03a' : (n % 90 === 0 ? '#f2f0ea' : '#9a978f');
+      c.fillText(COMPASS_LBL[n], x, Hh - 15);
+    }
+  }
+  c.globalAlpha = 1;
+  /* twoje auto (gdy nie jedziesz nim) */
+  const own = (mode === 'car' && driving.owner === 'player') ? null : (driving.owner === 'player' ? { x: chassisBody.position.x, z: chassisBody.position.z } : parkedCars.find(q => q.owner === 'player'));
+  if (own){
+    const p = mode === 'car' ? chassisBody.position : player.body.position;
+    let rel = ((bearingTo(own.x - p.x, own.z - p.z) - b + 540) % 360) - 180;
+    const x = W / 2 + clamp(rel, -95, 95) * ppd;
+    c.fillStyle = '#e05a4a'; c.beginPath(); c.moveTo(x, Hh - 3); c.lineTo(x - 4, Hh - 9); c.lineTo(x + 4, Hh - 9); c.closePath(); c.fill();
+  }
+  /* środek: znacznik i kurs w stopniach */
+  c.fillStyle = '#ffb03a'; c.fillRect(W / 2 - 0.5, 2, 1.5, 7);
+  c.font = '500 9px Inter, system-ui, sans-serif'; c.fillStyle = '#c9c6bd';
+  c.fillText(Math.round(b) % 360 + '°', W / 2 + 18, 10);
+}
+/* --- prędkościomierz: tarcza 240° do v maks. typu, wskazówka, liczba, obroty na wewnętrznym łuku --- */
+const speedCv = document.getElementById('speedCv'), sctx = speedCv.getContext('2d');
+function drawSpeedo(kmh, gauge, rpm){
+  const c = sctx, W = speedCv.width, cx = W / 2, cy = 82, R = 70, a0 = Math.PI * 0.75, a1 = Math.PI * 2.25;
+  const vmax = gauge || CAR_TYPES[carType].gauge || 200, f = v => a0 + (a1 - a0) * clamp(v / vmax, 0, 1);
+  const rp = rpm === undefined ? engineRpm : rpm;
+  c.clearRect(0, 0, W, speedCv.height);
+  c.lineCap = 'round';
+  c.lineWidth = 4; c.strokeStyle = 'rgba(200,198,191,.16)'; c.beginPath(); c.arc(cx, cy, R, a0, a1); c.stroke();
+  c.strokeStyle = '#ffb03a'; c.beginPath(); c.arc(cx, cy, R, a0, f(kmh)); c.stroke();
+  /* obroty */
+  c.lineWidth = 2; c.strokeStyle = 'rgba(200,198,191,.10)'; c.beginPath(); c.arc(cx, cy, R - 9, a0, a1); c.stroke();
+  c.strokeStyle = rp > 0.85 ? '#ff4a3d' : '#6f8fa0'; c.beginPath(); c.arc(cx, cy, R - 9, a0, a0 + (a1 - a0) * clamp(rp, 0, 1)); c.stroke();
+  /* podziałka */
+  const step = vmax <= 60 ? 10 : 20;
+  c.font = '500 9px Inter, system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+  for (let v = 0; v <= vmax; v += step / 2){
+    const a = f(v), major = v % step === 0, r0 = R + 4, r1 = R + (major ? 9 : 6);
+    c.strokeStyle = major ? 'rgba(242,240,234,.65)' : 'rgba(242,240,234,.28)'; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0); c.lineTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1); c.stroke();
+    if (major && (vmax <= 60 || v % (step * 2) === 0)){ c.fillStyle = '#8d8b86'; c.fillText(String(v), cx + Math.cos(a) * (R - 20), cy + Math.sin(a) * (R - 20)); }
+  }
+  /* wskazówka */
+  const an = f(kmh);
+  c.strokeStyle = '#f2f0ea'; c.lineWidth = 2; c.beginPath(); c.moveTo(cx + Math.cos(an) * 14, cy + Math.sin(an) * 14); c.lineTo(cx + Math.cos(an) * (R - 3), cy + Math.sin(an) * (R - 3)); c.stroke();
+  /* liczba */
+  c.fillStyle = '#f2f0ea'; c.font = '300 30px Inter, system-ui, sans-serif'; c.fillText(String(Math.round(kmh)), cx, cy + 4);
+  c.fillStyle = '#8d8b86'; c.font = '500 8px Inter, system-ui, sans-serif'; c.fillText('KM/H', cx, cy + 24);
+}
 let hudAcc = 0, fpsAcc = 0, fpsCount = 0;
 function updateHud(dt, kmh){
   hudAcc += dt; fpsAcc += dt; fpsCount++;
 
-  el.speedo.classList.toggle('on', mode === 'car');
+  el.speedo.classList.toggle('on', mode === 'car' || mode === 'plane');
+  el.stick.classList.toggle('on', mode === 'plane');
+  if (mode === 'plane' && curPlane){
+    const p = curPlane, lbl = 'Samolot · ' + p.T.name;
+    if (el.carlblTxt.textContent !== lbl){ el.carlblTxt.textContent = lbl; el.carlbl.classList.remove('stolen'); }
+    drawSpeedo(kmh, p.T.gauge, p.thr);
+    el.gval.textContent = Math.round(p.thr * 100) + '% · WYS ' + Math.max(0, Math.round(p.pos.y - p.T.gear - planeGroundY(p.pos.x, p.pos.z, p.pos.y))) + ' m';
+    el.ghand.textContent = 'GAZ'; el.ghand.className = '';
+    el.stickDot.style.transform = 'translate(' + (planeStick.x * 26).toFixed(1) + 'px,' + (planeStick.y * 26).toFixed(1) + 'px)';
+  } else if (el.ghand.textContent !== 'RĘCZNY') el.ghand.textContent = 'RĘCZNY';
   if (_toastT > 0){ _toastT -= dt; if (_toastT <= 0) el.toast.classList.remove('on'); }
   if (mode === 'car'){
-    const lbl = (driving.owner === 'player' ? 'Twój samochód' : 'Skradziony') + ' · ' + CAR_TYPES[carType].name;
-    if (el.carlbl.textContent !== lbl){ el.carlbl.textContent = lbl; el.carlbl.classList.toggle('stolen', driving.owner !== 'player'); }
-    el.kmh.firstChild.nodeValue = String(Math.round(kmh));
-    el.barfill.style.width = clamp(kmh / 210 * 100, 0, 100) + '%';
+    const lbl = (driving.owner === 'player' ? (CAR_TYPES[carType].bike ? 'Twój rower' : 'Twój samochód') : 'Skradziony') + ' · ' + CAR_TYPES[carType].name;
+    if (el.carlblTxt.textContent !== lbl){ el.carlblTxt.textContent = lbl; el.carlbl.classList.toggle('stolen', driving.owner !== 'player'); }
+    drawSpeedo(kmh);
+    el.indLh.classList.toggle('on', playerInd === 'L' && indBlinkOn); el.indRh.classList.toggle('on', playerInd === 'R' && indBlinkOn);
     el.gval.textContent = gearTxt;
     el.ghand.className = handbrakeOn ? 'hot' : '';
   }
 
+  drawCompass();
   el.healthfill.style.width = player.health + '%';
   el.healthval.textContent = Math.round(player.health);
   el.healthtrack.classList.toggle('low', player.health < 30);
@@ -184,13 +271,14 @@ function updateHud(dt, kmh){
 
   if (hudAcc > 0.12){
     hudAcc = 0;
-    el.modetxt.textContent = mode === 'car' ? 'W pojeździe' : 'Pieszo';
+    el.modetxt.textContent = mode === 'car' ? 'W pojeździe' : mode === 'plane' ? 'W powietrzu' : 'Pieszo';
     const hours = timeOfDay * 24;
     const hh = Math.floor(hours), mmn = Math.floor((hours - hh) * 60);
     el.clock.textContent = (hh < 10 ? '0' : '') + hh + ':' + (mmn < 10 ? '0' : '') + mmn;
+    el.clockIcon.textContent = (timeOfDay > 0.25 && timeOfDay < 0.8) ? '☀' : '☾';
     el.phase.textContent = phaseName(timeOfDay) + (muted ? ' · wyciszone' : '');
-    const px = mode === 'car' ? chassisBody.position.x : player.body.position.x;
-    const pz = mode === 'car' ? chassisBody.position.z : player.body.position.z;
+    const px = mode === 'car' ? chassisBody.position.x : mode === 'plane' && curPlane ? curPlane.pos.x : player.body.position.x;
+    const pz = mode === 'car' ? chassisBody.position.z : mode === 'plane' && curPlane ? curPlane.pos.z : player.body.position.z;
     el.coords.textContent = Math.round(px) + ', ' + Math.round(pz);
     drawMinimap();
   }
@@ -203,12 +291,14 @@ function updateHud(dt, kmh){
   let nv = null;
   if (mode === 'foot') nv = nearestVehicle();
   const near = !!nv && nv.dist < 3.5;
-  promptEl.classList.toggle('on', near || mode === 'car');
-  const want = mode === 'car' ? 'out' : (near ? (nv.kind === 'npc' ? 'jack' : 'in') : lastPrompt);
+  promptEl.classList.toggle('on', near || mode === 'car' || (mode === 'plane' && curPlane && curPlane.onGround && curPlane.v < 3));
+  const want = mode === 'car' ? 'out' : mode === 'plane' ? 'outPlane' : (near ? (nv.kind === 'npc' ? 'jack' : nv.kind === 'plane' ? 'plane' : 'in') : lastPrompt);
   if (want !== lastPrompt){
     lastPrompt = want;
-    promptEl.innerHTML = want === 'out' ? 'Naciśnij <kbd>F</kbd> lub <kbd>E</kbd>, aby wysiąść'
+    promptEl.innerHTML = want === 'out' ? 'Naciśnij <kbd>F</kbd>, aby wysiąść'
+                        : want === 'outPlane' ? 'Naciśnij <kbd>F</kbd>, aby wysiąść z samolotu'
                         : want === 'jack' ? 'Naciśnij <kbd>F</kbd> lub <kbd>E</kbd>, aby ukraść auto'
+                        : want === 'plane' ? 'Naciśnij <kbd>F</kbd> lub <kbd>E</kbd>, aby wsiąść do samolotu'
                         : 'Naciśnij <kbd>F</kbd> lub <kbd>E</kbd>, aby wsiąść';
   }
 }

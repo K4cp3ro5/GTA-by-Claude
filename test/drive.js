@@ -48,6 +48,7 @@ function __run(x0, z0, heading, secs, stopFn, maxKmh, y0){
 /* autopilot "pure pursuit" po łamanej wps (szuka punktu w odległości lookahead przed autem) */
 function __follow(x0, z0, heading, wps, secs, kmhMax, doneFn, look, y0){
   look = look || [6, 0.35];                              // punkt celowania: look[0] + look[1]*v metrów przed autem
+  mode = 'car';
   npcs.slice().forEach(removeNpcCar);
   Pedestrians.list.slice().forEach(removePed);
   delBody(player.body);
@@ -72,9 +73,10 @@ function __follow(x0, z0, heading, wps, secs, kmhMax, doneFn, look, y0){
     const lim = 0.45/(1 + sp/18);
     const st = Math.max(-lim, Math.min(lim, err*1.4));
     vehicle.setSteeringValue(st,0); vehicle.setSteeringValue(st,1);
-    const f = kmh < kmhMax ? 4200 : 0;
+    const f = (kmh < kmhMax ? 4200 : 0) * chassisBody.mass / 1250;   // siła wg masy (rower)
     for (let i = 0; i < 4; i++){ vehicle.applyEngineForce(i >= 2 ? f : 0, i); vehicle.setBrake(0, i); }
     world.step(1/60);
+    if (carType === 'bike') bikeHwyBan(1/60);                  // B-9: rower zawracany z rampy autostrady (update-vehicle.js)
     let dev = 1e9; for (let k = 0; k < path.length-1; k++) dev = Math.min(dev, distSeg(p, path[k], path[k+1]));   // odległość do całej trasy (cross-track)
     out.maxDev = Math.max(out.maxDev, dev); out.minY = Math.min(out.minY, p.y); out.maxY = Math.max(out.maxY, p.y);
     const u = new CANNON.Vec3(); chassisBody.quaternion.vmult(new CANNON.Vec3(0,1,0), u); if (u.y < 0.3) out.flipped = true;
@@ -89,6 +91,7 @@ function __follow(x0, z0, heading, wps, secs, kmhMax, doneFn, look, y0){
 function __perf(type){
   npcs.slice().forEach(removeNpcCar); Pedestrians.list.slice().forEach(removePed); delBody(player.body);
   applyCarType(type, 0x888888); mode = 'car';
+  const ban = bikeHwyBan; bikeHwyBan = () => {};          // pomiar na prostej A1+ — zakaz B-9 dla roweru tu wyłączony
   const w = CW['A1+'], p0 = wayAt(w, 5), T = CAR_TYPES[type];
   const place = (d, v) => { const q = wayAt(w, d), o = HP.laneR; chassisBody.position.set(q.x - q.hz * o, q.y + T.restY + 0.05, q.z + q.hx * o);
     chassisBody.quaternion.setFromAxisAngle(new CANNON.Vec3(0,1,0), Math.atan2(q.hx, q.hz) + Math.PI); chassisBody.velocity.set(q.hx * v, 0, q.hz * v); chassisBody.angularVelocity.set(0,0,0); };
@@ -100,16 +103,16 @@ function __perf(type){
   for (; t < 60 * 60; t++){
     updateCar(1/60); world.step(1/60);
     const v = chassisBody.velocity, kmh = Math.hypot(v.x, v.z) * 3.6; out.vmax = Math.max(out.vmax, kmh);
-    if (out.t100 === null && kmh >= 100) out.t100 = +(t / 60).toFixed(2);
+    if (out.t100 === null && kmh >= (T.bike ? 20 : 100)) out.t100 = +(t / 60).toFixed(2);
     const q = new CANNON.Vec3(); chassisBody.quaternion.vmult(new CANNON.Vec3(0,1,0), q); if (q.y < 0.3) out.flipped = true;
     if (Math.hypot(chassisBody.position.x - p0.x, chassisBody.position.z - p0.z) > 780) break;
   }
   keys[BIND.forward] = false;
-  place(60, 100 / 3.6);
+  place(60, (T.bike ? 25 : 100) / 3.6);
   for (let i = 0; i < 6; i++){ world.step(1/60); }
   const b0 = chassisBody.position.clone(); keys[BIND.back] = true;
   for (let i = 0; i < 60 * 15; i++){ updateCar(1/60); world.step(1/60); const v = chassisBody.velocity; if (Math.hypot(v.x, v.z) < 0.3){ out.brake = +Math.hypot(chassisBody.position.x - b0.x, chassisBody.position.z - b0.z).toFixed(1); break; } }
-  keys[BIND.back] = false; mode = 'foot';
+  keys[BIND.back] = false; mode = 'foot'; bikeHwyBan = ban;
   out.vmax = Math.round(out.vmax); out.restY = +T.restY.toFixed(2); out.name = T.name;
   return out;
 }
@@ -125,7 +128,7 @@ function __consts(){ return { wall: WALL_X, rbApron: RB.apron,
   tree: (() => { const free = t => ![signGeomLog, lampSpots, binSpots, hydSpots, HWY_PIERS].some(l => l.some(o => Math.abs(o.x - t.x) < 2.2 && o.z > t.z + 0.5 && o.z < t.z + 17)) && !treeSpots.some(o => o !== t && Math.abs(o.x - t.x) < 2.2 && o.z > t.z + 0.5 && o.z < t.z + 17) && !buildings.some(b => Math.abs(b.x - t.x) < b.w/2 + 1.2 && b.z - b.d/2 < t.z + 17 && b.z + b.d/2 > t.z);
     const s = treeSpots.find(q => q.y === undefined && Math.abs(q.z) < 200 && free(q)); return s ? [s.x, s.z] : null; })(),
   /* tor do muru północnego: x bez drzew pasa podmiejskiego i bez dróg */
-  wallX: (() => { for (let x = 3.5; x < 250; x += 7) if (!treeSpots.some(t => Math.abs(t.x - x) < 2.5 && t.z < -CITY_EDGE) && !hwyQuery(x, -330, 3).length) return x; return 3.5; })(),
+  wallX: (() => { for (let x = 3.5; x < 250; x += 7) if (!treeSpots.some(t => Math.abs(t.x - x) < 2.5 && t.z > CITY_EDGE) && !hwyQuery(x, 330, 3).length) return x; return 3.5; })(),   // mur południowy (na północy lotnisko)
   /* słupek znaku STOP; start z chodnika 7 m przed nim, wzdłuż ulicy (od strony nadjeżdżających — tam jest front znaku) */
   sign: (() => {
     const clear = g => { const f = [Math.sin(g.rot), Math.cos(g.rot)];
@@ -157,6 +160,11 @@ console.log('=== 2) węzeł: wszystkie 8 skrętów (4 pętle w lewo, 4 łącznic
 });
 console.log('=== 3) końce: zjazd do miasta i wjazd z miasta we wszystkich 4 narożnikach ===');
 ['SE','SW','NW','NE'].forEach((nm, k) => { follow3('zjazd ' + nm, base.__term(k, 'exit'), 50, [4, 0.2]); follow3('wjazd ' + nm, base.__term(k, 'entry'), 50, [4, 0.2]); });
+console.log('=== 3b) zakaz rowerów (B-9): rower gracza na wjeździe SE nie wjedzie na rampę ===');
+{ base.applyCarType('bike', 0x888888); const pts = base.__term(0, 'entry'), st = pts[1], nx = pts[4], end = pts[pts.length - 2]; let maxY = -1e9;
+  const rr = base.__follow(st[0], st[1], Math.atan2(nx[0] - st[0], nx[1] - st[1]), pts.slice(2).map(p => [p[0], p[1]]), 90, 28, p => { maxY = Math.max(maxY, p.y); return Math.hypot(p.x - end[0], p.z - end[1]) < 7; }, [4, 0.2], st[2]);
+  console.log(' rower na wjeździe: koniec ' + JSON.stringify(rr.end) + ' | maks. y ' + maxY.toFixed(2) + ' (ma być < 1.2, pomost 7) | ' + (rr.done === undefined && maxY < 1.2 ? 'OK — zawrócony' : 'BŁĄD — wjechał'));
+  base.applyCarType('sedan', 0xb3272b); }
 console.log('=== 4) ulica pod estakadami i węzłem: aleja j=6 od x=-200 do x=200 ===');
 r = base.__run(-200, 3.5, Math.PI / 2, 30, p => p.x > 200, 60);
 rep(' pod:', r, '(y ma zostać ~0.5 — bez uderzenia w filar)');
@@ -164,7 +172,7 @@ console.log('=== 5) bariera na pomoście: A1+ przy s=-200, prostopadle w barier�
 { const p = base.__hwyPt('A1', -200, 9.0), q = base.__hwyPt('A1', -200, 30), hd = Math.atan2(q.x - p.x, q.z - p.z);
   r = base.__run(p.x, p.z, hd, 5, () => false, 40, p.y);
   rep(' bariera:', r, '| auto zostało na pomoście: ' + (r.minY > p.y - 1 ? 'tak' : 'NIE') + ' (pomost ' + p.y.toFixed(1) + ')'); }
-console.log('=== 6) kolizje: drzewo, słupek znaku, mur przy 150 km/h ===');
+console.log('=== 6) kolizje: drzewo, słupek znaku, mur południowy przy 150 km/h ===');
 const hit = (name, tx, tz, fromDx, fromDz, kmh) => {
   const d = Math.hypot(fromDx, fromDz), ux = -fromDx/d, uz = -fromDz/d;      // kierunek jazdy: na cel
   const hd = Math.atan2(ux, uz);
@@ -178,15 +186,15 @@ if (K.sign){
   const pass = (rr.end[0] - s[0])*(-s[2]) + (rr.end[2] - s[1])*(-s[3]), d = Math.hypot(rr.end[0] - s[0], rr.end[2] - s[1]);
   console.log(' słupek znaku STOP: koniec ' + JSON.stringify(rr.end) + ' | za słupkiem o ' + pass.toFixed(2) + ' m (ma być < 0) | od słupka ' + d.toFixed(2) + ' m (ok. 2.2 = przód auta oparty o słupek) | przewrócone: ' + rr.flipped);
 }
-hit('mur północny', K.wallX, -K.wall, 0, K.wall - CITY_EDGE_T - 5, 150);
+hit('mur południowy', K.wallX, K.wall, 0, -(K.wall - CITY_EDGE_T - 5), 150);
 console.log('=== 8) TYPY AUT: 0–100 km/h, v maks. na prostej A1+ (790 m), droga hamowania 100 -> 0, rondo ===');
-['sedan', 'pickup', 'sport'].forEach(t => {
+['sedan', 'pickup', 'sport', 'bike'].forEach(t => {
   const r = base.__perf(t);
-  console.log(' ' + r.name + ':', '0–100:', r.t100, 's | v maks.:', r.vmax, 'km/h | hamowanie:', r.brake, 'm | przewrócone:', r.flipped, '| wys. nadwozia w spoczynku', r.restY);
+  console.log(' ' + r.name + ':', t === 'bike' ? '0–20 (hamowanie z 25):' : '0–100:', r.t100, 's | v maks.:', r.vmax, 'km/h | hamowanie:', r.brake, 'm | przewrócone:', r.flipped, '| wys. nadwozia w spoczynku', r.restY);
   base.applyCarType(t, 0x888888);
   const c = base.__rbCenter(0), uOut = {x:-1,z:0}, route = base.__rbRoute(0, {x:0,z:1}, uOut), last = route[route.length - 1], tail = [[last[0] - 25, last[1]], [last[0] - 45, last[1]]];
   let minD = 1e9;
-  const rr = base.__follow(c[0] + 3.5, c[1] + 45, Math.PI, route.concat(tail), 40, 25, p => { minD = Math.min(minD, Math.hypot(p.x - c[0], p.z - c[1])); return Math.hypot(p.x - tail[1][0], p.z - tail[1][1]) < 4; }, t === 'pickup' ? [4.2, 0.2] : [3.2, 0.15]);   // dłuższy rozstaw osi: dalszy punkt celowania autopilota
+  const rr = base.__follow(c[0] + 3.5, c[1] + 45, Math.PI, route.concat(tail), 40, t === 'bike' ? 15 : 25, p => { minD = Math.min(minD, Math.hypot(p.x - c[0], p.z - c[1])); return Math.hypot(p.x - tail[1][0], p.z - tail[1][1]) < 4; }, t === 'pickup' ? [4.2, 0.2] : [3.2, 0.15]);   // dłuższy rozstaw osi: dalszy punkt celowania autopilota
   rep('   rondo w lewo:', rr, '| maks. odchylenie: ' + rr.maxDev.toFixed(2) + ' m | najbliżej środka: ' + minD.toFixed(2) + ' m');
 });
 base.applyCarType('sedan', 0xb3272b);

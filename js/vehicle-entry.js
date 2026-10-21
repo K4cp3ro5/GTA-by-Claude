@@ -104,6 +104,13 @@ function nearestVehicle(){
     const d = Math.hypot(p.x - _parkDoor.x, p.z - _parkDoor.z);
     if (d < best.dist) best = { kind: 'parked', dist: d, parked: q };
   }
+  if (typeof planes !== 'undefined') for (const q of planes){
+    if (q.wreckT > 0) continue;
+    const d0 = planeDoorPoint(q, { x: 0, y: 0, z: 0 });
+    if (Math.abs(d0.y - (p.y - 0.9)) > 2) continue;
+    const d = Math.hypot(p.x - d0.x, p.z - d0.z) * 0.8;                       // drzwi samolotu: trochę większy zasięg
+    if (d < best.dist) best = { kind: 'plane', dist: d, plane: q };
+  }
   for (const n of npcs){
     if (Math.abs((n.y || 0) - (p.y - 0.9)) > 2) continue;           // auto na estakadzie nad / pod graczem
     npcDoorPoint(n, _npcDoor);
@@ -149,7 +156,7 @@ function pruneParked(){
 
 /* --- menu kołowe pojazdów (V) --- */
 const VEHICLE_MENU = [
-  { label: 'Zwykły', type: 'sedan' }, { label: 'Pickup', type: 'pickup' }, { label: 'Sportowy', type: 'sport' }, { label: 'Przywołaj', summon: true }
+  { label: 'Zwykły', type: 'sedan' }, { label: 'Pickup', type: 'pickup' }, { label: 'Sportowy', type: 'sport' }, { label: 'Rower', type: 'bike' }
 ];
 let lastCarSpawn = -99;
 const _ray = new CANNON.Ray(), _rayRes = new CANNON.RaycastResult();
@@ -206,7 +213,7 @@ function spawnOwnCar(type){
     const own = parkedCars.find(q => q.owner === 'player'); if (own) removeParked(own);
     addParked('player', type, MAIN_CAR_COLOR, spot.x, spot.y, spot.z, spot.heading);
   }
-  hudToast('Twój samochód: ' + CAR_TYPES[type].name);
+  hudToast(type === 'bike' ? 'Twój rower' : 'Twój samochód: ' + CAR_TYPES[type].name);
   return true;
 }
 function ownCarType(){ if (driving.owner === 'player') return carType; const own = parkedCars.find(q => q.owner === 'player'); return own ? own.type : 'sedan'; }
@@ -217,9 +224,11 @@ function vehicleMenuPick(i){
 
 function toggleVehicle(){
   if (!pointerLocked) return;
+  if (mode === 'plane'){ exitPlane(false); return; }
   if (mode === 'foot'){
     const nv = nearestVehicle();
     if (nv.dist > 3.5) return;
+    if (nv.kind === 'plane'){ enterPlane(nv.plane); return; }
     if (nv.kind === 'npc') jackCar(nv.npc);
     else if (nv.kind === 'parked') enterParked(nv.parked);
     mode = 'car';

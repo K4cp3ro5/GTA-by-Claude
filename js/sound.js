@@ -51,9 +51,14 @@ const Sound = {
     this.ready = true;
   },
 
+  paused: false,
   setMuted(m){
     if (!this.ready) return;
-    this.master.gain.setTargetAtTime(m ? 0 : 0.55, this.ctx.currentTime, 0.05);
+    this.master.gain.setTargetAtTime(m || this.paused ? 0 : 0.55, this.ctx.currentTime, 0.05);
+  },
+  setPaused(p){                               // pauza (menu Esc): cisza, po powrocie głośność zgodna z wyciszeniem (M)
+    this.paused = p;
+    this.setMuted(muted);
   },
 
   /* rpm01: 0..1, load: 0..1 */
@@ -127,6 +132,13 @@ const Sound = {
     o.start(t); o.stop(t + 0.13);
   },
 
+  tick(on){
+    if (!this.ready) return;
+    const ctx = this.ctx, t = ctx.currentTime, o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = 'square'; o.frequency.setValueAtTime(on ? 1900 : 1400, t);
+    g.gain.setValueAtTime(0.025, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.025);
+    o.connect(g); g.connect(this.master); o.start(t); o.stop(t + 0.03);
+  },
   thud(strength){
     if (!this.ready) return;
     const ctx = this.ctx, t = ctx.currentTime;
