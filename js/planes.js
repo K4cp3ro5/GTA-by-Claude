@@ -235,7 +235,7 @@ function bailOut(p){
   player.body.wakeUp(); addBody(player.body);
   player.fallSpeed = 0;
   if (!parachute.mesh) parachute.mesh = buildParachute();
-  Object.assign(parachute, { on: true, t: 0, heading: h, speed: PARA.glide, bank: 0 });
+  Object.assign(parachute, { on: true, t: 0, heading: h, speed: PARA.glide, bank: 0, yawRate: 0 });
   parachute.mesh.visible = false;
   Sound.engine(false, 0, 0);
   hudToast('Skok! A / D — skręt · W — szybciej · S — hamowanie', 4);
@@ -251,20 +251,23 @@ function updateParachute(dt){
   const s = Math.min(1, (parachute.t - 0.7) / 0.6), live = pointerLocked && !player.dead;
   const turn = live ? (down('left') || keys['ArrowLeft'] ? 1 : 0) - (down('right') || keys['ArrowRight'] ? 1 : 0) : 0;
   const fast = live && (down('forward') || keys['ArrowUp']), slow = live && (down('back') || keys['ArrowDown']);
-  parachute.heading += turn * PARA.turn * dt;                                       // A = w lewo (kurs rośnie)
-  parachute.bank = damp(parachute.bank, -turn * 0.38, 3, dt);
+  /* skręt narasta i wygasa płynnie (jak pociągnięcie linki sterowej), czasza przechyla się proporcjonalnie */
+  parachute.yawRate = approach(parachute.yawRate || 0, turn * PARA.turn, 2.6 * dt);
+  parachute.heading += parachute.yawRate * dt;                                      // A = w lewo (kurs rośnie)
+  parachute.bank = -parachute.yawRate / PARA.turn * 0.38;
   parachute.speed = damp(parachute.speed, fast ? PARA.fast : slow ? PARA.slow : PARA.glide, 1.5, dt);
   const sink = (fast ? PARA.sinkFast : slow ? PARA.sinkSlow : PARA.sink) + Math.abs(turn) * 1.2;
   const fx = Math.sin(parachute.heading), fz = Math.cos(parachute.heading);
-  b.velocity.x = damp(b.velocity.x, fx * parachute.speed * s, 2.2, dt);
-  b.velocity.z = damp(b.velocity.z, fz * parachute.speed * s, 2.2, dt);
+  /* lot zawsze w kierunku czaszy (bez bocznego znoszenia) */
+  b.velocity.x = damp(b.velocity.x, fx * parachute.speed * s, 8, dt);
+  b.velocity.z = damp(b.velocity.z, fz * parachute.speed * s, 8, dt);
   /* opadanie: hamowanie czaszy do -sink, potem stała prędkość; krok fizyki doda grawitację świata — kompensacja */
   const g = -world.gravity.y; let vy = b.velocity.y;
   vy = vy < -sink ? approach(vy, -sink, 14 * dt) : Math.max(vy - g * dt, -sink);
   b.velocity.y = vy + g * dt;
   player.fallSpeed = Math.min(player.fallSpeed, 6);                                 // pod czaszą bez obrażeń od upadku
   player.facing = parachute.heading; player.mesh.rotation.y = parachute.heading;
-  if (clock - lastMouseMove > 0.8) camYaw = angleDamp(camYaw, parachute.heading + Math.PI, 2.2, dt);   // kamera za plecami
+  if (clock - lastMouseMove > 0.8) camYaw = angleDamp(camYaw, parachute.heading + Math.PI, 3.2, dt);   // kamera za plecami
   /* czasza: rozwija się 0.6 s, nad graczem, w kierunku lotu, przechyla się w zakręcie */
   m.visible = true;
   m.scale.set(0.25 + 0.75 * s, 0.6 + 0.4 * s, 0.25 + 0.75 * s);
