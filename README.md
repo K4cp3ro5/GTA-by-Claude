@@ -73,8 +73,14 @@ Jak wystartować: ustaw samolot na pasie, trzymaj `W`, a gdy prędkościomierz p
 |---|---|---|
 | ![Wyspa](screenshots/wyspa.jpg) | ![Port](screenshots/port.jpg) | ![Łódź](screenshots/lodz.jpg) |
 
+| Przystań na wysepce | Mewy nad miastem |
+|---|---|
+| ![Przystań](screenshots/przystan.jpg) | ![Ptaki](screenshots/ptaki.jpg) |
+
 - Miasto leży na wyspie otoczonej morzem, z nabrzeżem i balustradą dookoła.
-- Na północnym brzegu jest **port**: plac kontenerowy z suwnicą, dwa dźwigi nabrzeżowe, statek kontenerowy, magazyn, biuro portu i przystań z motorówkami.
+- Na północnym brzegu jest **port towarowy**: plac kontenerowy z suwnicą, dwa dźwigi nabrzeżowe, statek kontenerowy i holownik, zbiorniki paliw, magazyn, biuro portu, przystań z motorówkami i falochron z biało-czerwoną latarnią.
+- Na wysepce jest **przystań pasażerska**: drewniany deptak, kasa biletowa z czerwonym dachem, ławki, prom, jachty i latarnie wejścia (zielona i czerwona).
+- Nad miastem, portem i przy graczu latają **mewy**. Co jakiś czas któraś „zrzuca balast”: na ziemi albo dachu zostaje biała plama, która po kilku sekundach znika. Trafienie w ciebie albo w szybę auta kończy się komunikatem i plamą na ekranie.
 - Za cieśniną, ok. 250 m na północ, leży **wysepka z drugim lotniskiem** i własną przystanią. Dopłyniesz tam łodzią z portu albo dolecisz samolotem z lotniska miejskiego.
 - Kto wpadnie do wody (pieszo albo autem), zostaje wyciągnięty na brzeg; auto ląduje obok. Samolot, który dotknie wody, rozbija się i tonie.
 
@@ -130,21 +136,21 @@ Jak wystartować: ustaw samolot na pasie, trzymaj `W`, a gdy prędkościomierz p
 |---|---|---|
 | ![Spadochron](screenshots/spadochron.jpg) | ![Katastrofa](screenshots/katastrofa.jpg) | ![Odrzutowiec](screenshots/odrzutowiec.jpg) |
 
-- **Dwa lotniska**: miejskie w zachodnim pasie zieleni wyspy głównej (pas 18/36, 326 × 26 m, terminal, wieża, hangar, parking, dojazd z alei) i na wysepce na północ od miasta (pas 09/27, 336 × 30 m, płyta z rękawami, terminal, wieża, hangar, parking, przystań). Na każdym stoi odrzutowiec i awionetka — można przelecieć z jednego na drugie.
+- **Dwa różne lotniska**: miejskie (regionalne) w zachodnim pasie zieleni wyspy głównej — pas 18/36 (326 × 26 m), ceglany terminal z dachem dwuspadowym, ceglana wieża z ośmiokątną kabiną, dwa hangary łukowe, zbiorniki paliwa; oraz międzynarodowe na wysepce — pas 09/27 (336 × 30 m) ze światłami podejścia, terminal z łukowym dachem i rękawami, okrągła wieża ze szklaną kabiną, radar, cysterna i wózki bagażowe, hangar, parking, przystań. Na każdym stoi odrzutowiec i awionetka — można przelecieć z jednego na drugie.
 - Dwa samoloty: szybki odrzutowiec i zwrotna awionetka. Sterowanie strzałkami z autopoziomowaniem, ochroną przed przeciągnięciem i asystentem lądowania.
 - `F` w locie — wyskakujesz, otwiera się prostokątna czasza (skręty `A`/`D`, `W` szybciej, `S` hamowanie), a samolot bez pilota nurkuje i rozbija się.
 - Zderzenie z budynkiem albo twarde lądowanie to katastrofa: kula ognia przechodząca w dym, błysk, odłamki, płonący wrak, wstrząs kamery i huk. Pilot nie przeżywa (z nieśmiertelnością z menu debug ląduje obok wraku). Po kilkunastu sekundach samolot wraca na lotnisko — gdy jego stanowisko jest wolne.
 
 ### Menu debug (`` ` ``)
 
-Liczba aut i pieszych, pora dnia, nieśmiertelność, amunicja, teleporty (start, port, lotnisko miejskie, wysepka, autostrada, zjazd, obwodnica), zmiana typu auta w trakcie jazdy i rower, kierunkowskazy, samolot na lotnisku albo od razu w powietrzu, dodawanie piratów i rowerzystów, szansa potrącenia rowerzysty, przełącznik LOD.
+Panel na całą szerokość ekranu, sekcje w kolumnach. Liczba aut i pieszych, pora dnia, nieśmiertelność, amunicja, teleporty (start, port, lotnisko miejskie, wysepka, autostrada, zjazd, obwodnica), zmiana typu auta w trakcie jazdy i rower, kierunkowskazy, samolot na lotnisku albo od razu w powietrzu, dodawanie piratów i rowerzystów, szansa potrącenia rowerzysty, przełącznik LOD, gęstość mgły, zrzut balastu przez ptaka (obok albo na ciebie), szybki cel nawigacji (szpital, lotnisko) i jego usunięcie, wejście do łodzi w porcie.
 
 ![Ekran ładowania](screenshots/ladowanie.jpg)
 
 ## Jak to jest zrobione
 
 - **Three.js r128** (grafika) i **cannon.js 0.6.2** (fizyka) z CDN, reszta to czysty JavaScript bez frameworków. Dźwięk syntezuje Web Audio, tekstury rysuje Canvas 2D.
-- 34 zwykłe skrypty ze wspólnym zakresem globalnym, ładowanych w kolejności z `loadorder.txt` (bez bundlera, więc gra działa z `file://`).
+- 36 zwykłych skryptów ze wspólnym zakresem globalnym, ładowanych w kolejności z `loadorder.txt` (bez bundlera, więc gra działa z `file://`).
 - Geometria miasta scalana w kilkadziesiąt siatek (ok. 200 wywołań rysowania), statyczne kolizje w komórkach 48 m.
 - Auta NPC to ciała kinematyczne na trasach z punktów; skrzyżowania rozstrzygane wg czasu dojazdu, ronda, światła, kolejki, objazdy i zmiana pasa.
 

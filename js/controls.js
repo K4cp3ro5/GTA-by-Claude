@@ -194,7 +194,7 @@ document.addEventListener('keyup', e => {
 window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; mouseDown = false; Sound.horn(false); });
 
 /* --- debug menu --- */
-let godMode = false, timeFrozen = false, debugOpen = false, wasLockedBeforeDebug = false, carSpeedMult = 1;
+let godMode = false, timeFrozen = false, debugOpen = false, wasLockedBeforeDebug = false, carSpeedMult = 1, fogMult = 1;
 const debugEl = document.getElementById('debugMenu');
 const dbg = {
   carCount: document.getElementById('dbgCarCount'),
@@ -391,6 +391,25 @@ document.getElementById('dbgAddBikes').addEventListener('click', ev => {
 });
 dbg.ram.addEventListener('input', () => { PIRATE_RAM_CHANCE = parseFloat(dbg.ram.value); dbg.ramVal.textContent = Math.round(PIRATE_RAM_CHANCE * 100) + '%'; });
 dbg.lod.addEventListener('change', () => { NPC_LOD_DIST = dbg.lod.checked ? 220 : Infinity; });
+/* świat i nawigacja (debug) */
+const dbgEl = id => document.getElementById(id);
+dbgEl('dbgFog').addEventListener('input', e => { fogMult = parseFloat(e.target.value); dbgEl('dbgFogVal').textContent = Math.round(fogMult * 100) + '%'; });
+const dbgDrop = onMe => {
+  const p = playerWorldPos(), b = birds[0];
+  b.pos.set(p.x + (onMe ? 0 : 5), (p.y || 0) + 22, p.z + (onMe ? 0 : 3)); b.prev.copy(b.pos); birdDrop(b);
+};
+dbgEl('dbgBirdDrop').addEventListener('click', ev => { ev.stopPropagation(); dbgDrop(false); });
+dbgEl('dbgBirdHit').addEventListener('click', ev => { ev.stopPropagation(); dbgDrop(true); });
+dbgEl('dbgWpHospital').addEventListener('click', ev => { ev.stopPropagation(); setWaypoint(HOSPITAL_SPAWN.x, HOSPITAL_SPAWN.z + 2); hudToast('Cel: szpital'); });
+dbgEl('dbgWpAirport').addEventListener('click', ev => { ev.stopPropagation(); setWaypoint(AIRPORT_W.front.x, AIRPORT_W.term.z0 + 10); hudToast('Cel: lotnisko miejskie'); });
+dbgEl('dbgWpClear').addEventListener('click', ev => { ev.stopPropagation(); setWaypoint(null); });
+dbgEl('dbgBoat').addEventListener('click', ev => {
+  ev.stopPropagation();
+  if (mode === 'plane') exitPlane(true);
+  if (mode === 'car'){ hudToast('Najpierw wysiądź z auta (F)'); return; }
+  if (mode === 'boat') return;
+  const b = boats[0]; b.v = 0; enterBoat(b); camCur.set(b.pos.x, 6, b.pos.z + 12); refreshDebugInfo();
+});
 dbg.teleport.addEventListener('click', ev => {
   ev.stopPropagation();
   if (mode === 'car'){

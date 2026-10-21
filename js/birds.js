@@ -64,7 +64,7 @@ function updateBirds(dt){
     const dx = b.pos.x - b.prev.x, dz = b.pos.z - b.prev.z;
     if (dx * dx + dz * dz > 1e-6) b.head = Math.atan2(dx, dz);
     b.flap += dt * b.fr;
-    const fl = Math.sin(b.flap) * 0.55, s = b.span, ch = Math.cos(b.head), sh = Math.sin(b.head);
+    const fl = Math.sin(b.flap) * 0.32, s = b.span, ch = Math.cos(b.head), sh = Math.sin(b.head);
     /* lokalnie: przód +z, bok +x; P(lx, ly, lz) -> świat */
     const K = 1.6, P = (lx, ly, lz, o) => { lx *= K; ly *= K; lz *= K; pos[o] = b.pos.x + lx * ch + lz * sh; pos[o + 1] = b.pos.y + ly; pos[o + 2] = b.pos.z - lx * sh + lz * ch; };   // mewa ~2.5 m rozpiętości (czytelna z dołu)
     const o = i * 27;

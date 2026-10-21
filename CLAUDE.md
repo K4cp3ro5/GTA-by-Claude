@@ -40,14 +40,16 @@ Brak bundlera: `index.html` ładuje zwykłe `<script>` w kolejności z `loadorde
 | sound.js | synteza dźwięku |
 | vehicle-entry.js | wsiadanie, wysiadanie, kradzież, atrapa głównego auta |
 | planes.js | samoloty (`PLANE_TYPES` jet/prop, `planes`): modele, ciało kinematyczne G_PLANE, `enterPlane`/`exitPlane`, lot `planeStep` (W/S gaz, strzałki = docelowe pochylenie/przechył, asystent lądowania), skok `bailOut` + `updateParachute` (prostokątna czasza, A/D skręt, W/S szybciej/hamowanie; wołane w main-loop po `updatePlayer`, kompensuje grawitację świata −20), samolot bez pilota (`p.free`), katastrofa `planeCrash` (gracz na wolne miejsce `safeSpot`, efekty `fxList`/`updateFx`, wrak `wreckEmit`, `camShake`, `Sound.boom`; pilot ginie) |
+| landmarks.js | detale lotnisk i portów (jedna scalona siatka `LM`, `buildLandmarks`): łukowy dach i okrągła wieża na wysepce, ceglany terminal/wieża i hangary łukowe w lotnisku miejskim, falochron z latarnią, zbiorniki, holownik, dziób statku, kasa, prom, jachty |
 | boats.js | łodzie (`BOAT_T`, `boats`): model, `enterBoat`/`exitBoat` (wysiadka tylko przy brzegu), `updateBoat`, `boatBlocked` (ląd, pomosty, statek, inne łodzie), `playerWorldPos()` |
-| daynight.js | cykl dobowy |
+| birds.js | mewy (`BIRD_FLOCKS`, jedna dynamiczna siatka), zrzut balastu (`birdDrop`, plamy `splatAt` znikają po kilku s, trafienie gracza → `#birdSplat`) |
+| daynight.js | cykl dobowy (mgła × `fogMult` z debug) |
 | update-player.js / update-vehicle.js / update-npc.js | logika na klatkę |
 | camera.js / hud.js | kamera TPP (osobne gałęzie: samolot, łódź; `camShake`) / HUD, minimapa (`mapStatic` obejmuje obie wyspy) |
 | navigation.js | pełna mapa (M, `openMap`/`closeMap`, PPM = cel), graf ulic `NAV` (jednokierunkowa obwodnica dla aut, dojazdy szpitala, portu, wysepki), `navCompute` (Dijkstra, przeprawa przez `PORTS`), słup celu, trasa na minimapie |
 | main-loop.js | pętla `frame` i start (`LOADER.finish()` chowa ekran ładowania z index.html) |
 
-Tryby `mode`: foot / car / plane / boat. Klawisze: M = mapa (otwarta mapa też pauzuje), N = wyciszenie. Klatka (`main-loop.js`): pauza (`gameStarted && !pointerLocked && !debugOpen`) = tylko render; inaczej `updateSky` → `updateTrafficLights` → `updateNpcs` → `updatePedestrians` → `updateCar` → `updatePlane` / `updatePlanesIdle` → `updateBoat` / `updateBoatsIdle` → `updatePlayer` → `updateParachute` → `physicsStep` (po nim `updateWaterHazards`, `navUpdate`, `updateSea`; akumulator 1/60, maks. 2 kroki, porzuca zaległość) → interpolacja modeli (`_p0/_q0`, `alpha`) → `syncCar` → kamera → HUD → render. Teleport ciała = `noLerp`.
+Tryby `mode`: foot / car / plane / boat. Klawisze: M = mapa (otwarta mapa też pauzuje), N = wyciszenie. Klatka (`main-loop.js`): pauza (`gameStarted && !pointerLocked && !debugOpen`) = tylko render; inaczej `updateSky` → `updateTrafficLights` → `updateNpcs` → `updatePedestrians` → `updateCar` → `updatePlane` / `updatePlanesIdle` → `updateBoat` / `updateBoatsIdle` → `updateBirds` → `updatePlayer` (nie pod otwartą czaszą) → `updateParachute` → `physicsStep` (po nim `updateWaterHazards`, `navUpdate`, `updateSea`; akumulator 1/60, maks. 2 kroki, porzuca zaległość) → interpolacja modeli (`_p0/_q0`, `alpha`) → `syncCar` → kamera → HUD → render. Teleport ciała = `noLerp`.
 
 ## Układ świata
 - Siatka 12×12: oś ulicy `L(i) = −264 + 44i`, `blockCenter(i) = L(i) + 22`, `ROAD_H = 7` (pół jezdni), `LOT = 30` (działka), `WALK_H = 0.25`.
