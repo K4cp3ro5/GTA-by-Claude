@@ -114,7 +114,6 @@ function buildAirport(){
   /* --- strona miejska: dojazd z ulicy i=5, droga przed terminalem, parking --- */
   const ac = A.access, fr = A.front, pk = A.park;
   flat(crossBuf, ac.x - ac.hw, ac.x + ac.hw, ac.z1, ac.z0, y);
-  paint(ac.x, ac.z0 - 3, ac.x, fr.z + fr.hw + 1, 0.15);                         // oś (przerywana)
   for (let z = ac.z0 - 2; z > fr.z + fr.hw + 2; z -= 6) paint(ac.x, z, ac.x, z - 3, 0.16, 0xeeeeea, y + 0.016);
   flat(crossBuf, fr.x0 - ac.hw, fr.x1, fr.z - fr.hw, fr.z + fr.hw, y + 0.001);
   /* objazd wysepki: wschodnia odnoga w dół i powrót wzdłuż obwodnicy do dojazdu (jednokierunkowo) */
@@ -122,11 +121,24 @@ function buildAirport(){
   flat(crossBuf, fr.x1 - 2 * fr.hw, fr.x1, fr.z - fr.hw, lz + fr.hw, y + 0.0012);
   flat(crossBuf, ac.x + ac.hw, fr.x1, lz - fr.hw, lz + fr.hw, y + 0.0014);
   const ix0 = ac.x + ac.hw, ix1 = fr.x1 - 2 * fr.hw, iz0 = fr.z + fr.hw, iz1 = lz - fr.hw;
-  CB(0x5f8a46).box((ix0 + ix1) / 2, 0.12, (iz0 + iz1) / 2, ix1 - ix0, 0.24, iz1 - iz0, 2, true);   // wysepka z trawą (krawężnik)
+  CB(0x4a7640).box((ix0 + ix1) / 2, 0.12, (iz0 + iz1) / 2, ix1 - ix0, 0.24, iz1 - iz0, 2, true);   // wysepka z trawą (krawężnik) — odcień jak trawa pasa podmiejskiego
   staticBox((ix0 + ix1) / 2, 0.12, (iz0 + iz1) / 2, ix1 - ix0, 0.24, iz1 - iz0);
   for (const mx of [-20, -8, 4]){ CB(0xcfd2d4).box(mx, 4, (iz0 + iz1) / 2, 0.14, 8, 0.14, 1, true); CB([0xc0392b, 0x1a4fa0, 0xeeeeea][(mx + 20) / 12]).box(mx + 0.8, 7.2, (iz0 + iz1) / 2, 1.5, 1.0, 0.04, 1, true); staticBox(mx, 4, (iz0 + iz1) / 2, 0.2, 8, 0.2); }
   for (let x = fr.x0 + 6; x < fr.x1 - 10; x += 6) paint(x, fr.z, x + 3, fr.z, 0.15, 0xeeeeea, y + 0.016);
   flat(crossBuf, pk.x1, ac.x - ac.hw, (pk.z0 + pk.z1) / 2 - 3.5, (pk.z0 + pk.z1) / 2 + 3.5, y + 0.001);     // wjazd na parking
+  /* linie krawędziowe jak na ulicach miasta (0.3 m od krawędzi, przerwy na wlotach) i linie ustąpienia pierwszeństwa */
+  {
+    const e = 0.3, yl = y + 0.017, ln = (x0, z0, x1, z1) => paint(x0, z0, x1, z1, 0.15, 0xeeeeea, yl);
+    const pe0 = (pk.z0 + pk.z1) / 2 + 3.5, pe1 = (pk.z0 + pk.z1) / 2 - 3.5;            // wjazd na parking (z: pe0 > pe1)
+    const W = ac.x - ac.hw + e, E = ac.x + ac.hw - e, N = fr.z - fr.hw + e, S = fr.z + fr.hw - e;
+    ln(W, ac.z0 - 0.5, W, pe0); ln(W, pe1, W, N);                                       // dojazd: zachodnia krawędź
+    ln(E, ac.z0 - 0.5, E, lz + fr.hw); ln(E, lz - fr.hw, E, S);                         // dojazd: wschodnia (przerwa na objazd)
+    ln(W, N, fr.x1 - e, N); ln(E, S, ix1, S);                                           // droga przed terminalem
+    ln(fr.x1 - e, N, fr.x1 - e, lz + fr.hw - e); ln(ix1, S, ix1, iz1);                  // objazd: odnoga wschodnia
+    ln(E, lz + fr.hw - e, fr.x1 - e, lz + fr.hw - e); ln(E, iz1, ix1, iz1);             // objazd: powrót wzdłuż obwodnicy
+    for (let x = W; x < ac.x - 0.4; x += 1.2) paint(x, ac.z0 - 1, x + 0.6, ac.z0 - 1, 0.3, 0xeeeeea, yl);   // wyjazd na obwodnicę: linia ustąpienia
+    for (let z = iz1; z < lz + fr.hw - 0.4; z += 1.2) paint(E + 0.4, z, E + 0.4, z + 0.6, 0.3, 0xeeeeea, yl); // objazd -> dojazd
+  }
   /* parking: 2 rzędy stanowisk P-18 z alejką, wjazd od dojazdu */
   flat(crossBuf, pk.x0, pk.x1, pk.z0, pk.z1, y);
   const rows = [[pk.z1 - 2.5, 1], [pk.z0 + 2.5, -1]];

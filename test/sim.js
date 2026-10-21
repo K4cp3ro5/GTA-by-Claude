@@ -114,7 +114,7 @@ function __static(){
   const out = {};
   /* normalne: poziome trójkąty muszą patrzeć W GÓRĘ (inaczej z góry niewidoczne) */
   const down = {};
-  [['roadBuf',roadBuf],['crossBuf',crossBuf],['crosswalkBuf',crosswalkBuf],['roundaboutPaintBuf',roundaboutPaintBuf],['hwTopBuf',hwTopBuf],['hwTopAuxBuf',hwTopAuxBuf],['hwRampBuf',hwRampBuf],['hwRampAuxBuf',hwRampAuxBuf],['hwGoreBuf',hwGoreBuf],['lawnBuf',lawnBuf],['walkBuf',walkBuf]].forEach(([nm,b]) => {
+  [['roadBuf',roadBuf],['crossBuf',crossBuf],['crosswalkBuf',crosswalkBuf],['roundaboutPaintBuf',roundaboutPaintBuf],['hwTopBuf',hwTopBuf],['hwTopAuxBuf',hwTopAuxBuf],['hwRampBuf',hwRampBuf],['hwRampAuxBuf',hwRampAuxBuf],['hwGoreBuf',hwGoreBuf],['hwPaintBuf',hwPaintBuf],['lawnBuf',lawnBuf],['walkBuf',walkBuf]].forEach(([nm,b]) => {
     let flatUp = 0, flatDown = 0;
     for (let i = 0; i < b.n.length; i += 3){
       const ny = b.n[i+1];

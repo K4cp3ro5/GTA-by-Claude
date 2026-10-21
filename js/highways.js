@@ -222,7 +222,7 @@ HWY_RAMPS.forEach(r => {
   }
 });
 /* ekrany akustyczne (panele 2.5 m na barierze) tam, gdzie jezdnia biegnie obok dzielnicy mieszkalnej */
-const hwNoiseBuf = new GeoBuf();
+const hwNoiseBuf = new GeoBuf(), hwPaintBuf = new GeoBuf();   // hwPaintBuf: malowane linie na końcach dróg zjazdowych
 ['A1+', 'A1-', 'A2+', 'A2-'].forEach(nm => {
   const w = CW[nm];
   for (let i = 0; i < w.pts.length - 1; i++){
@@ -315,6 +315,15 @@ HWY_TERM.forEach(t => {
   hwySignAt(ex, arcLen + 16, [FACE.B33(50)]);
   hwySignAt(ex, ex.len - 120, [FACE.B33(40)]);
   hwySignAt(ex, ex.len - 14, [FACE.D42()]);
+  hwySignAt(ex, ex.len - 5, [FACE.A7()]);                                    // ustąp pierwszeństwa przy wyjeździe na obwodnicę
+  /* koniec zjazdu przy obwodnicy: linia ustąpienia pierwszeństwa (P-13, kreski 0.6 m) przez cały pas */
+  {
+    const q = wayAt(ex, ex.len - 1.2), rx = -q.hz, rz = q.hx, hw = 3.5 - 0.3;
+    for (let o = -hw; o < hw - 0.3; o += 1.2){
+      const x0 = q.x + rx * o, z0 = q.z + rz * o, x1 = x0 + rx * 0.6, z1 = z0 + rz * 0.6, nx = -(z1 - z0) / 0.6 * 0.15, nz = (x1 - x0) / 0.6 * 0.15, yy = 0.03;
+      hwPaintBuf.quad([x0 - nx, yy, z0 - nz], [x0 + nx, yy, z0 + nz], [x1 + nx, yy, z1 + nz], [x1 - nx, yy, z1 - nz], [0,0],[1,0],[1,1],[0,1]);
+    }
+  }
   /* zakaz wjazdu w drogę zjazdową od strony miasta */
   hwySignAt(ex, ex.len - 4, [FACE.B2()], null, -1);
   /* tablica „AUTOSTRADA A1/A2” zaraz po wjeździe i tablica przed końcem autostrady */
@@ -356,6 +365,7 @@ const hwRampMesh = addMerged(hwRampBuf, new THREE.MeshLambertMaterial({ map: hwy
 const hwRampAuxMesh = addMerged(hwRampAuxBuf, new THREE.MeshLambertMaterial({ map: hwyRampAuxTex, color: 0xbcbcbc }), false, true);
 const hwGoreMesh = addMerged(hwGoreBuf, new THREE.MeshLambertMaterial({ map: hwyGoreTex, color: 0xbcbcbc }), false, true);
 const hwConcMesh = addMerged(hwConcBuf, new THREE.MeshLambertMaterial({ color: 0x9a978f }), true, true);
+addMerged(hwPaintBuf, new THREE.MeshLambertMaterial({ color: 0xeeeeea }), false, true);
 addMerged(hwCushionBuf, new THREE.MeshLambertMaterial({ color: 0xe8b81c }), true, true);
 addMerged(hwNoiseBuf, new THREE.MeshLambertMaterial({ color: 0x9cc6d8, transparent: true, opacity: 0.38, depthWrite: false }), false, false);
 [hwTopMesh, hwTopAuxMesh, hwRampMesh, hwRampAuxMesh, hwGoreMesh, hwConcMesh].forEach(m => { if (m) camBlockers.push(m); });
