@@ -1,107 +1,151 @@
 # GTA by Claude
 
-Przeglądarkowa gra 3D w stylu mini-GTA: miasto z dzielnicami, ruchem ulicznym (z rowerzystami i piratami drogowymi), autostradami na estakadach z węzłem koniczynowym, lotniskiem z samolotami, którymi można latać, cyklem dnia i nocy, bronią i kradzieżą aut. Działa w przeglądarce, bez instalacji i bez serwera. Cała oprawa (tekstury, modele, dźwięk) jest generowana proceduralnie w JavaScripcie, bez zewnętrznych plików graficznych i dźwiękowych.
+**Mini-GTA w przeglądarce.** Miasto 12 × 12 kwartałów z ruchem ulicznym, pieszymi, rowerzystami i piratami drogowymi, dwie autostrady na estakadach z węzłem koniczynowym, lotnisko z samolotami, którymi można latać (i z których można wyskoczyć ze spadochronem), cykl dnia i nocy, broń i kradzież aut.
+
+Wszystko — asfalt, okna, modele aut i samolotów, znaki, dźwięk silnika i wybuchów — jest generowane w kodzie. Nie ma ani jednego pliku graficznego czy dźwiękowego, nie ma bundlera ani serwera: wystarczy otworzyć `index.html`.
 
 ![Miasto z lotu ptaka](screenshots/miasto-z-gory.jpg)
 
-| Rondo | Ulica pod estakadami | Węzeł koniczynowy |
+| Ulica w centrum | Noc | Węzeł koniczynowy |
 |---|---|---|
-| ![Rondo](screenshots/rondo.jpg) | ![Estakada](screenshots/estakada.jpg) | ![Węzeł](screenshots/wezel.jpg) |
+| ![Ulica](screenshots/ulica.jpg) | ![Noc](screenshots/noc.jpg) | ![Węzeł](screenshots/wezel.jpg) |
 
-| Typy aut: zwykły, pickup, sportowy | Galeria handlowa | Park |
-|---|---|---|
-| ![Typy aut](screenshots/typy-aut.jpg) | ![Galeria](screenshots/galeria.jpg) | ![Park](screenshots/park.jpg) |
-
-| Lotnisko | Odrzutowiec | Awionetka |
-|---|---|---|
-| ![Lotnisko](screenshots/lotnisko.jpg) | ![Odrzutowiec](screenshots/odrzutowiec.jpg) | ![Awionetka](screenshots/awionetka.jpg) |
-
-| Rowerzysta NPC | Pirat drogowy | Ekran ładowania |
-|---|---|---|
-| ![Rowerzysta](screenshots/rowerzysta.jpg) | ![Pirat](screenshots/pirat.jpg) | ![Ładowanie](screenshots/ladowanie.jpg) |
-
-## Uruchomienie
+## Jak zagrać
 
 1. Pobierz repozytorium (`Code → Download ZIP` albo `git clone`).
-2. Otwórz plik `index.html` w Chrome, Firefox, Edge lub Safari (dwuklik wystarczy).
+2. Otwórz `index.html` w Chrome, Edge, Firefoksie albo Safari (dwuklik wystarczy).
 3. Poczekaj na koniec ekranu ładowania i kliknij **WEJDŹ DO MIASTA**.
 
-Potrzebne jest połączenie z internetem, bo Three.js i cannon.js ładują się z CDN (cdnjs). Gra nie wymaga serwera. Jeśli wolisz serwer lokalny: `npx serve` albo `python3 -m http.server` w katalogu projektu.
+Potrzebny jest internet, bo Three.js i cannon.js ładują się z CDN. Jeśli wolisz serwer lokalny: `npx serve` albo `python3 -m http.server` w katalogu projektu.
 
 ## Sterowanie
 
-Sterowanie można zmienić w menu (przycisk **STEROWANIE** albo `Esc`). `Esc` w trakcie gry to pauza: świat stoi, a dźwięk jest wyciszony.
+Klawisze można zmienić w menu (**STEROWANIE**). `Esc` w trakcie gry to pauza — świat stoi, dźwięk cichnie.
+
+**Pieszo**
 
 | Klawisz | Akcja |
 |---|---|
-| `W` `A` `S` `D` (w aucie także strzałki) | ruch pieszo, jazda autem |
-| Mysz | kamera (kliknij w ekran, żeby przechwycić kursor; `Esc` zwalnia) |
-| `Shift` | bieg |
-| `Spacja` | skok pieszo, hamulec ręczny (drift) w aucie |
-| `F` | wsiądź, wysiądź, ukradnij auto NPC, wsiądź do samolotu (`E` też wsiada, ale nie wysiada) |
-| `Q` / `E` (w aucie) | lewy / prawy kierunkowskaz (gaśnie sam po skręcie) |
-| `V` (przytrzymaj, pieszo) | menu pojazdów: twoje auto (zwykły, pickup, sportowy) albo rower przed tobą, albo przywołanie |
-| `H` | klakson |
-| `1` `2` `3` / `Q` (pieszo) | wybór broni / koło broni |
-| Lewy przycisk myszy | atak, strzał |
-| `R` | przeładuj (pieszo) albo postaw auto na kołach |
-| `T` | przyspiesz upływ doby (przytrzymaj) |
-| `M` | wycisz dźwięk |
-| `` ` `` | menu debug |
+| `W` `A` `S` `D` / strzałki, mysz | ruch, kamera |
+| `Shift` / `Spacja` | bieg / skok |
+| `F` (albo `E`) | wsiądź do auta lub samolotu, ukradnij auto NPC |
+| `V` (przytrzymaj) | menu pojazdów: twoje auto (zwykły, pickup, sportowy) albo rower |
+| `1` `2` `3`, `Q` (przytrzymaj) | broń: pięści, kij, pistolet / koło broni |
+| lewy przycisk myszy, `R` | atak, strzał / przeładowanie |
 
-W samolocie: `W` / `S` — gaz (więcej / mniej), mysz — drążek jak joystick (przód/tył = pochylenie, lewo/prawo = przechył), `A` / `D` — ster kierunku, `Spacja` — hamulce kół, `F` — wysiadka (tylko po wylądowaniu i zatrzymaniu).
+**W aucie**
 
-Menu debug pozwala m.in. zmieniać liczbę aut i pieszych, ustawić i zatrzymać godzinę, włączyć nieśmiertelność, zmienić mnożnik prędkości auta i usunąć zaparkowane skradzione auta, a do sprawdzania nowych funkcji: zmienić typ swojego pojazdu (także w trakcie jazdy) i wziąć rower, włączyć kierunkowskaz, wsiąść do odrzutowca albo awionetki na lotnisku lub od razu w powietrzu, teleportować się (start, lotnisko, autostrada, zjazd, obwodnica), dodać pirata albo zamienić w niego najbliższe auto, dodać rowerzystów, ustawić szansę potrącenia rowerzysty przez pirata i wyłączyć LOD AI.
+| Klawisz | Akcja |
+|---|---|
+| `W` `S` / strzałki | gaz, hamulec, wsteczny |
+| `A` `D` / strzałki | skręt |
+| `Spacja` | hamulec ręczny (drift) |
+| `Q` / `E` | lewy / prawy kierunkowskaz (gaśnie sam po skręcie) |
+| `H` | klakson — auto stojące przed tobą rusza |
+| `R` | postaw auto na koła |
+| `F` | wysiądź |
+
+**W samolocie**
+
+| Klawisz | Akcja |
+|---|---|
+| `W` / `S` | więcej / mniej gazu |
+| `↑` / `↓` | w górę / w dół (puszczone — samolot sam wraca do lotu poziomego) |
+| `←` / `→` | skręt w przechyle (puszczone — skrzydła się wyrównują) |
+| `A` / `D` | kołowanie po ziemi |
+| `Spacja` | hamulce kół |
+| `F` | wysiądź na ziemi, **w locie — skok ze spadochronem** |
+| mysz | rozglądanie się (kamera wraca za ogon) |
+
+Jak wystartować: ustaw samolot na pasie, trzymaj `W`, a gdy prędkościomierz pokaże ok. 160 km/h (awionetka ok. 85 km/h) — `↑`. Jak wylądować: podejdź nad pas na kilkadziesiąt metrów, zdejmij gaz (`S`) i puść strzałki — asystent lądowania sam zniży lot i łagodnie przyziemi, potem `Spacja`.
+
+**Zawsze**: `T` — szybszy upływ doby, `M` — wyciszenie, `` ` `` — menu debug.
 
 ## Co jest w grze
 
-- **Miasto** 12×12 kwartałów z dzielnicami: centrum z wieżowcami (uskoki, witryny w parterze, lądowiska) i placem z fontanną, dzielnica handlowa z galerią i parkingiem, przemysłowa (hale z dachami szedowymi, kominy, kontenery), mieszkalna z blokami z balkonami i domkami z ogródkami, podjazdami i garażami. Do tego parki z alejkami, stawami, fontannami i placami zabaw, stacja paliw w pasie podmiejskim i przystanki.
-- **Ruch uliczny**: auta NPC (zwykłe, pickupy, sportowe; kierowcy ostrożni, zwykli i dynamiczni) jeżdżą prawostronnie, stają na czerwonym (sygnalizatory trzykomorowe z fazą żółtą), zatrzymują się na STOP, ustępują wg reguły prawej ręki, a przy alei z pierwszeństwem — autom na niej. Konflikty na skrzyżowaniach rozstrzygają wg czasu dojazdu, więc auta się nie przenikają. Omijają zaparkowane auta na pasie, na autostradach wyprzedzają lewym pasem, ruszają na klakson, uciekają przed strzałami i stają ze światłami awaryjnymi po stłuczce.
-- **Przepisy i znaki**: zakaz wjazdu rowerów na autostradę (B-9 przy wjazdach; rower gracza zawraca na rampie). Limity są egzekwowane (miasto i pas podmiejski 50 km/h, strefa 30 w Starym Mieście, autostrady 100 km/h, łącznice i pętle węzła mniej). Jednokierunkowa obwodnica przy murze, aleja z pierwszeństwem, ponad 950 znaków (A-7, B-2, B-9, B-20, B-33, B-43/B-44, C-2, C-6, C-9, C-12, D-1, D-3, D-6, D-9/D-10, D-42/D-43) na słupkach, które nie przebijają tarcz; na autostradach znaki na koronie bariery, tablice kierunkowe na bramownicach i drogowskazy w rozwidleniach.
-- **Ronda** o jednolitych parametrach: wyspa z opaską (R 4,5 m), pas okrężny 4,5 m, wloty i wyloty łukami z wysepkami rozdzielającymi, linie P-13. Auta NPC objeżdżają wyspę przeciwnie do ruchu wskazówek zegara i ustępują jadącym po rondzie.
-- **Rowerzyści NPC** jeżdżą przy prawej krawędzi jezdni (16–20 km/h), auta wyprzedzają ich z odstępem ok. 1 m. **Piraci drogowi** (kwasowo zielony lakier, podrasowany silnik) nie trzymają się żadnych przepisów: jadą na czerwonym, przez STOP i przejścia, bez pierwszeństwa i bez limitów — praktycznie z prędkością maksymalną auta (zwalniają tylko przed zakrętem), jadą slalomem po pasie, wyprzedzają przeciwnym pasem także przez przejścia i skrzyżowania, nie sygnalizują, potrącają pieszych na jezdni i wjeżdżają w rowerzystów, którzy się przewracają. Auta NPC włączają kierunkowskazy przed skrętem, zmianą pasa i objazdem.
-- **Piesi** (różne ubrania, wzrost i tempo) spacerują po chodnikach i przechodzą przez jezdnię po przejściach (na światłach w swojej fazie), a auta im ustępują. Na strzały uciekają biegiem.
-- **Autostrady A1 i A2** biegną estakadami po przekątnych miasta (pomost 7 m, A2 nad węzłem 14 m), z ulicami pod wiaduktami (prześwit ≥ 5,8 m, filary tylko w kwartałach). W centrum jest węzeł koniczynowy (4 pętle, 4 łącznice, jezdnie zbierające, nosy z kreskowaniem i amortyzatorami, kliny pasów włączania) otoczony zielenią z kopcami i stawami, z parkingami i boiskami pod estakadami i ekranami akustycznymi przy osiedlach, a na końcach przekątnych zjazdy i wjazdy schodzą w pasie podmiejskim do poziomu ulic. Auta NPC jeżdżą trasami przez autostrady: wjeżdżają z przekątnych, przejeżdżają węzeł prosto, pętlą lub łącznicą i wracają ulicami.
-- **Gracz**: tryb pieszy i jazda autem z fizyką zawieszenia (RaycastVehicle). Trzy typy aut o różnych osiągach (zwykły: 0–100 w 4,4 s / 181 km/h, pickup: 6,9 s / 160 km/h, sportowy: 3,0 s / 250 km/h). Rower (wywrotka przy ostrym zakręcie, rowerzysta pedałuje). Kierunkowskazy z tykaniem. Twoje auto (zawsze jedno, z menu `V`) i auta skradzione, które zostają tam, gdzie je porzucisz (do 4). Ekwipunek (pięści, kij, pistolet), pasek zdrowia i kondycji.
-- **Lotnisko** w północnym pasie podmiejskim (z dala od zjazdów z autostrad): pas startowy 09/27, droga kołowania, płyta z rękawami, terminal, wieża, hangar, parking i dojazd z ulicy z objazdem wysepki przed terminalem. Dwa samoloty, którymi można latać: odrzutowiec (szybki, start ok. 195 km/h) i awionetka (zwrotna, start ok. 100 km/h). Model lotu: ciąg, opór, siła nośna, przeciągnięcie, skręt w przechyle; zderzenie z budynkiem albo twarde lądowanie kończy się wybuchem.
-- **HUD**: kompas u góry, zegarowy prędkościomierz (w samolocie z gazem i wysokością), zegar z porą dnia, zdrowie i kondycja przy minimapie, wskaźnik drążka w samolocie i strzałki kierunkowskazów.
-- **Świat**: cykl dnia i nocy (słońce, księżyc, mgła, latarnie z plamami światła na jezdni), minimapa całego świata, dźwięk syntezowany (Web Audio), ekran ładowania z paskiem postępu.
+### Miasto
 
-## Struktura projektu
+| Rondo | Ulica pod estakadami | Park |
+|---|---|---|
+| ![Rondo](screenshots/rondo.jpg) | ![Estakada](screenshots/estakada.jpg) | ![Park](screenshots/park.jpg) |
+
+- **Dzielnice**: centrum z wieżowcami i placem z fontanną, dzielnica handlowa z galerią i parkingiem, przemysłowa (hale, kominy, kontenery), osiedla bloków z balkonami i domki z ogródkami i garażami. Do tego parki ze stawami i placami zabaw, stacja paliw, przystanki.
+- **Autostrady A1 i A2** biegną estakadami po przekątnych miasta, z ulicami pod wiaduktami. W centrum — węzeł koniczynowy z pętlami, łącznicami i jezdniami zbierającymi, w narożnikach miasta zjazdy schodzące do poziomu ulic.
+- **Przepisy i znaki**: ponad 970 znaków (STOP, ustąp pierwszeństwa, limity, strefa 30, droga z pierwszeństwem, zakaz wjazdu rowerów na autostradę i inne), sygnalizacja świetlna, ronda, jednokierunkowa obwodnica.
+- **Dzień i noc**: słońce, księżyc, mgła, latarnie z plamami światła, oświetlone okna wieżowców.
+
+### Ruch uliczny
+
+| Pirat drogowy | Rowerzysta | Typy aut |
+|---|---|---|
+| ![Pirat](screenshots/pirat.jpg) | ![Rowerzysta](screenshots/rowerzysta.jpg) | ![Typy aut](screenshots/typy-aut.jpg) |
+
+- **Auta NPC** (zwykłe, pickupy, sportowe; kierowcy ostrożni, zwykli i dynamiczni) jeżdżą prawostronnie, stają na czerwonym i na STOP, ustępują pierwszeństwa, objeżdżają ronda, włączają kierunkowskazy, wyprzedzają lewym pasem na autostradzie, omijają zaparkowane auta. Po stłuczce stają na światłach awaryjnych, na strzały uciekają.
+- **Piraci drogowi** — kwasowo zielone auta (także na minimapie) z podrasowanym silnikiem. Nie przestrzegają żadnych przepisów: jadą na czerwonym, bez pierwszeństwa, praktycznie z prędkością maksymalną, slalomem, wyprzedzają przeciwnym pasem nawet na przejściach i potrącają pieszych i rowerzystów.
+- **Rowerzyści** jeżdżą przy prawej krawędzi jezdni, auta wymijają ich z odstępem.
+- **Piesi** spacerują po chodnikach i przechodzą po pasach (na światłach w swojej fazie).
+
+### Ty
+
+| HUD w aucie | W nocy |
+|---|---|
+| ![HUD](screenshots/hud-auto.jpg) | ![Noc w aucie](screenshots/hud-noc.jpg) |
+
+- Jazda z fizyką zawieszenia. Trzy typy aut: zwykły (0–100 km/h w 4,4 s, 181 km/h), pickup (6,9 s, 160 km/h), sportowy (3,0 s, 250 km/h), do tego rower. Twoje auto przywołujesz menu `V`, skradzione zostają tam, gdzie je porzucisz.
+- Broń (pięści, kij, pistolet), zdrowie i kondycja, upadki z wysokości.
+- HUD: kompas, zegarowy prędkościomierz, zegar, minimapa z całym światem.
+
+### Lotnisko i samoloty
+
+| Lotnisko | Odrzutowiec w locie | Awionetka |
+|---|---|---|
+| ![Lotnisko](screenshots/lotnisko.jpg) | ![Lot](screenshots/lot.jpg) | ![Awionetka](screenshots/awionetka.jpg) |
+
+| Skok ze spadochronem | Katastrofa | Odrzutowiec |
+|---|---|---|
+| ![Spadochron](screenshots/spadochron.jpg) | ![Katastrofa](screenshots/katastrofa.jpg) | ![Odrzutowiec](screenshots/odrzutowiec.jpg) |
+
+- Lotnisko na północ od miasta: pas startowy 336 × 30 m, droga kołowania, płyta z rękawami, terminal, wieża, hangar, parking.
+- Dwa samoloty: szybki odrzutowiec i zwrotna awionetka. Sterowanie strzałkami z autopoziomowaniem, ochroną przed przeciągnięciem i asystentem lądowania.
+- `F` w locie — wyskakujesz, otwiera się spadochron (sterowanie `W A S D`), a samolot bez pilota nurkuje i rozbija się.
+- Zderzenie z budynkiem albo twarde lądowanie to katastrofa: kula ognia przechodząca w dym, błysk, odłamki, płonący wrak, wstrząs kamery i huk. Pilot nie przeżywa. Po kilkunastu sekundach samolot wraca na lotnisko.
+
+### Menu debug (`` ` ``)
+
+Liczba aut i pieszych, pora dnia, nieśmiertelność, amunicja, teleporty (start, lotnisko, autostrada, zjazd, obwodnica), zmiana typu auta w trakcie jazdy i rower, kierunkowskazy, samolot na lotnisku albo od razu w powietrzu, dodawanie piratów i rowerzystów, szansa potrącenia rowerzysty, przełącznik LOD.
+
+![Ekran ładowania](screenshots/ladowanie.jpg)
+
+## Jak to jest zrobione
+
+- **Three.js r128** (grafika) i **cannon.js 0.6.2** (fizyka) z CDN, reszta to czysty JavaScript bez frameworków. Dźwięk syntezuje Web Audio, tekstury rysuje Canvas 2D.
+- 30 zwykłych skryptów ze wspólnym zakresem globalnym, ładowanych w kolejności z `loadorder.txt` (bez bundlera, więc gra działa z `file://`).
+- Geometria miasta scalana w kilkadziesiąt siatek (ok. 200 wywołań rysowania), statyczne kolizje w komórkach 48 m.
+- Auta NPC to ciała kinematyczne na trasach z punktów; skrzyżowania rozstrzygane wg czasu dojazdu, ronda, światła, kolejki, objazdy i zmiana pasa.
 
 ```
-index.html        strona, style i HUD
-loadorder.txt     kolejność ładowania skryptów (ważna!)
-js/               kod gry (30 plików ładowanych kolejno z index.html; hwy-plan.js — geometria autostrad, highways.js — ich budowa,
-                  car-types.js — typy aut i rower, districts.js — zabudowa dzielnic, airport.js — lotnisko, planes.js — samoloty i lot)
-test/             testy: harness, symulacja ruchu, jazda autem, skrypt bundle
+index.html        strona, style, HUD, ekran ładowania
+loadorder.txt     kolejność ładowania skryptów
+js/               kod gry (miasto, autostrady, lotnisko, auta, NPC, piesi, samoloty, HUD…)
+test/             testy w Node: harness, symulacja ruchu, jazda prawdziwym autem, bundle
+screenshots/      zrzuty do tego pliku
 ```
-
-Skrypty to zwykłe pliki (bez bundlera) ze wspólnym zakresem globalnym, więc ich kolejność ma znaczenie. Po dodaniu pliku zaktualizuj `loadorder.txt` i tagi `<script>` w `index.html`.
 
 ## Testy
 
+```bash
+npm install          # cannon@0.6.2 dla testu jazdy
+npm test             # harness (wszystkie skrypty w Node) + 300 s symulacji ruchu
+npm run test:drive   # jazda prawdziwym autem: autostrady, węzeł, zjazdy, kolizje, ronda, osiągi aut, zakaz rowerów (ok. 4 min)
+npm run bundle       # cała gra w jednym pliku gta-by-claude-single.html
 ```
-npm install          # instaluje cannon@0.6.2 potrzebny testowi jazdy
-npm test             # harness + symulacja ruchu NPC (nakładanie aut, zakleszczenia, ronda, piesi, przepisy, rowerzyści, piraci)
-RAM=1 node test/sim.js 600   # piraci zawsze próbują wjechać w mijanego rowerzystę (test potrąceń)
-npm run test:drive   # jazda prawdziwym autem: A1/A2, 8 skrętów węzła, 4 narożniki, ulica pod estakadą, kolizje, ronda, osiągi typów aut i roweru (ok. 4 min)
-npm run bundle       # skleja grę w jeden plik gta-by-claude-single.html
-```
 
-## Plany i ograniczenia
+Symulacja (`node test/sim.js <sekundy>`, `SEED=…`) sprawdza m.in. nakładanie się aut, zakleszczenia, auta w budynkach, ronda, pieszych, przepisy i znaki. Zmiany wizualne i lot samolotu są sprawdzane zrzutami z przeglądarki (Playwright).
 
-- Wnętrze miasta to nadal siatka ortogonalna, bez nieregularnych ulic (trasy NPC to stałe pętle, nie graf).
-- Auta NPC na zjazdach i wjazdach jeżdżą stałymi trasami, nie grafem dróg; wyprzedzanie tylko na prostych odcinkach jezdni głównej (bez węzła).
-- Pas podmiejski ma 125 m (zjazdy potrzebują tyle na zejście z 7 m do poziomu gruntu), a przęsła łącznic mają do ok. 64 m.
-- Auto NPC na estakadzie można ukraść tylko z pomostu (gracz musi stać na tym samym poziomie).
-- AI aut daleko od gracza liczone rzadziej (LOD), ale bez wyłączania; brak LOD modeli (pełne bryły także z daleka).
-- Objazd przeszkody tylko lewą stroną i poza skrzyżowaniami — przeszkoda w skrzyżowaniu albo zastawiająca całą jezdnię blokuje ruch.
-- Piesi nie chodzą alejkami parków (tylko chodnikami dookoła kwartałów).
-- Samoloty: uproszczony model lotu (bez wiatru, klap i chowania podwozia), brak samolotów NPC; samolot zderza się tylko ze statycznym światem (budynki, teren), nie z autami. Test lotu działa w przeglądarce (w Node `THREE` to atrapa).
-- Rowerzyści jeżdżą tylko pętlami bez rond; potrącenie przez pirata to rzadkie zdarzenie skryptowe, nie fizyka.
-- Ekran ładowania liczy wczytane pliki — w wersji z jednego pliku (`npm run bundle`) widać tylko biblioteki i koniec.
+## Ograniczenia
 
-## Technologie
-
-Three.js r128, cannon.js 0.6.2, Web Audio API, Canvas 2D. Czysty JavaScript, bez frameworków.
+- Ulice to siatka ortogonalna, a trasy NPC to stałe pętle, nie graf dróg.
+- Uproszczony model lotu (bez wiatru i klap), brak samolotów NPC; samolot zderza się z budynkami i terenem, nie z autami.
+- Piraci biorą zakręty kinematycznie (bez prawdziwego poślizgu); potrącenie rowerzysty to zdarzenie skryptowe.
+- AI dalekich aut liczone rzadziej, ale modele są pełne także z daleka.
+- Piesi nie chodzą alejkami parków.

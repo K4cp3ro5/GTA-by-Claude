@@ -9,7 +9,7 @@ Wszystko proceduralne (tekstury z `<canvas>`, modele z prymitywów, dźwięk z W
 - `node test/sim.js <s>` (env `SEED=…`, `RAM=1` = pirat zawsze próbuje wjechać w rowerzystę) — prawdziwa logika NPC i pieszych w Node: nakładanie aut (SAT, tylko |Δy| < 2,5), zakleszczenia, ronda, piesi, przepisy (limity, jednokierunkowe), kontrole statyczne (normalne buforów, znaki, autostrady: filary, prześwit, przęsła).
 - `npm run test:drive` (`test/drive.js`, ~4 min) — prawdziwy RaycastVehicle z cannon: przejazdy A1/A2, pętla, łącznica, zjazdy, ulica pod estakadą, bariera, kolizje (drzewo, słupek, mur), ronda.
 - `npm run bundle` — skleja grę w jeden plik HTML.
-- Zmiany wizualne sprawdzaj zrzutami Playwright (chromium + swiftshader, CDN podmieniony przez `page.route` na lokalne three/cannon, czekanie aż `#go` nie jest `disabled`). Geometrię i kolizje sprawdzaj liczbowo. Lot samolotu testuj w przeglądarce (w Node `THREE` to atrapa).
+- Zmiany wizualne sprawdzaj zrzutami Playwright (chromium + swiftshader, CDN podmieniony przez `page.route` na lokalne three/cannon, czekanie aż `#go` nie jest `disabled`). Geometrię i kolizje sprawdzaj liczbowo. Lot samolotu testuj w przeglądarce (w Node `THREE` to atrapa); kadry ze zrzutów zamrażaj pauzą (`gameStarted = true; pointerLocked = false` — klatka tylko renderuje).
 
 ## Architektura
 Brak bundlera: `index.html` ładuje zwykłe `<script>` w kolejności z `loadorder.txt` (harness sprawdza zgodność). Wszystkie pliki dzielą jeden zakres globalny; kod wykonywany przy starcie może używać tylko symboli z plików wcześniejszych.
@@ -37,7 +37,7 @@ Brak bundlera: `index.html` ładuje zwykłe `<script>` w kolejności z `loadorde
 | controls.js | klawisze (przebindowywalne, localStorage), mysz, menu |
 | sound.js | synteza dźwięku |
 | vehicle-entry.js | wsiadanie, wysiadanie, kradzież, atrapa głównego auta |
-| planes.js | samoloty (`PLANE_TYPES` jet/prop, `planes`): modele, ciało kinematyczne G_PLANE, `enterPlane`/`exitPlane`, lot `updatePlane` (W/S gaz, mysz = `planeStick`), katastrofa |
+| planes.js | samoloty (`PLANE_TYPES` jet/prop, `planes`): modele, ciało kinematyczne G_PLANE, `enterPlane`/`exitPlane`, lot `planeStep` (W/S gaz, strzałki = docelowe pochylenie/przechył, asystent lądowania), skok `bailOut` + `updateParachute`, samolot bez pilota (`p.free`), katastrofa `planeCrash` (efekty `fxList`/`updateFx`, wrak `wreckEmit`, `camShake`, `Sound.boom`; pilot ginie) |
 | daynight.js | cykl dobowy |
 | update-player.js / update-vehicle.js / update-npc.js | logika na klatkę |
 | camera.js / hud.js | kamera TPP / HUD, minimapa, mapa |
