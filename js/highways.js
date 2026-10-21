@@ -85,9 +85,28 @@ function wayAuxSeg(w, i){
   if (w.kind === 'col') return true;
   return w.kind === 'conn' && (i < w.auxIn - 1 || i >= w.pts.length - w.auxOut);
 }
+/* styki dróg (pętla z kolektorem, jezdnia z odcinkiem końcowym — pod kątem 1–2°): wspólny kierunek na styku,
+   żeby krawędzie końców obu płyt się pokrywały (inaczej między nimi zostawał klin, przez który od spodu widać niebo) */
+const HWY_JOIN = new Map();
+(function(){
+  const ends = [];
+  HWY_WAYS.forEach(w => { const P = w.pts, n = P.length; if (n < 2) return;
+    ends.push({ w: w, end: false, p: P[0], ox: P[0].x - P[1].x, oz: P[0].z - P[1].z });
+    ends.push({ w: w, end: true, p: P[n - 1], ox: P[n - 1].x - P[n - 2].x, oz: P[n - 1].z - P[n - 2].z }); });
+  ends.forEach(e => {
+    const o = ends.find(q => q.w !== e.w && Math.hypot(q.p.x - e.p.x, q.p.z - e.p.z) < 0.05 && Math.abs((q.p.y || 0) - (e.p.y || 0)) < 0.05 && Math.abs(q.p.hw - e.p.hw) < 0.05);
+    if (!o) return;
+    const la = Math.hypot(e.ox, e.oz) || 1, lb = Math.hypot(o.ox, o.oz) || 1;
+    let dx = e.ox / la - o.ox / lb, dz = e.oz / la - o.oz / lb; const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l;   // na zewnątrz e
+    if (!HWY_JOIN.has(e.w)) HWY_JOIN.set(e.w, {});
+    HWY_JOIN.get(e.w)[e.end ? 'end' : 'start'] = e.end ? { x: dx, z: dz } : { x: -dx, z: -dz };   // kierunek jazdy drogi e
+  });
+})();
 function buildWay(w){
-  const P = w.pts, n = P.length, isMed = w.kind === 'med', slab = HP.slab;
+  const P = w.pts, n = P.length, isMed = w.kind === 'med', slab = HP.slab, J = HWY_JOIN.get(w) || {};
   const R = P.map((p, i) => {
+    const f = i === 0 ? J.start : i === n - 1 ? J.end : null;
+    if (f) return { x: -f.z, z: f.x };
     const a = P[Math.max(0, i - 1)], b = P[Math.min(n - 1, i + 1)];
     const hx = b.x - a.x, hz = b.z - a.z, l = Math.hypot(hx, hz) || 1;
     return { x: -hz / l, z: hx / l };
@@ -114,7 +133,7 @@ function buildWay(w){
     sides.forEach(sd => {
       const s = sd[0];
       if (!isMed && s < 0 && (w.kind === 'cw' || w.kind === 'col')) return;          // wnętrze przekroju (pas rozdziału / jezdnia obok)
-      if (!isMed && s > 0 && w.kind === 'cw' && cwBarrierGap(w.name, (a.s + b.s) / 2)) return;   // styk z pasem obok / nosem
+      if (!isMed && s > 0 && w.kind === 'cw' && cwSideOpen(w.name, a.s, b.s)) return;   // styk z pasem obok / nosem (odcinek cały w przerwie — przy nosie ściana zostaje)
       if (!isMed && s < 0 && (wayAuxSeg(w, i) || (w.noBarL && w.noBarL.some(r => (a.d + b.d) / 2 > r[0] && (a.d + b.d) / 2 < r[1])))) return;
       const pa = s > 0 ? aR : aL, pb = s > 0 ? bR : bL;
       quadUV(hwConcBuf, [pa[0], sd[1], pa[1]], [pb[0], sd[2], pb[1]], [pb[0], yb, pb[1]], [pa[0], ya, pa[1]], [0,0],[1,0],[1,1],[0,1],

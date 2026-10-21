@@ -87,13 +87,13 @@ function spawnAirPlane(i){
   b.collisionFilterGroup = G_PLANE; b.collisionFilterMask = ~G_WORLD; b.isPlane = true;
   addBody(b);
   const r0 = NPC_RUNWAYS[i % NPC_RUNWAYS.length], st = rwPt(r0, -(r0.half - 15));
-  const a = { kind: kind, T: T, A: AIR_T[kind], group: m.group, prop: m.prop, body: b, pos: new THREE.Vector3(st.x, T.gear + 0.03, st.z),
+  const a = { kind: kind, T: T, A: AIR_T[kind], group: m.group, prop: m.prop, body: b, pos: { x: st.x, y: T.gear + 0.03, z: st.z },
     heading: Math.atan2(r0.ux, r0.uz), pitch: 0, bank: 0, alt: 0, v: 0, onGround: true, r0: r0, r1: null, state: 'wait', t: 4 + i * 20, path: null, _p: {} };
   airPlanes.push(a);
   if (!r0.busy) r0.busy = a;                                                       // czeka na progu: pas zajęty
   else {                                                                          // pas zajęty: start w powietrzu, 1.4 km od lotniska
     const th = i * 2.1 + 0.6, r1 = NPC_RUNWAYS[(i + 1) % NPC_RUNWAYS.length];
-    a.pos.set(r1.cx + Math.cos(th) * 1400, a.A.cruise, r1.cz + Math.sin(th) * 1400);
+    a.pos.x = r1.cx + Math.cos(th) * 1400; a.pos.y = a.A.cruise; a.pos.z = r1.cz + Math.sin(th) * 1400;
     a.heading = Math.atan2(r1.cx - a.pos.x, r1.cz - a.pos.z); a.onGround = false; a.alt = a.A.cruise; a.v = a.A.vC; a.r0 = null;
     airPlan(a, r1);
   }
@@ -112,10 +112,12 @@ function setAirCount(n){
   for (let i = airPlanes.length; i < n; i++) spawnAirPlane(i);
 }
 function airSync(a){
-  a.group.position.copy(a.pos);
+  a.group.position.set(a.pos.x, a.pos.y, a.pos.z);
   a.group.rotation.set(-a.pitch, a.heading, a.bank, 'YXZ');
   a.body.position.set(a.pos.x, a.pos.y, a.pos.z);
-  a.body.quaternion.setFromEuler(-a.pitch, a.heading, a.bank, 'YXZ');
+  /* kwaternion Euler YXZ (x = −pochylenie, y = kurs, z = przechył) liczony ręcznie — bez zależności od THREE/CANNON */
+  const c1 = Math.cos(-a.pitch / 2), s1 = Math.sin(-a.pitch / 2), c2 = Math.cos(a.heading / 2), s2 = Math.sin(a.heading / 2), c3 = Math.cos(a.bank / 2), s3 = Math.sin(a.bank / 2), q = a.body.quaternion;
+  q.x = s1 * c2 * c3 + c1 * s2 * s3; q.y = c1 * s2 * c3 - s1 * c2 * s3; q.z = c1 * c2 * s3 - s1 * s2 * c3; q.w = c1 * c2 * c3 + s1 * s2 * s3;
 }
 /* czy pas wolny dla startu: inny samolot NPC, gracz, auto */
 function airRunwayClear(r, a){
@@ -164,7 +166,7 @@ function updateAirTraffic(dt){
     }
     airSync(a);
     /* zderzenie z samolotem gracza w powietrzu */
-    if (mode === 'plane' && curPlane && !curPlane.onGround && !(curPlane.wreckT > 0) && a.pos.distanceTo(curPlane.pos) < a.T.half[2] + curPlane.T.half[2] * 0.6){
+    if (mode === 'plane' && curPlane && !curPlane.onGround && !(curPlane.wreckT > 0) && Math.hypot(a.pos.x - curPlane.pos.x, a.pos.y - curPlane.pos.y, a.pos.z - curPlane.pos.z) < a.T.half[2] + curPlane.T.half[2] * 0.6){
       hudToast('Zderzenie w powietrzu!', 2.5); planeCrash(curPlane);
     }
   }

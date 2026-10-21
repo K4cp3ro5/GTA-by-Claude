@@ -38,6 +38,7 @@ function frame(now){
   let dt = (now - last) / 1000;
   last = now;
   if (dt > 0.1) dt = 0.1;
+  dt *= gameSpeed;                             // tempo gry (menu deweloperskie)
   /* pauza: menu otwarte klawiszem Esc po starcie gry (debug menu nie zatrzymuje świata) — tylko render */
   if (gameStarted && !pointerLocked && !debugOpen){ renderer.render(scene, camera); return; }
   clock += dt;
@@ -45,8 +46,7 @@ function frame(now){
 
   updateSky(dt);
   updateTrafficLights(dt);
-  updateNpcs(dt);
-  updatePedestrians(dt);
+  if (!npcFrozen){ updateNpcs(dt); updatePedestrians(dt); }   // menu deweloperskie: „zatrzymaj ruch”
   const carState = updateCar(dt);
   const planeKmh = mode === 'plane' ? updatePlane(dt) : 0;
   updatePlanesIdle(dt);

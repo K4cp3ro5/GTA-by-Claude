@@ -34,7 +34,7 @@ function makeBoat(s, color, i){
   b.addShape(new CANNON.Box(new CANNON.Vec3(BOAT_T.beam / 2, 0.5, BOAT_T.len / 2)));
   b.collisionFilterGroup = G_CAR; b.collisionFilterMask = ~G_WORLD; b.isBoat = true;
   addBody(b);
-  const bt = { spec: s, group: m.group, wake: m.wake, body: b, pos: new THREE.Vector3(s.x, WATER_Y, s.z), heading: s.heading, v: 0, thr: 0, phase: i * 1.7, roll: 0, npc: null };
+  const bt = { spec: s, group: m.group, wake: m.wake, body: b, pos: { x: s.x, y: WATER_Y, z: s.z }, heading: s.heading, v: 0, thr: 0, phase: i * 1.7, roll: 0, npc: null };
   boats.push(bt);
   syncBoat(bt, 0);
   return bt;

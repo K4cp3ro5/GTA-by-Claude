@@ -252,11 +252,13 @@ const Sound = {
   }
 };
 
+let _crashT = -9, _crashD = 0;
 /* dźwięk uderzenia karoserii + obrażenia od kraksy + potrącenie pieszego */
 chassisBody.addEventListener('collide', e => {
   const v = e.contact ? Math.abs(e.contact.getImpactVelocityAlongNormal()) : 0;
   if (v > 3.2) Sound.thud(v);
-  if (mode === 'car' && v > 10) damagePlayer((v - 10) * 4, 'kraksa');
+  /* obrażenia raz na kraksę (kilka kształtów naraz = kilka zdarzeń): najmocniejsze uderzenie w oknie 0.4 s */
+  if (mode === 'car' && v > 11){ const d = (v - 11) * 3.6; if (clock - _crashT > 0.4){ _crashT = clock; _crashD = 0; } if (d > _crashD){ damagePlayer(d - _crashD, 'kraksa'); _crashD = d; } }
   if (e.body && e.body.isPed && v > 2.2) Pedestrians.hit(e.body.pedRef, v);   // body.pedRef = obiekt pieszego (samo ciało nie ma group/state)
   if (e.body && e.body.npcRef && v > 5.6) npcHitByPlayer(e.body.npcRef, v);    // > 20 km/h: NPC staje ze światłami awaryjnymi
 });

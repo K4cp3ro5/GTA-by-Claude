@@ -23,7 +23,7 @@ function updateCamera(dt, kmh){
     camera.position.copy(camCur);
     camera.lookAt(b.pos.x + Math.sin(b.heading) * 6, WATER_Y + 1.2, b.pos.z + Math.cos(b.heading) * 6);
     camFov = damp(camFov, 66 + clamp(kmh / 60, 0, 1) * 8, 2, dt);
-    if (Math.abs(camera.fov - camFov) > 0.01){ camera.fov = camFov; camera.updateProjectionMatrix(); }
+    if (Math.abs(camera.fov - camFov - fovAdd) > 0.01){ camera.fov = camFov + fovAdd; camera.updateProjectionMatrix(); }
     sun.target.position.set(b.pos.x, 0, b.pos.z);
     sun.position.set(b.pos.x + lightDir.x * 95, lightDir.y * 95 + 2, b.pos.z + lightDir.z * 95);
     camYaw = h + Math.PI;
@@ -41,7 +41,7 @@ function updateCamera(dt, kmh){
     camera.position.copy(camCur);
     _cpL.copy(p.pos).addScaledVector(_cpF, planeCamYaw ? 0 : 25); camera.lookAt(_cpL);
     camFov = damp(camFov, 70 + clamp(kmh / 400, 0, 1) * 10, 2, dt);
-    if (Math.abs(camera.fov - camFov) > 0.01){ camera.fov = camFov; camera.updateProjectionMatrix(); }
+    if (Math.abs(camera.fov - camFov - fovAdd) > 0.01){ camera.fov = camFov + fovAdd; camera.updateProjectionMatrix(); }
     sun.target.position.set(p.pos.x, 0, p.pos.z);
     sun.position.set(p.pos.x + lightDir.x * 95, lightDir.y * 95 + 2, p.pos.z + lightDir.z * 95);
     camYaw = Math.atan2(-_cpF.x, -_cpF.z);
@@ -110,8 +110,8 @@ function updateCamera(dt, kmh){
   lookAt.y += mode === 'car' ? 0.35 : 0.30;
   camera.lookAt(lookAt);
 
-  if (Math.abs(camera.fov - camFov) > 0.01){
-    camera.fov = camFov;
+  if (Math.abs(camera.fov - camFov - fovAdd) > 0.01){
+    camera.fov = camFov + fovAdd;
     camera.updateProjectionMatrix();
   }
 

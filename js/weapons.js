@@ -13,6 +13,7 @@ const WEAPON_DEFS = [
   { id:'rifle',  name:'Karabin',  kind:'ranged', range:160, dmg:28, cooldown:0.095, magSize:30, reserve0:150, reloadT:1.8, spread:0.008, kick:0.011, bloom:0.22, muzzle:0.8, auto:true }
 ];
 const weaponRay = new THREE.Raycaster();
+let infAmmo = false;                                                            // menu deweloperskie
 
 /* modele w układzie „naturalnym” (lufa +Z, góra +Y, dłoń na chwycie w 0,0,0); broń palna wisi na osobnym przegubie
    przed klatką piersiową postaci (gunPivot), pochylonym wg celowania — ręce sięgają do chwytu i łoża */
@@ -132,7 +133,7 @@ const Weapons = {
     }
     const a = this.ammo[d.id];
     if (a.mag <= 0){ this.reload(); return; }
-    a.mag--;
+    if (!infAmmo) a.mag--;
     this.recoil = 1;
     this.cooldown = d.cooldown;
     Sound.shoot(d.id === 'rifle');
