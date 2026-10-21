@@ -656,8 +656,8 @@ function updatePark(dt){
     let yy = 2;
     if (cyc < 0.4) yy = 2 + (top - 2) * smooth01(cyc / 0.4);
     else if (cyc < 0.5) yy = top;
-    else if (cyc < 0.555){ const k = (cyc - 0.5) / 0.055; yy = top - (top - 10) * k * k; }
-    else if (cyc < 0.62){ const k = (cyc - 0.555) / 0.065; yy = 10 - 8 * smooth01(k); }
+    else if (cyc < 0.592){ const k = (cyc - 0.5) / 0.092; yy = top - (top - 10) * k * k; }       // swobodny spadek ~2.8 s (≈ 98 km/h)
+    else if (cyc < 0.62){ const k = (cyc - 0.592) / 0.028; yy = 10 - 8 * (1 - (1 - k) * (1 - k)); }   // hamowanie magnetyczne
     T.v = dt > 0 ? (yy - T.ring.position.y) / dt : 0;
     T.ring.position.y = yy;
   }
