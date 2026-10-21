@@ -139,6 +139,22 @@ const Sound = {
     g.gain.setValueAtTime(0.025, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.025);
     o.connect(g); g.connect(this.master); o.start(t); o.stop(t + 0.03);
   },
+  /* wybuch: niski spadający ton + szum przez filtr dolnoprzepustowy zamykający się w ~2.5 s (s: 0..1 — siła i odległość) */
+  boom(s){
+    if (!this.ready) return;
+    const ctx = this.ctx, t = ctx.currentTime;
+    const o = ctx.createOscillator(), og = ctx.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(90, t); o.frequency.exponentialRampToValueAtTime(28, t + 1.2);
+    og.gain.setValueAtTime(0.55 * s, t); og.gain.exponentialRampToValueAtTime(0.0001, t + 1.4);
+    o.connect(og); og.connect(this.master); o.start(t); o.stop(t + 1.5);
+    for (let k = 0; k < 3; k++){                                             // trzask + dudnienie (3 nakładające się warstwy szumu)
+      const src = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain(), t0 = t + k * 0.09;
+      src.buffer = this.noise; src.loop = true;
+      f.type = 'lowpass'; f.frequency.setValueAtTime(k ? 900 : 4000, t0); f.frequency.exponentialRampToValueAtTime(80, t0 + 2.4);
+      g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime((k ? 0.35 : 0.5) * s, t0 + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t0 + 2.6);
+      src.connect(f); f.connect(g); g.connect(this.master); src.start(t0); src.stop(t0 + 2.7);
+    }
+  },
   thud(strength){
     if (!this.ready) return;
     const ctx = this.ctx, t = ctx.currentTime;

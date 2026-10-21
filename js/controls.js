@@ -130,9 +130,9 @@ document.addEventListener('mousemove', e => {
     wheelVY += e.movementY;
     return;
   }
-  if (mode === 'plane'){                                                     // mysz = drążek (wychylenie, wraca powoli do środka)
-    planeStick.x = clamp(planeStick.x + e.movementX * 0.0035, -1, 1);
-    planeStick.y = clamp(planeStick.y + e.movementY * 0.0035, -1, 1);
+  if (mode === 'plane'){                                                     // samolot sterowany strzałkami — mysz tylko obraca kamerę
+    planeCamYaw = clamp(planeCamYaw - e.movementX * 0.003, -2.6, 2.6);
+    if (Math.abs(e.movementX) > 1.5) lastMouseMove = clock;
     return;
   }
   const s = 0.0022;

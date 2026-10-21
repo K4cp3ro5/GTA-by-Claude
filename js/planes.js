@@ -1,17 +1,17 @@
 /* ---------------------------------------------------------------
    14b. SAMOLOTY — odrzutowiec i awionetka z lotniska (AIRPORT_PLANES): modele, wsiadanie, lot.
-   Model lotu zręcznościowy: ciąg (gaz W/S) i opór ~v², grawitacja wzdłuż pochylenia, poniżej
-   prędkości przeciągnięcia samolot opada i opuszcza nos; drążek = mysz (wychylenie wraca powoli do
-   środka), przechył daje zakręt skoordynowany, A/D = ster kierunku (na ziemi: kołowanie), Spacja =
-   hamulce kół. Ziemia z raycastu, zderzenie z budynkiem / twarde przyziemienie = katastrofa
-   (samolot wraca na lotnisko po kilku sekundach). Każdy samolot ma ciało kinematyczne (kadłub +
+   Model lotu zręcznościowy: ciąg (gaz W/S) i opór ~v², grawitacja wzdłuż pochylenia; strzałki ustawiają
+   docelowe pochylenie i przechył (puszczone — lot poziomy), przechył daje zakręt, asystent lądowania przy
+   małym gazie, A/D = kołowanie, Spacja = hamulce. F w locie = skok ze spadochronem (samolot bez pilota
+   nurkuje). Zderzenie z budynkiem / twarde przyziemienie = katastrofa (wybuch, odłamki, dym, płonący
+   wrak; pilot ginie), samolot wraca na lotnisko po kilkunastu sekundach. Każdy samolot ma ciało kinematyczne (kadłub +
    skrzydła), więc stojący na płycie jest przeszkodą dla aut i gracza.
    --------------------------------------------------------------- */
 const G_PLANE = 16;
 const PLANE_TYPES = {
-  jet:  { name: 'Odrzutowiec', thrust: 7.5, vMax: 92, vStall: 50, vRot: 54, pitchRate: 0.55, rollRate: 1.1, yawGround: 0.42,
+  jet:  { name: 'Odrzutowiec', thrust: 7.5, vMax: 92, vStall: 40, vRot: 45, pitchRate: 0.55, rollRate: 1.1, yawGround: 0.42,
           gear: 2.35, camDist: 36, camH: 9, gauge: 360, half: [1.7, 1.8, 14.5], wing: [12.5, 0.25, 2.6], door: [-2.6, 8.5] },
-  prop: { name: 'Awionetka', thrust: 5.0, vMax: 62, vStall: 24, vRot: 27, pitchRate: 1.0, rollRate: 2.0, yawGround: 0.8,
+  prop: { name: 'Awionetka', thrust: 5.0, vMax: 62, vStall: 20, vRot: 23, pitchRate: 1.0, rollRate: 2.0, yawGround: 0.8,
           gear: 1.4, camDist: 15, camH: 4, gauge: 240, half: [0.8, 1.0, 4.3], wing: [5.6, 0.12, 0.9], door: [-1.5, 0.6] }
 };
 const _planeMat = new THREE.MeshPhongMaterial({ vertexColors: true, shininess: 60, specular: 0x333333 });
@@ -117,7 +117,7 @@ function resetPlane(p){
   const T = p.T, s = p.spec;
   p.pos.set(s.x, planeGroundY(s.x, s.z, 30) + T.gear, s.z);
   p.quat.setFromEuler(_pE.set(0, s.heading, 0, 'YXZ'));
-  p.v = 0; p.vy = 0; p.thr = 0; p.onGround = true; p.wreckT = 0;
+  p.v = 0; p.vy = 0; p.thr = 0; p.onGround = true; p.wreckT = 0; p.free = false; p.agl = undefined; p.wreck = null;
   p.group.visible = true;
   if (!p.bodyIn){ addBody(p.body); p.bodyIn = true; }
   syncPlane(p);
@@ -146,19 +146,23 @@ function planeDoorPoint(p, out){
   return out;
 }
 
-/* --- wsiadanie / wysiadanie --- */
+/* --- wsiadanie / wysiadanie, skok ze spadochronem --- */
 let curPlane = null;
-const planeStick = { x: 0, y: 0 };
-const planeKeysHelp = 'W / S — gaz, mysz — drążek, A / D — ster, Spacja — hamulce, F — wysiądź (na ziemi)';
+const planeKeysHelp = 'W / S — gaz · ↑ / ↓ — w górę / w dół · ← / → — skręt · A / D — kołowanie · Spacja — hamulce · F — wysiadka (w locie: spadochron)';
 function enterPlane(p){
-  curPlane = p; mode = 'plane';
+  curPlane = p; mode = 'plane'; p.free = false;
   player.mesh.visible = false; delBody(player.body);
-  planeStick.x = planeStick.y = 0;
-  hudToast(p.T.name + ': ' + planeKeysHelp, 4.5);
+  planeCamYaw = 0;
+  hudToast(p.T.name + ': ' + planeKeysHelp, 6);
+  setTimeout(() => { if (curPlane === p) hudToast('Lądowanie: nad pasem zdejmij gaz (S) i puść strzałki — samolot sam łagodnie przyziemi', 5); }, 6500);
 }
 function exitPlane(force){
   const p = curPlane; if (!p) return;
-  if (!force && (!p.onGround || p.v > 3)){ hudToast('Wyląduj i zatrzymaj się, żeby wysiąść'); return; }
+  if (!force && (!p.onGround || p.v > 3)){
+    if (p.onGround) { hudToast('Zatrzymaj się, żeby wysiąść'); return; }
+    if ((p.agl || 0) < 15){ hudToast('Za nisko na skok — wyląduj'); return; }
+    return bailOut(p);
+  }
   const d = planeDoorPoint(p, { x: 0, y: 0, z: 0 });
   mode = 'foot'; curPlane = null;
   player.mesh.visible = true;
@@ -166,19 +170,164 @@ function exitPlane(force){
   player.body.velocity.set(0, 0, 0); player.body.wakeUp(); addBody(player.body);
   Sound.engine(false, 0, 0);
 }
-
-/* --- wybuch (katastrofa) --- */
-const _boomMat = new THREE.MeshBasicMaterial({ color: 0xff8a2a, transparent: true, opacity: 0.9 }), booms = [];
-function planeCrash(p){
-  const m = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), _boomMat.clone());
-  m.position.copy(p.pos); scene.add(m); booms.push({ m: m, t: 0 });
-  Sound.thud(40);
-  if (curPlane === p){ exitPlane(true); damagePlayer(65, 'katastrofa'); }
-  p.group.visible = false; if (p.bodyIn){ delBody(p.body); p.bodyIn = false; }
-  p.wreckT = 8;
+/* skok: gracz pod kadłubem, spadochron otwiera się po ~0.7 s; samolot leci dalej bez pilota (nurkuje i się rozbija) */
+const _paraMat = new THREE.MeshLambertMaterial({ color: 0xe8701c, side: THREE.DoubleSide }), _paraMat2 = new THREE.MeshLambertMaterial({ color: 0xf2f0ea, side: THREE.DoubleSide });
+function buildParachute(){
+  const g = new THREE.Group();
+  for (let k = 0; k < 8; k++){                                                // czasza z 8 klinów (na przemian pomarańczowe / białe)
+    const geo = new THREE.SphereGeometry(3.4, 4, 6, k * Math.PI / 4, Math.PI / 4, 0, Math.PI * 0.42);
+    const m = new THREE.Mesh(geo, k % 2 ? _paraMat2 : _paraMat); m.scale.y = 0.55; m.castShadow = true; g.add(m);
+  }
+  const lineGeo = new THREE.BoxGeometry(0.03, 1, 0.03), lineMat = new THREE.MeshBasicMaterial({ color: 0x2a2a2a });
+  for (let k = 0; k < 6; k++){                                                // linki do uprzęży
+    const a = k / 6 * TAU, ex = Math.cos(a) * 3.1, ez = Math.sin(a) * 3.1, ey = 1.2;
+    const l = new THREE.Mesh(lineGeo, lineMat), len = Math.hypot(ex, ey + 4.6, ez);
+    l.scale.y = len; l.position.set(ex / 2, (ey - 4.6) / 2, ez / 2);
+    l.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(ex, ey + 4.6, ez).normalize());
+    g.add(l);
+  }
+  g.visible = false; scene.add(g);
+  return g;
+}
+const parachute = { on: false, t: 0, mesh: null };
+function bailOut(p){
+  _pR.set(1, 0, 0).applyQuaternion(p.quat); _pF.set(0, 0, 1).applyQuaternion(p.quat);
+  mode = 'foot'; curPlane = null;
+  p.free = true; p.freeTurn = rand(-0.6, 0.6);
+  player.mesh.visible = true;
+  player.body.position.set(p.pos.x + _pR.x * (p.T.wing[0] * 0.3), p.pos.y - p.T.half[1] - 3, p.pos.z + _pR.z * (p.T.wing[0] * 0.3));
+  player.body.velocity.set(_pF.x * p.v * 0.3, Math.min(0, p.vy), _pF.z * p.v * 0.3);
+  player.body.wakeUp(); addBody(player.body);
+  player.fallSpeed = 0;
+  if (!parachute.mesh) parachute.mesh = buildParachute();
+  parachute.on = true; parachute.t = 0; parachute.mesh.visible = false;
+  Sound.engine(false, 0, 0);
+  hudToast('Skok! Spadochron otwiera się… W / A / S / D — sterowanie', 3.5);
+}
+function updateParachute(dt){
+  if (!parachute.on) return;
+  const b = player.body, m = parachute.mesh;
+  parachute.t += dt;
+  if (player.dead || mode !== 'foot'){ parachute.on = false; m.visible = false; return; }
+  const open = parachute.t > 0.7;
+  if (open){
+    m.visible = true;
+    const s = Math.min(1, (parachute.t - 0.7) / 0.5);                         // czasza rozwija się w 0.5 s
+    m.scale.set(0.3 + 0.7 * s, 0.3 + 0.7 * s, 0.3 + 0.7 * s);
+    if (b.velocity.y < -5) b.velocity.y = damp(b.velocity.y, -5, 7, dt);       // opadanie ~5 m/s
+    /* sterowanie: W/A/S/D względem kamery, do 6 m/s */
+    const fx = -Math.sin(camYaw), fz = -Math.cos(camYaw), rx = Math.cos(camYaw), rz = -Math.sin(camYaw);
+    const iz = (down('forward') ? 1 : 0) - (down('back') ? 1 : 0), ix = (down('right') ? 1 : 0) - (down('left') ? 1 : 0);
+    const tx = (fx * iz + rx * ix) * 6, tz = (fz * iz + rz * ix) * 6;
+    b.velocity.x = damp(b.velocity.x, tx, 1.2, dt); b.velocity.z = damp(b.velocity.z, tz, 1.2, dt);
+    player.fallSpeed = Math.min(player.fallSpeed, 6);                           // bez obrażeń od upadku
+    m.position.set(b.position.x, b.position.y + 4.6, b.position.z);
+    m.rotation.set(Math.sin(parachute.t * 1.3) * 0.06, camYaw, Math.sin(parachute.t * 1.7) * 0.05);
+  }
+  if (parachute.t > 1.2 && player.grounded){ parachute.on = false; m.visible = false; hudToast('Wylądowano'); }
 }
 
-/* --- lot --- */
+/* --- katastrofa: kula ognia, błysk, odłamki, dym, płonący wrak, wstrząs kamery, huk --- */
+const _fxSphere = new THREE.SphereGeometry(1, 14, 10), _fxBox = new THREE.BoxGeometry(1, 1, 1);
+const _wreckMat = new THREE.MeshLambertMaterial({ vertexColors: true, color: 0x2b2724 });
+const fxList = [], _smokeCol = new THREE.Color(0x2e2a28);                                                            // { kind, m, t, life, … }
+function fxAdd(o){ fxList.push(o); return o; }
+function planeCrash(p){
+  const T = p.T, at = p.pos.clone(), gy = planeGroundY(at.x, at.z, at.y + 2), big = p.kind === 'jet' ? 1 : 0.55;
+  const pilot = curPlane === p;
+  /* wybuch: jądro (biało-żółte), ogień (pomarańczowy), kilka kul z opóźnieniem */
+  fxAdd({ kind: 'ball', m: fxMesh(0xffe08a, 0.9, true), t: 0, life: 0.35, at: at.clone(), r0: 2 * big, r1: 10 * big });
+  fxAdd({ kind: 'ball', m: fxMesh(0xff7a1a, 0.95, false), t: 0, life: 1.6, at: at.clone(), r0: 3 * big, r1: 18 * big, smoke: true });
+  for (let k = 0; k < 9; k++) fxAdd({ kind: 'ball', m: fxMesh([0xffa52a, 0xe0461a, 0xffc94a][k % 3], 0.95, false), t: -k * 0.1, life: rand(1.2, 1.8), r0: 2 * big, r1: rand(6, 12) * big, smoke: true,
+    at: at.clone().add(new THREE.Vector3(rand(-8, 8), rand(0, 6), rand(-8, 8)).multiplyScalar(big)) });
+  const light = new THREE.PointLight(0xffa040, 8, 160 * big); light.position.copy(at); light.position.y += 4; scene.add(light);
+  fxAdd({ kind: 'light', m: light, t: 0, life: 1.6 });
+  /* odłamki w kolorach samolotu: lot balistyczny, odbicie od ziemi */
+  const cols = [0xe9eaec, 0xe9eaec, 0xb9bec6, 0x262a30, p.spec.livery || 0x1a4fa0];
+  for (let k = 0; k < Math.round(16 * big + 6); k++){
+    const mat = new THREE.MeshLambertMaterial({ color: cols[k % cols.length] }), m = new THREE.Mesh(_fxBox, mat);
+    m.scale.set(rand(0.3, 1.6) * big + 0.2, rand(0.1, 0.4), rand(0.4, 2.2) * big + 0.2); m.position.copy(at); m.castShadow = true; scene.add(m);
+    const a = rand(0, TAU), sp = rand(8, 26) * (0.6 + big * 0.4);
+    fxAdd({ kind: 'debris', m: m, t: 0, life: 14, v: new THREE.Vector3(Math.cos(a) * sp, rand(6, 22), Math.sin(a) * sp), w: new THREE.Vector3(rand(-6, 6), rand(-6, 6), rand(-6, 6)), gy: gy });
+  }
+  /* wrak: przyciemniony model na ziemi, przechylony; płomienie i dym przez cały czas wraku */
+  p.free = false;
+  p.wreck = { y: gy + T.gear * 0.45, fire: 0, smoke: 0 };
+  p.pos.set(at.x, p.wreck.y, at.z);
+  _pF.set(0, 0, 1).applyQuaternion(p.quat);
+  p.quat.setFromEuler(_pE.set(0.12, Math.atan2(_pF.x, _pF.z), rand(-0.35, 0.35), 'YXZ'));
+  p.group.children[0].material = _wreckMat; if (p.prop) p.prop.visible = false;
+  p.group.position.copy(p.pos); p.group.quaternion.copy(p.quat);
+  if (p.bodyIn){ delBody(p.body); p.bodyIn = false; }
+  p.v = 0; p.vy = 0; p.thr = 0; p.wreckT = 14;
+  /* dźwięk i wstrząs (słabszy z daleka) */
+  const cam = camera.position, dist = Math.hypot(cam.x - at.x, cam.y - at.y, cam.z - at.z);
+  Sound.boom(clamp(1 - dist / 600, 0.15, 1) * (0.6 + big * 0.4));
+  camShake = Math.max(camShake, clamp(1.6 - dist / 120, 0, 1.6) * big + (pilot ? 0.6 : 0));
+  /* pilot w środku — ginie */
+  if (pilot){ exitPlane(true); player.mesh.visible = false; damagePlayer(1000, 'katastrofa'); hudToast('Katastrofa — pilot nie przeżył', 3); }
+}
+function fxMesh(color, opacity, add){
+  const m = new THREE.Mesh(_fxSphere, new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: opacity, depthWrite: false, blending: add ? THREE.AdditiveBlending : THREE.NormalBlending }));
+  m.visible = false; scene.add(m); return m;
+}
+function fxRemove(i){
+  const f = fxList[i]; scene.remove(f.m);
+  if (f.m.material) f.m.material.dispose();
+  fxList.splice(i, 1);
+}
+function updateFx(dt){
+  for (let i = fxList.length - 1; i >= 0; i--){
+    const f = fxList[i]; f.t += dt;
+    if (f.t < 0) continue;
+    const k = f.t / f.life;
+    if (k >= 1){ fxRemove(i); continue; }
+    if (f.kind === 'ball'){
+      f.m.visible = true; f.m.position.copy(f.at); f.m.position.y += f.t * 3;
+      f.m.scale.setScalar(f.r0 + (f.r1 - f.r0) * Math.sqrt(k)); f.m.material.opacity = 0.95 * (1 - k * k);
+      if (f.smoke){ if (!f.c0) f.c0 = f.m.material.color.clone(); f.m.material.color.copy(f.c0).lerp(_smokeCol, clamp((k - 0.35) / 0.5, 0, 1)); }   // ogień przechodzi w dym
+    } else if (f.kind === 'light'){
+      f.m.intensity = 8 * (1 - k) * (0.85 + Math.random() * 0.3);
+    } else if (f.kind === 'debris'){
+      const m = f.m;
+      if (!f.rest){
+        f.v.y -= 9.81 * dt; m.position.addScaledVector(f.v, dt);
+        m.rotation.x += f.w.x * dt; m.rotation.y += f.w.y * dt; m.rotation.z += f.w.z * dt;
+        if (m.position.y < f.gy + 0.15){ m.position.y = f.gy + 0.15; f.v.y *= -0.3; f.v.x *= 0.5; f.v.z *= 0.5; f.w.multiplyScalar(0.5);
+          if (Math.abs(f.v.y) < 1.5){ f.rest = true; m.rotation.x = 0; m.rotation.z = 0; } }
+      }
+      if (k > 0.85) m.scale.multiplyScalar(1 - dt * 2);
+    } else if (f.kind === 'smoke'){
+      f.m.visible = true; f.m.position.y += dt * f.rise; f.m.position.x += dt * 1.2;
+      f.m.scale.setScalar(f.r0 + f.t * 2.2); f.m.material.opacity = 0.45 * Math.min(1, f.t * 3) * (1 - k);
+    } else if (f.kind === 'flame'){
+      f.m.visible = true; f.m.scale.set(f.r * (0.8 + Math.random() * 0.4), f.r * (1.3 + Math.random() * 0.8), f.r * (0.8 + Math.random() * 0.4));
+      f.m.material.opacity = 0.85 * (1 - k);
+    }
+  }
+}
+/* tlący się wrak: dym (ciemne kule unoszące się i rosnące) i języki ognia */
+function wreckEmit(p, dt){
+  const w = p.wreck; if (!w) return;
+  const big = p.kind === 'jet' ? 1 : 0.55, burn = p.wreckT > 4;
+  w.smoke -= dt; w.fire -= dt;
+  if (w.smoke <= 0){
+    w.smoke = 0.18;
+    const s = fxMesh(burn ? 0x2b2b2d : 0x55575a, 0.45, false);
+    s.position.set(p.pos.x + rand(-4, 4) * big, p.pos.y + 1, p.pos.z + rand(-4, 4) * big);
+    fxAdd({ kind: 'smoke', m: s, t: 0, life: rand(4, 6), rise: rand(3, 5), r0: rand(1.5, 2.5) * big });
+  }
+  if (burn && w.fire <= 0){
+    w.fire = 0.12;
+    const f = fxMesh(Math.random() < 0.5 ? 0xff7a1a : 0xffb030, 0.85, true);
+    f.position.set(p.pos.x + rand(-6, 6) * big, p.pos.y + rand(0, 1.5), p.pos.z + rand(-6, 6) * big);
+    fxAdd({ kind: 'flame', m: f, t: 0, life: 0.6, r: rand(1, 2.2) * big });
+  }
+}
+
+/* --- lot (sterowanie zręcznościowe): ↑/↓ = docelowe pochylenie, ←/→ = docelowy przechył (puszczone — samolot
+   wraca do lotu poziomego), zakręt z przechyłu, ochrona przed przeciągnięciem, asystent lądowania: bez strzałek,
+   gaz < 35% i < 35 m nad ziemią — łagodne zniżanie, tuż nad ziemią wyrównanie i opadanie ~1.5 m/s --- */
 const _rayFrom = new CANNON.Vec3(), _rayTo = new CANNON.Vec3(), _pRes = new CANNON.RaycastResult(), _pRay = new CANNON.Ray();
 function planeSweepHit(a, b){
   _pRes.reset(); _pRay.from.set(a.x, a.y, a.z); _pRay.to.set(b.x, b.y, b.z);
@@ -186,71 +335,83 @@ function planeSweepHit(a, b){
   return _pRes.hasHit ? _pRes : null;
 }
 const _pNew = new THREE.Vector3(), _pNose = new THREE.Vector3();
-function updatePlane(dt){
-  const p = curPlane; if (!p) return 0;
+/* jeden krok lotu samolotu p; inp = { thr: −1|0|1, pitch: −1..1, turn: −1..1 (+ w prawo), rud: −1..1 (+ w lewo), brake } ; false = rozbił się */
+function planeStep(p, dt, inp){
   const T = p.T, g = 9.81;
-  if (down('forward')) p.thr = Math.min(1, p.thr + dt * 0.45);
-  if (down('back')) p.thr = Math.max(0, p.thr - dt * 0.6);
-  planeStick.x = approach(planeStick.x, 0, dt * 0.3); planeStick.y = approach(planeStick.y, 0, dt * 0.3);   // drążek powoli wraca do środka
-  const rud = (down('left') ? 1 : 0) - (down('right') ? 1 : 0), brake = down('jump');
+  if (inp.thr > 0) p.thr = Math.min(1, p.thr + dt * 0.45);
+  if (inp.thr < 0) p.thr = Math.max(0, p.thr - dt * 0.6);
   _pF.set(0, 0, 1).applyQuaternion(p.quat); _pR.set(1, 0, 0).applyQuaternion(p.quat);
-  const pitch = Math.asin(clamp(_pF.y, -1, 1)), roll = Math.asin(clamp(_pR.y, -1, 1));   // roll > 0: prawe skrzydło w górze (przechył w lewo)
-  /* prędkość: ciąg − opór − składowa ciężaru; na ziemi opór toczenia i hamulce */
+  let pitch = Math.asin(clamp(_pF.y, -1, 1)), bank = Math.asin(clamp(_pR.y / Math.max(0.2, Math.cos(pitch)), -1, 1)), h = Math.atan2(_pF.x, _pF.z);
+  /* prędkość: ciąg − opór − składowa ciężaru; na ziemi opór toczenia, hamulce i hamowanie aerodynamiczne bez gazu */
   let a = T.thrust * p.thr - T.thrust / (T.vMax * T.vMax) * p.v * p.v - g * Math.sin(pitch);
-  if (p.onGround) a -= 0.25 + (brake ? 6 : 0);
+  if (p.onGround) a -= 0.25 + (inp.brake ? 9 : 0) + (p.thr < 0.05 && p.v > 5 ? 1.5 : 0);
   p.v = Math.max(0, p.v + a * dt);
-  const lift = clamp((p.v - T.vStall * 0.75) / (T.vStall * 0.25), 0, 1), eff = clamp(p.v / T.vStall, 0.15, 1);
-  const rotLocal = (axis, ang) => { _pAxis.copy(axis).applyQuaternion(p.quat); _pQ.setFromAxisAngle(_pAxis, ang); p.quat.premultiply(_pQ); };
-  const X = new THREE.Vector3(1, 0, 0), Yl = new THREE.Vector3(0, 1, 0), Z = new THREE.Vector3(0, 0, 1);
+  const lift = clamp((p.v - T.vStall * 0.75) / (T.vStall * 0.25), 0, 1), eff = clamp(p.v / T.vStall, 0.3, 1), agl = p.agl === undefined ? 99 : p.agl;
   if (p.onGround){
-    /* kołowanie: ster A/D, rotacja przy v ≥ ~vRot (drążek do siebie), bez przechyłu */
-    const h = Math.atan2(_pF.x, _pF.z) + rud * T.yawGround * clamp(p.v / 6, 0.25, 1) * dt * (p.v > 0.3 ? 1 : 0.4);
-    let pt = pitch;
-    if (p.v > T.vRot * 0.92 && planeStick.y > 0.05) pt = Math.min(0.28, pt + planeStick.y * T.pitchRate * dt);
-    else pt = Math.max(0, pt - dt * 0.4);
-    p.quat.setFromEuler(_pE.set(-pt, h, 0, 'YXZ'));
+    h += inp.rud * T.yawGround * clamp(p.v / 6, 0.25, 1) * dt * (p.v > 0.3 ? 1 : 0.4);
+    if (p.v > T.vRot * 0.92 && inp.pitch > 0) pitch = Math.min(0.22, pitch + T.pitchRate * 0.6 * dt);
+    else pitch = Math.max(0, pitch - dt * 0.4);
+    bank = 0;
   } else {
-    /* drążek do siebie = nos w górę; blisko przeciągnięcia ciągnięcie słabnie (ochrona przed przeciągnięciem) */
-    const effUp = clamp((p.v - T.vStall * 0.9) / (T.vStall * 0.4), 0, 1);
-    rotLocal(X, -planeStick.y * T.pitchRate * (planeStick.y > 0 ? effUp : eff) * dt);
-    rotLocal(Z, -planeStick.x * T.rollRate * eff * dt);                      // mysz w prawo = przechył w prawo
-    rotLocal(Yl, rud * 0.35 * eff * dt);                                     // ster kierunku
-    _pQ.setFromAxisAngle(_pY, g * Math.tan(clamp(roll, -1.2, 1.2)) / Math.max(p.v, 15) * lift * dt); p.quat.premultiply(_pQ);   // zakręt z przechyłu
-    if (lift < 1){ p.vy -= g * (1 - lift) * dt; rotLocal(X, (1 - lift) * 0.5 * dt); }                                        // przeciągnięcie: opada, nos w dół
-    else p.vy = damp(p.vy, 0, 2, dt);
+    let tp = inp.pitch > 0 ? 0.3 : inp.pitch < 0 ? -0.32 : 0;
+    if (inp.pitch > 0) tp *= clamp((p.v - T.vStall * 0.95) / (T.vStall * 0.3), 0, 1);            // za wolno — nos nie idzie w górę
+    const land = !inp.pitch && p.thr < 0.35 && agl < 35;
+    if (land) tp = agl > 6 ? -0.08 : -0.01;
+    if (lift < 1) tp = Math.min(tp, -0.15 * (1 - lift));                                         // przeciągnięcie: nos w dół
+    pitch = approach(pitch, tp, T.pitchRate * 0.8 * Math.max(eff, 0.4) * dt);
+    bank = approach(bank, clamp(inp.turn, -1, 1) * 0.7, T.rollRate * 0.6 * dt);
+    h -= g * Math.tan(bank) / Math.max(p.v, 15) * Math.max(lift, 0.3) * dt;                     // zakręt z przechyłu (w prawo: kurs maleje)
+    h += inp.rud * 0.25 * eff * dt;
+    if (lift < 1) p.vy -= g * (1 - lift) * dt; else p.vy = damp(p.vy, 0, 2, dt);
+    if (land && agl < 6) p.vy = approach(p.vy, -1.5, 4 * dt);
   }
-  p.quat.normalize();
+  p.quat.setFromEuler(_pE.set(-pitch, h, bank, 'YXZ'));
   _pF.set(0, 0, 1).applyQuaternion(p.quat);
   _pNew.copy(p.pos).addScaledVector(_pF, p.v * dt); _pNew.y += p.vy * dt;
-  /* zderzenie z zabudową / filarem / ziemią po drodze (odcinek od nosa) */
+  /* zderzenie z zabudową / filarem po drodze (odcinek od nosa); ziemię i dachy obsługuje podwozie */
   _pNose.copy(p.pos).addScaledVector(_pF, T.half[2] * 0.9);
   const sweepTo = _pNose.clone().add(_pNew).sub(p.pos);
   const hit = p.v > 2 ? planeSweepHit(_pNose, sweepTo) : null;
-  /* ściana / filar (ziemię i dachy obsługuje podwozie) */
-  if (hit && hit.hitNormalWorld.y < 0.8){ if (p.v > 9) return planeCrash(p), 0; p.v = 0; _pNew.copy(p.pos); }
-  /* ziemia pod kołami */
+  if (hit && hit.hitNormalWorld.y < 0.8){ if (p.v > 9){ planeCrash(p); return false; } p.v = 0; _pNew.copy(p.pos); }
   const gy = planeGroundY(_pNew.x, _pNew.z, _pNew.y + 1);
   if (_pNew.y - T.gear <= gy + 0.02){
     const sink = -((_pNew.y - p.pos.y) / Math.max(dt, 1e-3));
-    if (!p.onGround && (sink > 7 || Math.abs(roll) > 0.45 || pitch < -0.22)) return planeCrash(p), 0;   // twarde / krzywe przyziemienie
+    if (!p.onGround && (sink > 9 || Math.abs(bank) > 0.6 || pitch < -0.3)){ planeCrash(p); return false; }   // twarde / krzywe przyziemienie
     _pNew.y = gy + T.gear; p.onGround = true; p.vy = 0;
   } else if (p.onGround && _pNew.y - T.gear > gy + 0.3) p.onGround = false;
+  p.agl = _pNew.y - T.gear - gy;
   /* granice: zawracanie poza ±900 m, pułap 700 m */
-  if (Math.abs(_pNew.x) > 900 || Math.abs(_pNew.z) > 900){ p.quat.premultiply(_pQ.setFromAxisAngle(_pY, Math.PI)); hudToast('Granica obszaru — zawracanie'); }
+  if (Math.abs(_pNew.x) > 900 || Math.abs(_pNew.z) > 900){ p.quat.premultiply(_pQ.setFromAxisAngle(_pY, Math.PI)); if (p === curPlane) hudToast('Granica obszaru — zawracanie'); }
   if (_pNew.y > 700){ _pNew.y = 700; p.vy = Math.min(p.vy, 0); }
   p.pos.copy(_pNew);
   syncPlane(p);
+  return true;
+}
+function updatePlane(dt){
+  const p = curPlane; if (!p) return 0;
+  const ar = (keys['ArrowRight'] ? 1 : 0) - (keys['ArrowLeft'] ? 1 : 0);
+  const ok = planeStep(p, dt, {
+    thr: down('forward') ? 1 : down('back') ? -1 : 0,
+    pitch: (keys['ArrowUp'] ? 1 : 0) - (keys['ArrowDown'] ? 1 : 0),
+    turn: ar,
+    rud: (down('left') ? 1 : 0) - (down('right') ? 1 : 0) - (p.onGround ? ar : 0),          // na ziemi ←/→ też skręca
+    brake: down('jump')
+  });
+  if (!ok) return 0;
   Sound.engine(true, 0.15 + p.thr * 0.75, p.thr, { pitch: p.kind === 'jet' ? 0.62 : 1.15, bright: p.kind === 'jet' ? 1.8 : 1.1 });
   return p.v * 3.6;
 }
-/* co klatkę: śmigła, wraki (powrót na lotnisko), wybuchy */
+/* co klatkę: śmigła, samoloty bez pilota (nurkują), wraki (dym, ogień, powrót na lotnisko), efekty, spadochron */
 function updatePlanesIdle(dt){
   for (const p of planes){
-    if (p.prop) p.prop.rotation.z += dt * (p === curPlane ? 8 + p.thr * 50 : 0);
-    if (p.wreckT > 0){ p.wreckT -= dt; if (p.wreckT <= 0) resetPlane(p); }
+    if (p.prop) p.prop.rotation.z += dt * (p === curPlane || p.free ? 8 + p.thr * 50 : 0);
+    if (p.free && !(p.wreckT > 0)) planeStep(p, dt, { thr: 0, pitch: -1, turn: p.freeTurn, rud: 0, brake: false });
+    if (p.wreckT > 0){
+      wreckEmit(p, dt);
+      p.wreckT -= dt;
+      if (p.wreckT <= 0){ p.wreck = null; p.group.children[0].material = _planeMat; if (p.prop) p.prop.visible = true; resetPlane(p); }
+    }
   }
-  for (let i = booms.length - 1; i >= 0; i--){
-    const b = booms[i]; b.t += dt; b.m.scale.setScalar(2 + b.t * 22); b.m.material.opacity = Math.max(0, 0.9 - b.t * 0.9);
-    if (b.t > 1){ scene.remove(b.m); b.m.geometry.dispose(); b.m.material.dispose(); booms.splice(i, 1); }
-  }
+  updateFx(dt);
+  updateParachute(dt);
 }

@@ -26,8 +26,6 @@ const el = {
   carlblTxt:   document.getElementById('carlblTxt'),
   indLh:       document.getElementById('indLh'),
   indRh:       document.getElementById('indRh'),
-  stick:       document.getElementById('stick'),
-  stickDot:    document.getElementById('stickDot'),
   toast:       document.getElementById('toast')
 };
 /* krótki komunikat na środku ekranu */
@@ -240,14 +238,12 @@ function updateHud(dt, kmh){
   hudAcc += dt; fpsAcc += dt; fpsCount++;
 
   el.speedo.classList.toggle('on', mode === 'car' || mode === 'plane');
-  el.stick.classList.toggle('on', mode === 'plane');
   if (mode === 'plane' && curPlane){
     const p = curPlane, lbl = 'Samolot · ' + p.T.name;
     if (el.carlblTxt.textContent !== lbl){ el.carlblTxt.textContent = lbl; el.carlbl.classList.remove('stolen'); }
     drawSpeedo(kmh, p.T.gauge, p.thr);
     el.gval.textContent = Math.round(p.thr * 100) + '% · WYS ' + Math.max(0, Math.round(p.pos.y - p.T.gear - planeGroundY(p.pos.x, p.pos.z, p.pos.y))) + ' m';
     el.ghand.textContent = 'GAZ'; el.ghand.className = '';
-    el.stickDot.style.transform = 'translate(' + (planeStick.x * 26).toFixed(1) + 'px,' + (planeStick.y * 26).toFixed(1) + 'px)';
   } else if (el.ghand.textContent !== 'RĘCZNY') el.ghand.textContent = 'RĘCZNY';
   if (_toastT > 0){ _toastT -= dt; if (_toastT <= 0) el.toast.classList.remove('on'); }
   if (mode === 'car'){
@@ -291,12 +287,13 @@ function updateHud(dt, kmh){
   let nv = null;
   if (mode === 'foot') nv = nearestVehicle();
   const near = !!nv && nv.dist < 3.5;
-  promptEl.classList.toggle('on', near || mode === 'car' || (mode === 'plane' && curPlane && curPlane.onGround && curPlane.v < 3));
-  const want = mode === 'car' ? 'out' : mode === 'plane' ? 'outPlane' : (near ? (nv.kind === 'npc' ? 'jack' : nv.kind === 'plane' ? 'plane' : 'in') : lastPrompt);
+  promptEl.classList.toggle('on', near || mode === 'car' || (mode === 'plane' && curPlane && ((curPlane.onGround && curPlane.v < 3) || (!curPlane.onGround && curPlane.agl > 15))));
+  const want = mode === 'car' ? 'out' : mode === 'plane' ? (curPlane && !curPlane.onGround ? 'bail' : 'outPlane') : (near ? (nv.kind === 'npc' ? 'jack' : nv.kind === 'plane' ? 'plane' : 'in') : lastPrompt);
   if (want !== lastPrompt){
     lastPrompt = want;
     promptEl.innerHTML = want === 'out' ? 'Naciśnij <kbd>F</kbd>, aby wysiąść'
                         : want === 'outPlane' ? 'Naciśnij <kbd>F</kbd>, aby wysiąść z samolotu'
+                        : want === 'bail' ? 'Naciśnij <kbd>F</kbd>, aby wyskoczyć ze spadochronem'
                         : want === 'jack' ? 'Naciśnij <kbd>F</kbd> lub <kbd>E</kbd>, aby ukraść auto'
                         : want === 'plane' ? 'Naciśnij <kbd>F</kbd> lub <kbd>E</kbd>, aby wsiąść do samolotu'
                         : 'Naciśnij <kbd>F</kbd> lub <kbd>E</kbd>, aby wsiąść';

@@ -6,7 +6,7 @@
    wieża, hangar, rękaw wiatrowy. Wywoływane z city-generation.js (buildAirport).
    --------------------------------------------------------------- */
 const AIRPORT = {
-  runway: { x0: -150, x1: 150, z: -378, hw: 12 },          // pas startowy 300 × 24 m
+  runway: { x0: -168, x1: 168, z: -378, hw: 15 },          // pas startowy 336 × 30 m (dalej na W/E są drogi zjazdowe, na N mur)
   taxi:   { x0: -140, x1: 140, z: -356, hw: 5 },           // droga kołowania
   apron:  { x0: -70, x1: 85, z0: -351, z1: -320 },         // płyta postojowa
   term:   { x0: -30, x1: 40, z0: -320, z1: -304 },         // terminal
@@ -26,7 +26,7 @@ function buildPlane(x, z, heading, s, livery, prop){ AIRPORT_PLANES.push({ x: x,
 function buildAirport(){
   const A = AIRPORT, y = 0.03;
   /* drzewa pasa podmiejskiego z obszaru lotniska */
-  for (let i = treeSpots.length - 1; i >= 0; i--){ const t = treeSpots[i]; if (t.z < -CITY_EDGE && Math.abs(t.x) < 162) treeSpots.splice(i, 1); }
+  for (let i = treeSpots.length - 1; i >= 0; i--){ const t = treeSpots[i]; if (t.z < -CITY_EDGE && Math.abs(t.x) < 175) treeSpots.splice(i, 1); }
   const paint = (x0, z0, x1, z1, w, col, yy) => {            // pas malowany (linia) na nawierzchni
     const l = Math.hypot(x1 - x0, z1 - z0) || 1, nx = -(z1 - z0) / l * w / 2, nz = (x1 - x0) / l * w / 2;
     CB(col || 0xeeeeea).quad([x0 - nx, yy || y + 0.012, z0 - nz], [x0 + nx, yy || y + 0.012, z0 + nz], [x1 + nx, yy || y + 0.012, z1 + nz], [x1 - nx, yy || y + 0.012, z1 - nz], [0,0],[1,0],[1,1],[0,1]);
@@ -108,8 +108,8 @@ function buildAirport(){
   buildings.push({ x: hx, z: hz, w: hw2, d: hd });
 
   /* --- rękaw wiatrowy przy pasie --- */
-  CB(0xcfd2d4).box(-128, 3, rw.z + rw.hw + 9, 0.15, 6, 0.15, 1, true);
-  CB(0xe8701c).boxRot(-127, 5.6, rw.z + rw.hw + 9, 2.2, 0.6, 0.6, 0.3, 1, true);
+  CB(0xcfd2d4).box(-158, 3, A.taxi.z, 0.15, 6, 0.15, 1, true);
+  CB(0xe8701c).boxRot(-157, 5.6, A.taxi.z, 2.2, 0.6, 0.6, 0.3, 1, true);
 
   /* --- strona miejska: dojazd z ulicy i=5, droga przed terminalem, parking --- */
   const ac = A.access, fr = A.front, pk = A.park;

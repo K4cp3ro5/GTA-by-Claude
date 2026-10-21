@@ -127,6 +127,7 @@ function respawnPlayer(){
     for (let i = 0; i < 4; i++){ vehicle.applyEngineForce(0, i); vehicle.setBrake(160, i); }
     Sound.engine(false, 0, 0);
   }
+  player.mesh.visible = true;                         // (ukryty po śmierci w katastrofie samolotu)
   player.body.position.set(SPAWN.x, SPAWN.y, SPAWN.z);
   player.body.velocity.set(0, 0, 0);
   player.body.wakeUp();

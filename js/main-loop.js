@@ -73,6 +73,7 @@ function frame(now){
   }
   syncCar(alpha);
   updateCamera(dt, vehKmh);
+  applyCamShake(dt);
   updateLampLights();
   updateHud(dt, vehKmh);
 
