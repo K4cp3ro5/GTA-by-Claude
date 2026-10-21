@@ -33,7 +33,7 @@ function updateSky(dt){
   scene.background = skyCol;
   fogCol.copy(skyCol).multiplyScalar(lerp(0.55, 0.92, dayF));
   scene.fog.color.copy(fogCol);
-  scene.fog.density = lerp(0.0090, 0.0055, dayF);
+  scene.fog.density = lerp(0.0062, 0.0036, dayF);              // dalszy zasięg widzenia (w dzień ~ 2× dalej niż wcześniej)
 
   sun.intensity = dayF * 1.25 + nightF * 0.34;                 // nocą: słaba, chłodna poświata księżyca
   sun.color.copy(C_SUN_D).lerp(C_SUN_K, duskF * 0.85).lerp(C_MOON, nightF);

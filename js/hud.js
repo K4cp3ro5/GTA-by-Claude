@@ -80,17 +80,22 @@ const mm = document.getElementById('minimap');
 const mg = mm.getContext('2d');
 const MM = mm.width;
 
+let mmZoom = 0.62;                                     // skala minimapy względem mapStatic (mniej = szerszy widok)
 function drawMinimap(){
   const wp0 = playerWorldPos(), px = wp0.x, pz = wp0.z;
   const cx = (px - MAP_X0) * MAP_SCALE;
   const cz = (pz - MAP_Z0) * MAP_SCALE;
+  /* przybliżenie minimapy wg trybu (pieszo bliżej, autem / łodzią dalej, samolotem najdalej) — płynnie */
+  const zt = mode === 'plane' ? 0.28 : (mode === 'car' || mode === 'boat') ? 0.5 : 0.62;
+  mmZoom += (zt - mmZoom) * 0.08;
+  const zs = MAP_SCALE * mmZoom;
 
   mg.clearRect(0, 0, MM, MM);
-  mg.fillStyle = '#0d0f13';
+  mg.fillStyle = '#16384b';
   mg.fillRect(0, 0, MM, MM);
-  mg.drawImage(mapStatic, Math.round(MM/2 - cx), Math.round(MM/2 - cz));
+  mg.save(); mg.translate(MM / 2, MM / 2); mg.scale(mmZoom, mmZoom); mg.drawImage(mapStatic, -cx, -cz); mg.restore();
 
-  const toMap = (wx, wz) => [ MM/2 + (wx - px) * MAP_SCALE, MM/2 + (wz - pz) * MAP_SCALE ];
+  const toMap = (wx, wz) => [ MM/2 + (wx - px) * zs, MM/2 + (wz - pz) * zs ];
   navDrawMinimap(mg, toMap, MM);                       // trasa do celu (navigation.js)
 
   /* NPC (piraci drogowi większym kwasowo zielonym punktem, jak lakier) */

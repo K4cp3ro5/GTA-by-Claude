@@ -106,7 +106,7 @@ const MAXA = renderer.capabilities.getMaxAnisotropy();
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87b4e0);
-scene.fog = new THREE.FogExp2(0x87b4e0, 0.0062);
+scene.fog = new THREE.FogExp2(0x87b4e0, 0.0042);
 
 const camera = new THREE.PerspectiveCamera(66, window.innerWidth / window.innerHeight, 0.25, 1600);   // daleko: strzałka nad pasem lotniska
 camera.position.set(0, 6, 20);
