@@ -201,7 +201,7 @@ function spawnNpcCar(path, colorHex, startIdx, frac, type){
   b.npcRef = n;                              // zderzenie z autem gracza (sound.js) -> npcHitByPlayer
   n.indMeshes = addIndicators(n.mesh, type);
   b.collisionFilterGroup = G_CAR;
-  b.collisionFilterMask = -1;
+  b.collisionFilterMask = ~G_WORLD;          // kinematyczne: bez par ze światem (bryły wysp) — tylko gracz, auta, piesi
   b.allowSleep = false;
   addBody(b);
   n.body = b;

@@ -112,13 +112,13 @@ function buildPlaneModel(kind, livery){
 /* --- samoloty na lotnisku --- */
 const planes = [];
 const _pQ = new THREE.Quaternion(), _pE = new THREE.Euler(), _pF = new THREE.Vector3(), _pR = new THREE.Vector3(), _pAxis = new THREE.Vector3(), _pY = new THREE.Vector3(0, 1, 0);
-function planeGroundY(x, z, yTop){ const g = groundAt(x, z, yTop); return g === null ? 0 : g; }
+function planeGroundY(x, z, yTop){ if (!isLand(x, z)) return WATER_Y; const g = groundAt(x, z, yTop); return g === null ? 0 : g; }   // nad morzem: powierzchnia wody
 function resetPlane(p){
   const T = p.T, s = p.spec;
   p.pos.set(s.x, planeGroundY(s.x, s.z, 30) + T.gear, s.z);
   p.quat.setFromEuler(_pE.set(0, s.heading, 0, 'YXZ'));
   p.v = 0; p.vy = 0; p.thr = 0; p.onGround = true; p.wreckT = 0; p.free = false; p.freeT = 0; p.agl = undefined; p.wreck = null; p.waitReset = false;
-  p.body.collisionFilterMask = -1; p.group.children[0].material = _planeMat;
+  p.body.collisionFilterMask = ~G_WORLD; p.group.children[0].material = _planeMat;
   p.group.visible = true;
   if (!p.bodyIn){ addBody(p.body); p.bodyIn = true; }
   syncPlane(p);
@@ -134,7 +134,7 @@ function syncPlane(p){
     const b = new CANNON.Body({ mass: 0, type: CANNON.Body.KINEMATIC, material: matCar });
     b.addShape(new CANNON.Box(new CANNON.Vec3(T.half[0], T.half[1], T.half[2])));
     b.addShape(new CANNON.Box(new CANNON.Vec3(T.wing[0], T.wing[1], T.wing[2])), new CANNON.Vec3(0, s.kind === 'jet' ? -0.9 : 0.95, s.kind === 'jet' ? -1 : 0.85));
-    b.collisionFilterGroup = G_PLANE; b.collisionFilterMask = -1; b.isPlane = true;
+    b.collisionFilterGroup = G_PLANE; b.collisionFilterMask = ~G_WORLD; b.isPlane = true;
     const p = { kind: s.kind, T: T, spec: s, group: m.group, prop: m.prop, body: b, bodyIn: false, pos: new THREE.Vector3(), quat: new THREE.Quaternion(), v: 0, vy: 0, thr: 0, onGround: true, wreckT: 0 };
     planes.push(p);
     resetPlane(p);
@@ -179,12 +179,12 @@ function exitPlane(force){
    trawa — nie dach, nie pomost), poza budynkami, wrakami, samolotami i wodą; null = nic w zasięgu */
 function safeSpot(x, z, rMin, rMax){
   for (let r = rMin; r <= rMax; r += 3){
-    const n = r < 1 ? 1 : Math.max(8, Math.round(r * 1.2));
+    const n = r < 1 ? 1 : Math.max(12, Math.round(r * 2.5));
     for (let k = 0; k < n; k++){
       const a = k / n * TAU + r * 0.37, px = x + Math.cos(a) * r, pz = z + Math.sin(a) * r;
-      if (Math.abs(px) > WALL_X - 3 || Math.abs(pz) > WALL_X - 3) continue;
+      if (!isLand(px, pz) || !isLand(px + 0.8, pz) || !isLand(px - 0.8, pz) || !isLand(px, pz + 0.8) || !isLand(px, pz - 0.8)) continue;   // ląd z zapasem od brzegu (pomost 4 m)
       const h = rayHit(px, 160, pz, px, -2, pz, G_WORLD | G_CAR | G_PLANE);
-      if (!h || h.hitNormalWorld.y < 0.85 || h.hitPointWorld.y > 1.0 || h.body.isPlane) continue;
+      if (!h || h.hitNormalWorld.y < 0.85 || h.hitPointWorld.y > 1.0 || h.hitPointWorld.y < -0.5 || h.body.isPlane) continue;
       if (buildings.some(b => Math.abs(px - b.x) < b.w / 2 + 1.5 && Math.abs(pz - b.z) < b.d / 2 + 1.5)) continue;
       if (planes.some(q => (q.wreck || q.wreckT > 0) && Math.hypot(px - q.pos.x, pz - q.pos.z) < 14)) continue;
       if (terrainLog.some(t => t.kind === 'pond' && Math.hypot(px - t.x, pz - t.z) < (t.r || 8) + 1)) continue;
@@ -227,7 +227,7 @@ function bailOut(p){
   const h = Math.atan2(_pF.x, _pF.z), side = p.T.wing[0] + 4;                       // poza rozpiętością skrzydła — samolot nie zahaczy gracza
   mode = 'foot'; curPlane = null;
   p.free = true; p.freeT = 0; p.freeTurn = rand(-0.6, 0.6);
-  p.body.collisionFilterMask = G_WORLD | G_CAR;                                      // samolot bez pilota nie trąca gracza w powietrzu
+  p.body.collisionFilterMask = G_CAR;                                                 // samolot bez pilota nie trąca gracza w powietrzu
   player.mesh.visible = true;
   player.body.position.set(p.pos.x - _pR.x * side, p.pos.y - p.T.half[1] - 3, p.pos.z - _pR.z * side);
   player.body.velocity.set(_pF.x * p.v * 0.25, Math.min(0, p.vy) - 2, _pF.z * p.v * 0.25);
@@ -278,7 +278,8 @@ const _fxSphere = new THREE.SphereGeometry(1, 14, 10), _fxBox = new THREE.BoxGeo
 const _wreckMat = new THREE.MeshLambertMaterial({ vertexColors: true, color: 0x2b2724 });
 const fxList = [], _smokeCol = new THREE.Color(0x2e2a28);                                                            // { kind, m, t, life, … }
 function fxAdd(o){ fxList.push(o); return o; }
-function planeCrash(p){
+function planeCrash(p, water){
+  if (water) return planeSplash(p);
   const T = p.T, at = p.pos.clone(), big = p.kind === 'jet' ? 1 : 0.55;
   const gh = rayHit(at.x, at.y + 2, at.z, at.x, -5, at.z, G_WORLD), gy = gh && gh.hitNormalWorld.y > 0.6 ? gh.hitPointWorld.y : 0;   // podłoże pod miejscem wybuchu (dowolnie wysoko)
   const pilot = curPlane === p;
@@ -316,6 +317,30 @@ function planeCrash(p){
     exitPlane(true);                                                          // gracz obok wraku, poza ogniem (safeSpot)
     if (godMode) hudToast('Katastrofa — przeżyłeś dzięki nieśmiertelności', 3);
     else { damagePlayer(1000, 'katastrofa'); hudToast('Katastrofa — pilot nie przeżył', 3); }
+  }
+}
+/* wodowanie (dotknięcie wody poza lądem): pióropusz i rozbryzgi, samolot tonie; pilot ginie (z nieśmiertelnością — na brzeg) */
+function planeSplash(p){
+  const at = p.pos.clone(), big = p.kind === 'jet' ? 1 : 0.55, pilot = curPlane === p;
+  at.y = WATER_Y;
+  fxAdd({ kind: 'ball', m: fxMesh(0xeaf6fb, 0.85, false), t: 0, life: 1.3, at: at.clone(), r0: 2 * big, r1: 13 * big });
+  for (let k = 0; k < 10; k++) fxAdd({ kind: 'ball', m: fxMesh(k % 2 ? 0xffffff : 0xbfe3f0, 0.8, false), t: -k * 0.06, life: rand(0.9, 1.5), r0: big, r1: rand(4, 8) * big,
+    at: at.clone().add(new THREE.Vector3(rand(-10, 10) * big, rand(0, 4), rand(-10, 10) * big)) });
+  for (let k = 0; k < 14; k++){
+    const m = new THREE.Mesh(_fxBox, new THREE.MeshLambertMaterial({ color: 0xf2f8fb })); m.scale.setScalar(rand(0.3, 0.8)); m.position.copy(at); scene.add(m);
+    const a = rand(0, TAU), sp = rand(4, 14);
+    fxAdd({ kind: 'debris', m: m, t: 0, life: 2.2, v: new THREE.Vector3(Math.cos(a) * sp, rand(8, 18), Math.sin(a) * sp), w: new THREE.Vector3(rand(-4, 4), rand(-4, 4), rand(-4, 4)), gy: SEA_FLOOR });
+  }
+  p.free = false; p.wreck = { sink: true }; p.v = 0; p.vy = 0; p.thr = 0; p.wreckT = 8;
+  if (p.prop) p.prop.visible = false;
+  if (p.bodyIn){ delBody(p.body); p.bodyIn = false; }
+  const cam = camera.position, dist = Math.hypot(cam.x - at.x, cam.y - at.y, cam.z - at.z);
+  Sound.boom(clamp(1 - dist / 600, 0.1, 0.6));
+  camShake = Math.max(camShake, clamp(1 - dist / 120, 0, 0.8) + (pilot ? 0.4 : 0));
+  if (pilot){
+    exitPlane(true);                                                          // w wodzie nie ma miejsca — brzeg albo szpital
+    if (godMode) hudToast('Wodowanie — wyłowiono cię z wody', 3);
+    else { damagePlayer(1000, 'wodowanie'); hudToast('Samolot rozbił się o wodę', 3); }
   }
 }
 function fxMesh(color, opacity, add){
@@ -361,6 +386,7 @@ function updateFx(dt){
 /* tlący się wrak: dym (ciemne kule unoszące się i rosnące) i języki ognia */
 function wreckEmit(p, dt){
   const w = p.wreck; if (!w) return;
+  if (w.sink){ p.group.position.y -= dt * 1.4; p.group.rotation.z += dt * 0.08; if (p.group.position.y < WATER_Y - 12) p.group.visible = false; return; }   // tonie
   const big = p.kind === 'jet' ? 1 : 0.55, burn = p.wreckT > 4;
   w.smoke -= dt; w.fire -= dt;
   if (w.smoke <= 0){
@@ -426,6 +452,7 @@ function planeStep(p, dt, inp){
   const hit = p.v > 2 ? planeSweepHit(_pNose, sweepTo) : null;
   if (hit && hit.hitNormalWorld.y < 0.8){ if (p.v > 9){ planeCrash(p); return false; } p.v = 0; _pNew.copy(p.pos); }
   const gy = planeGroundY(_pNew.x, _pNew.z, _pNew.y + 1);
+  if (_pNew.y - T.gear <= gy + 0.02 && !isLand(_pNew.x, _pNew.z)){ planeCrash(p, true); return false; }   // woda: wodowanie = katastrofa
   if (_pNew.y - T.gear <= gy + 0.02){
     const sink = -((_pNew.y - p.pos.y) / Math.max(dt, 1e-3));
     if (!p.onGround && (sink > 9 || Math.abs(bank) > 0.6 || pitch < -0.3)){ planeCrash(p); return false; }   // twarde / krzywe przyziemienie
@@ -433,7 +460,7 @@ function planeStep(p, dt, inp){
   } else if (p.onGround && _pNew.y - T.gear > gy + 0.3) p.onGround = false;
   p.agl = _pNew.y - T.gear - gy;
   /* granice: zawracanie poza ±900 m, pułap 700 m */
-  if (Math.abs(_pNew.x) > 900 || Math.abs(_pNew.z) > 900){ p.quat.premultiply(_pQ.setFromAxisAngle(_pY, Math.PI)); if (p === curPlane) hudToast('Granica obszaru — zawracanie'); }
+  if (Math.abs(_pNew.x) > 1300 || Math.abs(_pNew.z) > 1300){ p.quat.premultiply(_pQ.setFromAxisAngle(_pY, Math.PI)); if (p === curPlane) hudToast('Granica obszaru — zawracanie'); }
   if (_pNew.y > 700){ _pNew.y = 700; p.vy = Math.min(p.vy, 0); }
   p.pos.copy(_pNew);
   syncPlane(p);

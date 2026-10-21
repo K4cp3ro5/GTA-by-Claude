@@ -108,7 +108,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87b4e0);
 scene.fog = new THREE.FogExp2(0x87b4e0, 0.0062);
 
-const camera = new THREE.PerspectiveCamera(66, window.innerWidth / window.innerHeight, 0.25, 900);
+const camera = new THREE.PerspectiveCamera(66, window.innerWidth / window.innerHeight, 0.25, 1600);   // daleko: strzałka nad pasem lotniska
 camera.position.set(0, 6, 20);
 
 const hemi = new THREE.HemisphereLight(0xbfd8ff, 0x3a3630, 0.7);

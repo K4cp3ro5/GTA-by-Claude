@@ -62,7 +62,7 @@ function spawnPed(bi, bj){
   b.addShape(new CANNON.Sphere(0.36), new CANNON.Vec3(0,  0.45, 0));
   b.position.set(n.pos.x, WALK_H + 0.85, n.pos.y);
   b.collisionFilterGroup = G_PED;
-  b.collisionFilterMask  = -1;
+  b.collisionFilterMask  = ~G_WORLD;   // kinematyczne: bez par ze światem (bryły wysp)
   b.allowSleep = false;
   b.isPed = true;
   b.pedRef = n;

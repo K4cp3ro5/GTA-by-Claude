@@ -130,7 +130,7 @@ document.addEventListener('mousemove', e => {
     wheelVY += e.movementY;
     return;
   }
-  if (mode === 'plane'){                                                     // samolot sterowany strzałkami — mysz tylko obraca kamerę
+  if (mode === 'plane' || mode === 'boat'){                                  // samolot / łódź: mysz tylko obraca kamerę
     planeCamYaw = clamp(planeCamYaw - e.movementX * 0.003, -2.6, 2.6);
     if (Math.abs(e.movementX) > 1.5) lastMouseMove = clock;
     return;
@@ -249,7 +249,7 @@ function refreshDebugInfo(){
   dbg.bikeCount.textContent = String(npcs.filter(n => n.type === 'bike').length);
   dbg.ram.value = String(PIRATE_RAM_CHANCE); dbg.ramVal.textContent = Math.round(PIRATE_RAM_CHANCE * 100) + '%';
   dbg.lod.checked = NPC_LOD_DIST < 1e6;
-  dbg.modeInfo.textContent = mode + (mode === 'car' ? ' · ' + CAR_TYPES[carType].name + ' (' + driving.owner + ')' : mode === 'plane' && curPlane ? ' · ' + curPlane.T.name : '');
+  dbg.modeInfo.textContent = mode + (mode === 'boat' ? ' · ' + BOAT_T.name : '') + (mode === 'car' ? ' · ' + CAR_TYPES[carType].name + ' (' + driving.owner + ')' : mode === 'plane' && curPlane ? ' · ' + curPlane.T.name : '');
   dbg.npcInd.textContent = npcs.filter(n => n.ind).length + ' / ' + npcs.reduce((a, n) => a + (n.rams || 0) + (n.pedHits || 0), 0);
 }
 function timeLabel(v){
@@ -310,11 +310,13 @@ dbg.ammo.addEventListener('click', ev => { ev.stopPropagation(); Weapons.reserve
 /* --- pojazdy, samoloty, teleporty, piraci, rowerzyści (debug) --- */
 function dbgOnFoot(){                                    // samolot: wysiadka; auto: trzeba wysiąść samemu (F)
   if (mode === 'plane') exitPlane(true);
+  if (mode === 'boat') exitBoat(true);
   if (mode === 'car'){ hudToast('Najpierw wysiądź z auta (F)'); return false; }
   return true;
 }
 function dbgTeleport(x, z, heading, yTop){
   if (mode === 'plane') exitPlane(true);
+  if (mode === 'boat') exitBoat(true);
   const g = groundAt(x, z, yTop === undefined ? 30 : yTop); const y = g === null ? 0 : g;
   if (mode === 'car') takeOver(carType, driving.color, driving.owner, x, y, z, heading);
   else { player.body.position.set(x, y + 1.2, z); player.body.velocity.set(0, 0, 0); }
@@ -324,6 +326,7 @@ debugEl.querySelectorAll('[data-car]').forEach(b => b.addEventListener('click', 
   ev.stopPropagation();
   const type = b.dataset.car;
   if (mode === 'plane') exitPlane(true);
+  if (mode === 'boat') exitBoat(true);
   if (mode === 'car'){                                   // w aucie: zmiana typu w miejscu
     const T = CAR_TYPES[carType], p = chassisBody.position;
     takeOver(type, driving.color, driving.owner, p.x, p.y - T.restY - 0.13, p.z, carYaw());
@@ -351,7 +354,8 @@ debugEl.querySelectorAll('[data-plane]').forEach(b => b.addEventListener('click'
 debugEl.querySelectorAll('[data-tp]').forEach(b => b.addEventListener('click', ev => {
   ev.stopPropagation();
   const k = b.dataset.tp;
-  if (k === 'airport') dbgTeleport(AIRPORT.access.x - 2, -285, 0);
+  if (k === 'airport') dbgTeleport(AIRPORT.access.x - 2, -690, 0);
+  else if (k === 'port') dbgTeleport(L(5) - 2, -330, Math.PI);
   else if (k === 'ring') dbgTeleport(L(12) + 3.5, 60, Math.PI);           // wschodnia obwodnica, pas na północ
   else if (k === 'exit'){ const q = wayAt(HWY_TERM[0].exit, HWY_TERM[0].exit.len - 160); dbgTeleport(q.x, q.z, Math.atan2(q.hx, q.hz), q.y + 3); }
   else {                                                 // pomost A1 przed węzłem (punkt trasy NPC na jezdni)

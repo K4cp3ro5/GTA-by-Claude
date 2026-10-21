@@ -13,6 +13,22 @@ const _camEuler = new THREE.Euler();
 const _cpF = new THREE.Vector3(), _cpW = new THREE.Vector3(), _cpL = new THREE.Vector3();
 function updateCamera(dt, kmh){
   let dist, height, tx, ty, tz;
+  if (mode === 'boat' && curBoat){
+    /* łódź: kamera pościgowa za rufą (mysz obraca jak w samolocie) */
+    const b = curBoat;
+    if (clock - lastMouseMove > 1.2) planeCamYaw = angleDamp(planeCamYaw, 0, 1.5, dt);
+    const h = b.heading + planeCamYaw;
+    _cpW.set(b.pos.x - Math.sin(h) * BOAT_T.camDist, WATER_Y + BOAT_T.camH, b.pos.z - Math.cos(h) * BOAT_T.camDist);
+    camCur.x = damp(camCur.x, _cpW.x, 6, dt); camCur.y = damp(camCur.y, _cpW.y, 6, dt); camCur.z = damp(camCur.z, _cpW.z, 6, dt);
+    camera.position.copy(camCur);
+    camera.lookAt(b.pos.x + Math.sin(b.heading) * 6, WATER_Y + 1.2, b.pos.z + Math.cos(b.heading) * 6);
+    camFov = damp(camFov, 66 + clamp(kmh / 60, 0, 1) * 8, 2, dt);
+    if (Math.abs(camera.fov - camFov) > 0.01){ camera.fov = camFov; camera.updateProjectionMatrix(); }
+    sun.target.position.set(b.pos.x, 0, b.pos.z);
+    sun.position.set(b.pos.x + lightDir.x * 95, lightDir.y * 95 + 2, b.pos.z + lightDir.z * 95);
+    camYaw = h + Math.PI;
+    return;
+  }
   if (mode === 'plane' && curPlane){
     /* kamera pościgowa: za ogonem i nad samolotem, patrzy przed nos; płynnie, bez wysięgnika kolizyjnego */
     const p = curPlane, T = p.T;

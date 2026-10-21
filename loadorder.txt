@@ -8,6 +8,7 @@ signs.js
 districts.js
 airport.js
 hospital.js
+islands.js
 city-generation.js
 highways.js
 traffic-lights.js
@@ -22,6 +23,7 @@ controls.js
 sound.js
 vehicle-entry.js
 planes.js
+boats.js
 daynight.js
 update-player.js
 update-vehicle.js

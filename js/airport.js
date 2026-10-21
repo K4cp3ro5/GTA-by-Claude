@@ -1,19 +1,18 @@
 /* ---------------------------------------------------------------
-   7a2. LOTNISKO — północny pas podmiejski (między obwodnicą j=0 a murem), x ∈ ±150 m:
-   z dala od dróg zjazdowych autostrad (najbliższa przy |x| ≈ 176 m). Od miasta: dojazd z ulicy i=5
-   (skrzyżowanie z obwodnicą przy x = −44), parking, droga przed terminalem; strona lotnicza za
+   7a2. LOTNISKO — na osobnej wysepce na północ od miasta (islands.js: ISLANDS[1], z ∈ −812…−648). Od
+   przystani na południowym brzegu: dojazd, parking, droga przed terminalem; strona lotnicza za
    ogrodzeniem: płyta postojowa z samolotami i rękawami, droga kołowania, pas startowy 09/27,
    wieża, hangar, rękaw wiatrowy. Wywoływane z city-generation.js (buildAirport).
    --------------------------------------------------------------- */
 const AIRPORT = {
-  runway: { x0: -168, x1: 168, z: -378, hw: 15 },          // pas startowy 336 × 30 m (dalej na W/E są drogi zjazdowe, na N mur)
-  taxi:   { x0: -140, x1: 140, z: -356, hw: 5 },           // droga kołowania
-  apron:  { x0: -70, x1: 85, z0: -351, z1: -320 },         // płyta postojowa
-  term:   { x0: -30, x1: 40, z0: -320, z1: -304 },         // terminal
-  access: { x: L(5), z0: -CITY_EDGE, z1: -302, hw: 4 },    // dojazd z ulicy i=5
-  front:  { x0: L(5), x1: 40, z: -298, hw: 4 },            // droga przed terminalem (dalej objazd wysepki do dojazdu)
-  park:   { x0: -150, x1: -52, z0: -291, z1: -274 },       // parking
-  fenceZ: -303
+  runway: { x0: -168, x1: 168, z: -778, hw: 15 },          // pas startowy 336 × 30 m
+  taxi:   { x0: -140, x1: 140, z: -756, hw: 5 },           // droga kołowania
+  apron:  { x0: -70, x1: 85, z0: -751, z1: -720 },         // płyta postojowa
+  term:   { x0: -30, x1: 40, z0: -720, z1: -704 },         // terminal
+  access: { x: L(5), z0: -654, z1: -702, hw: 4 },          // dojazd z przystani (południowy brzeg wysepki)
+  front:  { x0: L(5), x1: 40, z: -698, hw: 4 },            // droga przed terminalem (dalej objazd wysepki do dojazdu)
+  park:   { x0: -150, x1: -52, z0: -691, z1: -674 },       // parking
+  fenceZ: -703
 };
 const AIRPORT_PARKED = [];   // miejsca aut zaparkowanych na parkingu (vehicle-entry.js stawia tam auta „ambient”)
 const AIRPORT_PLANES = [];
@@ -26,7 +25,6 @@ function buildPlane(x, z, heading, s, livery, prop){ AIRPORT_PLANES.push({ x: x,
 function buildAirport(){
   const A = AIRPORT, y = 0.03;
   /* drzewa pasa podmiejskiego z obszaru lotniska */
-  for (let i = treeSpots.length - 1; i >= 0; i--){ const t = treeSpots[i]; if (t.z < -CITY_EDGE && Math.abs(t.x) < 175) treeSpots.splice(i, 1); }
   const paint = (x0, z0, x1, z1, w, col, yy) => {            // pas malowany (linia) na nawierzchni
     const l = Math.hypot(x1 - x0, z1 - z0) || 1, nx = -(z1 - z0) / l * w / 2, nz = (x1 - x0) / l * w / 2;
     CB(col || 0xeeeeea).quad([x0 - nx, yy || y + 0.012, z0 - nz], [x0 + nx, yy || y + 0.012, z0 + nz], [x1 + nx, yy || y + 0.012, z1 + nz], [x1 - nx, yy || y + 0.012, z1 - nz], [0,0],[1,0],[1,1],[0,1]);
@@ -88,7 +86,7 @@ function buildAirport(){
     staticBox(gx + 3.2, 4.0, tm.z0 - 6, 2.6, 2.8, 12); staticBox(gx + 3.2, 1.3, tm.z0 - 10.5, 0.6, 2.6, 0.6); });
 
   /* --- wieża kontroli lotów --- */
-  const wx = 60, wz = -312;
+  const wx = 60, wz = -712;
   CB(0xd3cfc6).box(wx, 11, wz, 4, 22, 4, 2, false);
   glassWallBuf.box(wx, 24, wz, 7.5, 4, 7.5, 2, false);
   CB(0x3b4046).box(wx, 26.3, wz, 8.5, 0.6, 8.5, 2, true);
@@ -97,7 +95,7 @@ function buildAirport(){
   buildings.push({ x: wx, z: wz, w: 4, d: 4 });
 
   /* --- hangar (blacha, dach dwuspadowy, wrota od strony płyty) --- */
-  const hx = 118, hz = -334, hw2 = 34, hd = 26, hh = 12;
+  const hx = 118, hz = -734, hw2 = 34, hd = 26, hh = 12;
   corrBuf.box(hx, hh / 2, hz, hw2, hh, hd, 6, false);
   quadOut(CB(0x6d7174), [hx - hw2 / 2 - 0.3, hh, hz - hd / 2 - 0.3], [hx + hw2 / 2 + 0.3, hh, hz - hd / 2 - 0.3], [hx + hw2 / 2 + 0.3, hh + 3, hz], [hx - hw2 / 2 - 0.3, hh + 3, hz], [0, 1, -1]);
   quadOut(CB(0x6d7174), [hx - hw2 / 2 - 0.3, hh, hz + hd / 2 + 0.3], [hx + hw2 / 2 + 0.3, hh, hz + hd / 2 + 0.3], [hx + hw2 / 2 + 0.3, hh + 3, hz], [hx - hw2 / 2 - 0.3, hh + 3, hz], [0, 1, 1]);
@@ -111,13 +109,13 @@ function buildAirport(){
   CB(0xcfd2d4).box(-158, 3, A.taxi.z, 0.15, 6, 0.15, 1, true);
   CB(0xe8701c).boxRot(-157, 5.6, A.taxi.z, 2.2, 0.6, 0.6, 0.3, 1, true);
 
-  /* --- strona miejska: dojazd z ulicy i=5, droga przed terminalem, parking --- */
+  /* --- strona przystani: dojazd, droga przed terminalem, parking --- */
   const ac = A.access, fr = A.front, pk = A.park;
   flat(crossBuf, ac.x - ac.hw, ac.x + ac.hw, ac.z1, ac.z0, y);
   for (let z = ac.z0 - 2; z > fr.z + fr.hw + 2; z -= 6) paint(ac.x, z, ac.x, z - 3, 0.16, 0xeeeeea, y + 0.016);
   flat(crossBuf, fr.x0 - ac.hw, fr.x1, fr.z - fr.hw, fr.z + fr.hw, y + 0.001);
   /* objazd wysepki: wschodnia odnoga w dół i powrót wzdłuż obwodnicy do dojazdu (jednokierunkowo) */
-  const lz = -279;
+  const lz = -679;
   flat(crossBuf, fr.x1 - 2 * fr.hw, fr.x1, fr.z - fr.hw, lz + fr.hw, y + 0.0012);
   flat(crossBuf, ac.x + ac.hw, fr.x1, lz - fr.hw, lz + fr.hw, y + 0.0014);
   const ix0 = ac.x + ac.hw, ix1 = fr.x1 - 2 * fr.hw, iz0 = fr.z + fr.hw, iz1 = lz - fr.hw;
@@ -136,7 +134,6 @@ function buildAirport(){
     ln(W, N, fr.x1 - e, N); ln(E, S, ix1, S);                                           // droga przed terminalem
     ln(fr.x1 - e, N, fr.x1 - e, lz + fr.hw - e); ln(ix1, S, ix1, iz1);                  // objazd: odnoga wschodnia
     ln(E, lz + fr.hw - e, fr.x1 - e, lz + fr.hw - e); ln(E, iz1, ix1, iz1);             // objazd: powrót wzdłuż obwodnicy
-    for (let x = W; x < ac.x - 0.4; x += 1.2) paint(x, ac.z0 - 1, x + 0.6, ac.z0 - 1, 0.3, 0xeeeeea, yl);   // wyjazd na obwodnicę: linia ustąpienia
     for (let z = iz1; z < lz + fr.hw - 0.4; z += 1.2) paint(E + 0.4, z, E + 0.4, z + 0.6, 0.3, 0xeeeeea, yl); // objazd -> dojazd
   }
   /* parking: 2 rzędy stanowisk P-18 z alejką, wjazd od dojazdu */
@@ -161,14 +158,11 @@ function buildAirport(){
   /* --- ogrodzenie strony lotniczej z bramą techniczną przy hangarze --- */
   const fz = A.fenceZ;
   fenceLine(-155, fz, tm.x0 - 0.5, fz); fenceLine(tm.x1 + 0.5, fz, 92, fz); fenceLine(100, fz, 155, fz);
-  fenceLine(-155, fz, -155, -396); fenceLine(155, fz, 155, -396);
+  fenceLine(-155, fz, -155, -806); fenceLine(155, fz, 155, -806);
   CB(0xd8402c).box(96, 1.0, fz, 7.6, 0.12, 0.12, 1, true);                       // szlaban (podniesiony — wjazd możliwy)
   CB(0xd8402c).boxRot(92.3, 2.6, fz, 0.12, 3.4, 0.12, 0, 1, true);
 
-  /* --- znaki: na dojeździe przed obwodnicą (jednokierunkowa na wschód) A-7 + C-2, drogowskaz na obwodnicy --- */
-  placeSign(ac.x - ac.hw - 1.0, -CITY_EDGE - 7, Math.PI, [FACE.A7(), FACE.C2()], { base: 0 });
-  placeSign(ac.x - 26, -256, -Math.PI / 2, [signFace('drogowskaz', texHwySign(['LOTNISKO'], '✈'), shapeRect(1.8, 1.1))], { base: WALK_H, bottom: 2.1, poleR: 0.05 });
-
+  
   /* --- minimapa --- */
   mapExtras.push({ t: 'rect', x0: rw.x0, x1: rw.x1, z0: rw.z - rw.hw, z1: rw.z + rw.hw, c: '#3b3f47' });
   mapExtras.push({ t: 'rect', x0: tx.x0, x1: tx.x1, z0: tx.z - tx.hw, z1: tx.z + tx.hw, c: '#33363d' });

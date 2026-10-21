@@ -119,6 +119,7 @@ function damagePlayer(amount, cause){
 
 function respawnPlayer(){
   if (mode === 'plane') exitPlane(true);
+  if (mode === 'boat') exitBoat(true);
   if (mode === 'car'){
     mode = 'foot';
     player.mesh.visible = true;

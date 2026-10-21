@@ -299,7 +299,7 @@
 
 <!-- ekran ładowania: pasek liczy wczytane skrypty (data-scripts = 2 biblioteki + pliki z loadorder.txt, sprawdza harness);
      main-loop.js woła LOADER.finish(), błąd podczas ładowania odsłania menu z komunikatem (#err) -->
-<div id="loader" data-scripts="33">
+<div id="loader" data-scripts="35">
   <div class="ltitle">GTA by <em>Claude</em></div>
   <div class="lbar"><i id="lfill"></i></div>
   <div id="lstat">Wczytywanie bibliotek…</div>
@@ -435,7 +435,7 @@ var LOADER = (function(){
     <div class="dsec">
       <h3>Teleport</h3>
       <div class="drow"><span>Dokąd</span>
-        <span class="dbtnrow"><button class="dbtn" data-tp="airport">Lotnisko</button><button class="dbtn" data-tp="hwy">Autostrada</button><button class="dbtn" data-tp="exit">Zjazd SE</button><button class="dbtn" data-tp="ring">Obwodnica</button></span></div>
+        <span class="dbtnrow"><button class="dbtn" data-tp="port">Port</button><button class="dbtn" data-tp="airport">Lotnisko</button><button class="dbtn" data-tp="hwy">Autostrada</button><button class="dbtn" data-tp="exit">Zjazd SE</button><button class="dbtn" data-tp="ring">Obwodnica</button></span></div>
     </div>
 
     <div class="dsec">
@@ -475,6 +475,7 @@ var LOADER = (function(){
 <script src="js/districts.js"></script>
 <script src="js/airport.js"></script>
 <script src="js/hospital.js"></script>
+<script src="js/islands.js"></script>
 <script src="js/city-generation.js"></script>
 <script src="js/highways.js"></script>
 <script src="js/traffic-lights.js"></script>
@@ -489,6 +490,7 @@ var LOADER = (function(){
 <script src="js/sound.js"></script>
 <script src="js/vehicle-entry.js"></script>
 <script src="js/planes.js"></script>
+<script src="js/boats.js"></script>
 <script src="js/daynight.js"></script>
 <script src="js/update-player.js"></script>
 <script src="js/update-vehicle.js"></script>

@@ -34,15 +34,14 @@ function hudToast(text, secs){ el.toast.textContent = text; el.toast.classList.a
 
 /* statyczna mapa CAŁEGO świata (miasto + pas podmiejski + autostrady) rysowana raz */
 const MAP_SCALE = 1.35;
-const MAP_X0 = -WALL_X - 6, MAP_Z0 = -WALL_X - 6;
-const MAP_W = (WALL_X + 6) * 2, MAP_H = (WALL_X + 6) * 2;
+const MAP_X0 = -470, MAP_Z0 = -840;                                  // obie wyspy z morzem dookoła
+const MAP_W = 940, MAP_H = 1290;
 const mapStatic = mkCanvas(Math.ceil(MAP_W * MAP_SCALE), Math.ceil(MAP_H * MAP_SCALE));
 (function drawStaticMap(){
   const g = mapStatic.getContext('2d');
   const wx = v => (v - MAP_X0) * MAP_SCALE, wz = v => (v - MAP_Z0) * MAP_SCALE;
-  g.fillStyle = '#0d0f13'; g.fillRect(0, 0, mapStatic.width, mapStatic.height);
-  g.fillStyle = '#171a20';                                            // teren wewnątrz muru
-  g.fillRect(wx(-WALL_X), wz(-WALL_X), WALL_X * 2 * MAP_SCALE, WALL_X * 2 * MAP_SCALE);
+  g.fillStyle = '#16384b'; g.fillRect(0, 0, mapStatic.width, mapStatic.height);   // morze
+  ISLANDS.forEach(r => { g.fillStyle = r.name === 'main' ? '#171a20' : '#1f2a1c'; g.fillRect(wx(r.x0), wz(r.z0), (r.x1 - r.x0) * MAP_SCALE, (r.z1 - r.z0) * MAP_SCALE); });
   g.fillStyle = '#23262c';                                            // jezdnie miasta
   g.fillRect(wx(-CITY_EDGE), wz(-CITY_EDGE), CITY_EDGE * 2 * MAP_SCALE, CITY_EDGE * 2 * MAP_SCALE);
   for (let i = 0; i < GRID; i++){
@@ -73,8 +72,8 @@ const mapStatic = mkCanvas(Math.ceil(MAP_W * MAP_SCALE), Math.ceil(MAP_H * MAP_S
       g.stroke();
     }
   });
-  g.strokeStyle = 'rgba(255,176,58,.30)'; g.lineWidth = 2;            // mur dookoła całości
-  g.strokeRect(wx(-WALL_X), wz(-WALL_X), WALL_X * 2 * MAP_SCALE, WALL_X * 2 * MAP_SCALE);
+  g.strokeStyle = 'rgba(160,210,230,.35)'; g.lineWidth = 2;          // linia brzegowa (nabrzeża)
+  ISLANDS.forEach(r => g.strokeRect(wx(r.x0), wz(r.z0), (r.x1 - r.x0) * MAP_SCALE, (r.z1 - r.z0) * MAP_SCALE));
 })();
 
 const mm = document.getElementById('minimap');
@@ -82,8 +81,7 @@ const mg = mm.getContext('2d');
 const MM = mm.width;
 
 function drawMinimap(){
-  const px = mode === 'car' ? chassisBody.position.x : mode === 'plane' && curPlane ? curPlane.pos.x : player.body.position.x;
-  const pz = mode === 'car' ? chassisBody.position.z : mode === 'plane' && curPlane ? curPlane.pos.z : player.body.position.z;
+  const wp0 = playerWorldPos(), px = wp0.x, pz = wp0.z;
   const cx = (px - MAP_X0) * MAP_SCALE;
   const cz = (pz - MAP_Z0) * MAP_SCALE;
 
@@ -120,6 +118,13 @@ function drawMinimap(){
   mg.closePath(); mg.fill();
   mg.restore();
 
+  /* łodzie (niebieskie kreski) i łódź gracza */
+  for (const b of boats){ const q = toMap(b.pos.x, b.pos.z); if (b === curBoat || q[0] < -6 || q[0] > MM + 6 || q[1] < -6 || q[1] > MM + 6) continue; mg.save(); mg.translate(q[0], q[1]); mg.rotate(-b.heading + Math.PI); mg.fillStyle = '#7fc4e8'; mg.fillRect(-1.5, -3.5, 3, 7); mg.restore(); }
+  if (mode === 'boat' && curBoat){
+    mg.save(); mg.translate(MM / 2, MM / 2); mg.rotate(-curBoat.heading + Math.PI);
+    mg.fillStyle = '#f2f0ea'; mg.beginPath(); mg.moveTo(0, -7); mg.lineTo(3.5, -1); mg.lineTo(3.5, 6); mg.lineTo(-3.5, 6); mg.lineTo(-3.5, -1); mg.closePath(); mg.fill();
+    mg.restore();
+  }
   /* samolot gracza */
   if (mode === 'plane' && curPlane){
     _cpF.set(0, 0, 1).applyQuaternion(curPlane.quat);
@@ -237,12 +242,18 @@ let hudAcc = 0, fpsAcc = 0, fpsCount = 0;
 function updateHud(dt, kmh){
   hudAcc += dt; fpsAcc += dt; fpsCount++;
 
-  el.speedo.classList.toggle('on', mode === 'car' || mode === 'plane');
+  el.speedo.classList.toggle('on', mode === 'car' || mode === 'plane' || mode === 'boat');
   if (mode === 'plane' && curPlane){
     const p = curPlane, lbl = 'Samolot · ' + p.T.name;
     if (el.carlblTxt.textContent !== lbl){ el.carlblTxt.textContent = lbl; el.carlbl.classList.remove('stolen'); }
     drawSpeedo(kmh, p.T.gauge, p.thr);
     el.gval.textContent = Math.round(p.thr * 100) + '% · WYS ' + Math.max(0, Math.round(p.pos.y - p.T.gear - planeGroundY(p.pos.x, p.pos.z, p.pos.y))) + ' m';
+    el.ghand.textContent = 'GAZ'; el.ghand.className = '';
+  } else if (mode === 'boat' && curBoat){
+    const lbl = 'Łódź · ' + BOAT_T.name;
+    if (el.carlblTxt.textContent !== lbl){ el.carlblTxt.textContent = lbl; el.carlbl.classList.remove('stolen'); }
+    drawSpeedo(kmh, BOAT_T.gauge, Math.abs(curBoat.thr));
+    el.gval.textContent = curBoat.v < -0.3 ? 'R' : curBoat.v > 0.3 ? 'D' : 'N';
     el.ghand.textContent = 'GAZ'; el.ghand.className = '';
   } else if (el.ghand.textContent !== 'RĘCZNY') el.ghand.textContent = 'RĘCZNY';
   if (_toastT > 0){ _toastT -= dt; if (_toastT <= 0) el.toast.classList.remove('on'); }
@@ -267,14 +278,13 @@ function updateHud(dt, kmh){
 
   if (hudAcc > 0.12){
     hudAcc = 0;
-    el.modetxt.textContent = mode === 'car' ? 'W pojeździe' : mode === 'plane' ? 'W powietrzu' : 'Pieszo';
+    el.modetxt.textContent = mode === 'car' ? 'W pojeździe' : mode === 'plane' ? 'W powietrzu' : mode === 'boat' ? 'Na wodzie' : 'Pieszo';
     const hours = timeOfDay * 24;
     const hh = Math.floor(hours), mmn = Math.floor((hours - hh) * 60);
     el.clock.textContent = (hh < 10 ? '0' : '') + hh + ':' + (mmn < 10 ? '0' : '') + mmn;
     el.clockIcon.textContent = (timeOfDay > 0.25 && timeOfDay < 0.8) ? '☀' : '☾';
     el.phase.textContent = phaseName(timeOfDay) + (muted ? ' · wyciszone' : '');
-    const px = mode === 'car' ? chassisBody.position.x : mode === 'plane' && curPlane ? curPlane.pos.x : player.body.position.x;
-    const pz = mode === 'car' ? chassisBody.position.z : mode === 'plane' && curPlane ? curPlane.pos.z : player.body.position.z;
+    const wp1 = playerWorldPos(), px = wp1.x, pz = wp1.z;
     el.coords.textContent = Math.round(px) + ', ' + Math.round(pz);
     drawMinimap();
   }
@@ -287,13 +297,15 @@ function updateHud(dt, kmh){
   let nv = null;
   if (mode === 'foot') nv = nearestVehicle();
   const near = !!nv && nv.dist < 3.5;
-  promptEl.classList.toggle('on', near || mode === 'car' || (mode === 'plane' && curPlane && ((curPlane.onGround && curPlane.v < 3) || (!curPlane.onGround && curPlane.agl > 15))));
-  const want = mode === 'car' ? 'out' : mode === 'plane' ? (curPlane && !curPlane.onGround ? 'bail' : 'outPlane') : (near ? (nv.kind === 'npc' ? 'jack' : nv.kind === 'plane' ? 'plane' : 'in') : lastPrompt);
+  promptEl.classList.toggle('on', near || mode === 'car' || mode === 'boat' || (mode === 'plane' && curPlane && ((curPlane.onGround && curPlane.v < 3) || (!curPlane.onGround && curPlane.agl > 15))));
+  const want = mode === 'car' ? 'out' : mode === 'boat' ? 'outBoat' : mode === 'plane' ? (curPlane && !curPlane.onGround ? 'bail' : 'outPlane') : (near ? (nv.kind === 'npc' ? 'jack' : nv.kind === 'plane' ? 'plane' : nv.kind === 'boat' ? 'boat' : 'in') : lastPrompt);
   if (want !== lastPrompt){
     lastPrompt = want;
     promptEl.innerHTML = want === 'out' ? 'Naciśnij <kbd>F</kbd>, aby wysiąść'
                         : want === 'outPlane' ? 'Naciśnij <kbd>F</kbd>, aby wysiąść z samolotu'
                         : want === 'bail' ? 'Naciśnij <kbd>F</kbd>, aby wyskoczyć ze spadochronem'
+                        : want === 'outBoat' ? 'Naciśnij <kbd>F</kbd> przy brzegu, aby wysiąść'
+                        : want === 'boat' ? 'Naciśnij <kbd>F</kbd>, aby wsiąść do łodzi'
                         : want === 'jack' ? 'Naciśnij <kbd>F</kbd> lub <kbd>E</kbd>, aby ukraść auto'
                         : want === 'plane' ? 'Naciśnij <kbd>F</kbd> lub <kbd>E</kbd>, aby wsiąść do samolotu'
                         : 'Naciśnij <kbd>F</kbd> lub <kbd>E</kbd>, aby wsiąść';
