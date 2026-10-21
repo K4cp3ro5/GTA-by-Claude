@@ -307,6 +307,7 @@ HWY_TERM.forEach(t => {
   const ex = t.exit, en = t.entry, arcLen = (Math.PI * 3 / 4) * HP.termR;
   /* wjazd z miasta: D-43 (koniec obszaru zabudowanego), D-9 (autostrada), B-33 100 po wjeździe na jezdnię główną */
   hwySignAt(en, 10, [FACE.D43()]);
+  hwySignAt(en, 24, [FACE.B9()]);                                          // zakaz wjazdu rowerów (rower gracza zawraca na rampie)
   hwySignAt(en, en.len - arcLen - 18, [FACE.D9()]);
   hwySignAt(CW[t.entryCw], 40, [FACE.B33(100)]);
   hwySignAt(CW[t.entryCw], 40, [FACE.B33(100)], null, -1);                 // B-33 po obu stronach jezdni

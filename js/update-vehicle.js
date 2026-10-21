@@ -25,7 +25,22 @@ const _upLocal = new CANNON.Vec3(0, 1, 0), _upW = new CANNON.Vec3();
 const HAND_F = 190;                        // ręczny; reszta parametrów wg typu auta (car-types.js)
 
 const _fwdWorld = new CANNON.Vec3();
+/* B-9: rower nie wjedzie na rampę ani pomost autostrady (droga o wysokości > 0.1 m pod kołami) — odbicie z komunikatem */
+let _bikeBanT = 0;
+function bikeHwyBan(dt){
+  _bikeBanT -= dt;
+  if (carType !== 'bike' || mode !== 'car' || _bikeBanT > 0) return;
+  _bikeBanT = 0.15;
+  const p = chassisBody.position, v = chassisBody.velocity;
+  const on = hwyQuery(p.x, p.z, -0.3).some(h => h.y > 0.1 && Math.abs(h.y - (p.y - CAR_TYPES.bike.restY)) < 1.6);
+  if (!on) return;
+  const sp = Math.hypot(v.x, v.z) || 1;
+  p.x -= v.x / sp * 2.5; p.z -= v.z / sp * 2.5; p.y += 0.05;           // 2.5 m wstecz
+  v.set(-v.x * 0.2, 0, -v.z * 0.2); chassisBody.angularVelocity.set(0, 0, 0);
+  hudToast('Zakaz wjazdu rowerów na autostradę (B-9)');
+}
 function updateCar(dt){
+  bikeHwyBan(dt);
   const driving = (mode === 'car');
   const fwdWorld = _fwdWorld;
   chassisBody.quaternion.vmult(CAR_FWD, fwdWorld);

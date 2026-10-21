@@ -9,15 +9,15 @@ const CAR_TYPES = {
   sedan:  { name: 'Zwykły', mass: 1250, force: 5200, fadeKmh: 205, drag: 1.15, steer: 0.52, brake: 62, grip: 3.4,
             stiff: 40, rest: 0.36, travel: 0.34, damp: [4.0, 5.5], half: [0.96, 0.35, 2.16], boxY: 0.15,
             wheelR: 0.36, track: 0.86, wbF: -1.45, wbR: 1.45, connY: 0.11, pitch: 1.0, bright: 1.0,
-            npc: { hw: 0.93, hl: 2.05, hh: 0.62, accel: 1.7, speed: 1.0 } },
+            npc: { hw: 0.93, hl: 2.05, hh: 0.62, accel: 1.7, speed: 1.0, pirV: 52, pirA: 10 } },
   pickup: { name: 'Pickup', mass: 1900, force: 5400, fadeKmh: 190, drag: 1.40, steer: 0.50, brake: 58, grip: 3.3,
             stiff: 32, rest: 0.42, travel: 0.40, damp: [3.6, 5.0], half: [1.02, 0.45, 2.62], boxY: 0.22,
             wheelR: 0.42, track: 0.92, wbF: -1.6, wbR: 1.6, connY: 0.12, pitch: 0.78, bright: 0.8,
-            npc: { hw: 1.0, hl: 2.65, hh: 0.75, accel: 1.35, speed: 0.95 } },
+            npc: { hw: 1.0, hl: 2.65, hh: 0.75, accel: 1.35, speed: 0.95, pirV: 46, pirA: 7 } },
   sport:  { name: 'Sportowy', mass: 1150, force: 6400, fadeKmh: 300, drag: 0.70, steer: 0.55, brake: 76, grip: 4.3,
             stiff: 58, rest: 0.28, travel: 0.24, damp: [4.6, 6.2], half: [0.98, 0.28, 2.2], boxY: 0.08,
             wheelR: 0.35, track: 0.88, wbF: -1.40, wbR: 1.40, connY: 0.10, pitch: 1.3, bright: 1.45,
-            npc: { hw: 0.97, hl: 2.2, hh: 0.52, accel: 2.3, speed: 1.08 } },
+            npc: { hw: 0.97, hl: 2.2, hh: 0.52, accel: 2.3, speed: 1.08, pirV: 70, pirA: 15 } },
   /* rower: ten sam RaycastVehicle — 4 koła o rozstawie 0.12 m (wizualnie 2), w pionie trzyma go moment
      prostujący (update-vehicle.js); napęd, hamulce i hamowanie silnikiem skalowane do masy */
   bike:   { name: 'Rower', mass: 95, force: 150, fadeKmh: 32, drag: 0.32, steer: 0.55, brake: 2.4, grip: 2.6,
@@ -38,11 +38,13 @@ const IND_Y = { sedan: 0.8, pickup: 1.05, sport: 0.66 };
 const _indGeo = {};
 function indicatorGeo(type, side){                     // side +1 lewy, −1 prawy
   const key = type + side; if (_indGeo[key]) return _indGeo[key];
-  /* z obrysu brył modelu: przód / tył (zderzaki) i szerokość — lampy na narożnikach, wystające 2 cm */
-  const P = carParts(type), front = Math.max(...P.map(q => q[6] + q[2] / 2)), rear = Math.min(...P.map(q => q[6] - q[2] / 2));
-  const half = Math.max(...P.map(q => Math.abs(q[4]) + q[0] / 2)), x = side * (half - 0.14), y = IND_Y[type] || 0.8;
-  const B = () => new THREE.BoxGeometry(0.24, 0.12, 0.08);
-  return (_indGeo[key] = mergeColored([{ geo: B(), color: 0xffffff, x: x, y: y, z: front - 0.02 }, { geo: B(), color: 0xffffff, x: x, y: y, z: rear + 0.02 }]));
+  /* z obrysu brył modelu NA WYSOKOŚCI lampy (bez lusterek i zderzaków niżej / wyżej) — lampy na narożnikach nadwozia (połowa w blasze, lico 6 cm przed nią) */
+  const y = IND_Y[type] || 0.8, all = carParts(type).filter(q => q[3] === 'paint' || q[3] === 'dark');
+  const at = all.filter(q => Math.abs(q[5] - y) <= q[1] / 2 + 0.01), P = at.length ? at : all;
+  const front = Math.max(...P.map(q => q[6] + q[2] / 2)), rear = Math.min(...P.map(q => q[6] - q[2] / 2));
+  const half = Math.min(...[front, rear].map(zz => Math.max(...P.filter(q => Math.abs(q[6] - zz) <= q[2] / 2 + 0.1).map(q => Math.abs(q[4]) + q[0] / 2), 0.5))), x = side * (half - 0.065);   // przy krawędzi, na zewnątrz reflektorów
+  const B = () => new THREE.BoxGeometry(0.12, 0.12, 0.08);
+  return (_indGeo[key] = mergeColored([{ geo: B(), color: 0xffffff, x: x, y: y, z: front + 0.02 }, { geo: B(), color: 0xffffff, x: x, y: y, z: rear - 0.02 }]));
 }
 const indMat = new THREE.MeshBasicMaterial({ color: 0xffa21a });
 let indBlinkOn = false;                                // faza migania (main-loop: ~1.4 Hz)

@@ -28,46 +28,79 @@ function planeFin(pts, thick){                         // kształt w płaszczyź
   return g;
 }
 function cylZ(r0, r1, len, seg){ const g = new THREE.CylinderGeometry(r1, r0, len, seg || 14); g.rotateX(Math.PI / 2); return g; }   // oś Z, r0 z tyłu, r1 z przodu
+function wheelX(r, w){ const g = new THREE.CylinderGeometry(r, r, w, 14); g.rotateZ(Math.PI / 2); return g; }          // koło: oś obrotu X (toczy się wzdłuż Z)
+/* kadłub: bryła obrotowa wokół osi Z z profilu [[z, r], …] (od ogona do nosa); 16 ścian — boczne ściany
+   leżą tuż nad i tuż pod osią (pas okien / malowania); lift(z) unosi oś (podniesiony ogon) */
+function fuselage(profile, lift){
+  const g = new THREE.LatheGeometry(profile.map(p => new THREE.Vector2(Math.max(0.001, p[1]), p[0])), 16);
+  g.rotateX(Math.PI / 2);                                // oś lathe (y) -> z
+  const a = g.attributes.position;
+  for (let i = 0; i < a.count; i++) a.setY(i, a.getY(i) + lift(a.getZ(i)));
+  g.computeVertexNormals();
+  return g;
+}
+/* zastrzał / goleń: prostopadłościan t × t od punktu a do b */
+function strut(a, b, t){
+  const d = new THREE.Vector3(b[0] - a[0], b[1] - a[1], b[2] - a[2]), len = d.length();
+  const g = new THREE.BoxGeometry(t, len, t);
+  g.applyMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize())));   // r128: bez applyQuaternion
+  g.translate((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2);
+  return g;
+}
 function buildPlaneModel(kind, livery){
-  const B = (w, h, d) => new THREE.BoxGeometry(w, h, d), parts = [], add = (geo, color, x, y, z) => parts.push({ geo: geo, color: color, x: x || 0, y: y || 0, z: z || 0 });
+  const B = (w, h, d) => new THREE.BoxGeometry(w, h, d), parts = [], add = (geo, color, x, y, z, fn) => parts.push({ geo: geo, color: color, x: x || 0, y: y || 0, z: z || 0, colorFn: fn, quads: !!fn });
   const WHITE = 0xe9eaec, DARK = 0x262a30, GREY = 0xb9bec6, WIN = 0x1b2a38;
   let prop = null;
   if (kind === 'jet'){
-    add(cylZ(1.65, 1.65, 19), WHITE, 0, 0, 0.5);                            // kadłub
-    const nose = new THREE.SphereGeometry(1.65, 16, 12); nose.scale(1, 0.95, 2.1); add(nose, WHITE, 0, -0.05, 10);   // nos
-    add(cylZ(0.45, 1.65, 7), WHITE, 0, 0.45, -12.5);                        // stożek ogonowy (uniesiony)
-    add(B(2.0, 0.42, 0.7), WIN, 0, 0.85, 12.6);                             // szyby kabiny
+    /* kadłub z nosem i stożkiem ogonowym w jednej bryle; ogon uniesiony o 0.09 m na metr za z = −8 */
+    const lift = z => z < -8 ? (-8 - z) * 0.09 : 0;
+    const prof = [[-16.6, 0.05], [-16.2, 0.3], [-15, 0.6], [-13.5, 0.95], [-12, 1.25], [-10, 1.52], [-8.5, 1.65]];
+    for (let z = -8; z <= 9; z += 0.5) prof.push([z, 1.65]);
+    prof.push([10, 1.6], [11, 1.48], [12, 1.25], [12.8, 0.98], [13.5, 0.65], [14, 0.32], [14.25, 0.05]);
+    add(fuselage(prof, lift), WHITE, 0, 0, 0, (x, y, z) => {
+      const side = Math.abs(x) > 1.0;
+      if (z > 12 && z < 12.8 && y > 0.3 && y < 1.0) return WIN;                                         // szyby kabiny (pas na nosie)
+      if (side && y > 0 && y < 0.7 && z > -7.5 && z < 9.6) return Math.floor((z + 20) / 0.5) % 2 ? WIN : null;   // okna co 1 m
+      if (side && y < 0 && y > -0.7 && z > -11 && z < 11.5) return livery;                         // pas malowania
+      if (z < -14.8) return livery;                                                                // końcówka ogona
+      return null;
+    });
     for (const sx of [-1, 1]){
-      add(B(0.06, 0.3, 15.5), WIN, sx * 1.62, 0.5, 0.2);                    // okna
-      add(B(0.06, 0.42, 19), livery, sx * 1.63, -0.25, 0.5);                // pas malowania
-      add(planeWing([[0, 3.2], [sx * 12.5, -3.6], [sx * 12.5, -5.4], [0, -3.2]], 0.32), WHITE, 0, -0.75, 0);   // skrzydła (skos)
+      add(planeWing([[0, 3.2], [sx * 12.5, -3.6], [sx * 12.5, -5.4], [0, -3.2]], 0.32), WHITE, 0, -0.75, 0);   // skrzydła (skos), nasada w kadłubie
       add(planeWing([[sx * 12.5, -3.6], [sx * 12.7, -4.0], [sx * 12.7, -5.2], [sx * 12.5, -5.4]], 0.32), livery, 0, -0.75, 0);
       add(cylZ(0.8, 0.9, 3.6), GREY, sx * 4.8, -1.75, 1.2);                 // silniki
       add(cylZ(0.72, 0.72, 0.12), DARK, sx * 4.8, -1.75, 3.05);
-      add(B(0.25, 0.9, 2.2), GREY, sx * 4.8, -1.0, 0.6);                    // pylon
-      add(planeWing([[0, -10.4], [sx * 4.9, -13.2], [sx * 4.9, -14.4], [0, -13.6]], 0.2), WHITE, 0, 0.95, 0);   // statecznik poziomy
-      add(B(0.3, 1.4, 0.3), DARK, sx * 1.7, -1.9, -0.8);                    // podwozie główne
-      add(cylZ(0.55, 0.55, 0.5), DARK, sx * 1.7, -1.8, -0.8);
+      add(cylZ(0.35, 0.62, 0.7), DARK, sx * 4.8, -1.75, -0.95);             // dysza
+      add(B(0.25, 0.75, 2.2), GREY, sx * 4.8, -0.95, 0.6);                  // pylon (do spodu skrzydła)
+      add(planeWing([[0, -11.0], [sx * 4.9, -13.6], [sx * 4.9, -14.8], [0, -14.2]], 0.2), WHITE, 0, 1.0, 0);   // statecznik poziomy (nasada w ogonie)
+      add(strut([sx * 1.7, -1.2, -0.8], [sx * 1.7, -1.8, -0.8], 0.3), DARK);   // podwozie główne: goleń + 2 koła
+      add(wheelX(0.55, 0.32), DARK, sx * 1.52, -1.8, -0.8); add(wheelX(0.55, 0.32), DARK, sx * 1.88, -1.8, -0.8);
     }
-    add(planeFin([[-9.6, 1.4], [-14.6, 1.4], [-15.4, 6.6], [-13.4, 6.6]], 0.34), livery, 0, 0, 0);   // statecznik pionowy
-    add(B(0.25, 1.4, 0.25), DARK, 0, -1.65, 9.2); add(cylZ(0.4, 0.4, 0.35), DARK, 0, -1.95, 9.2);     // podwozie przednie
+    add(planeFin([[-9.0, 1.0], [-15.8, 1.1], [-16.4, 6.6], [-14.2, 6.6]], 0.34), livery, 0, 0, 0);   // statecznik pionowy (spód w kadłubie)
+    add(strut([0, -1.2, 9.2], [0, -1.95, 9.2], 0.22), DARK); add(wheelX(0.4, 0.26), DARK, 0, -1.95, 9.2);   // podwozie przednie
   } else {
-    add(cylZ(0.45, 0.78, 5.4), WHITE, 0, 0, -0.4);                          // kadłub (zwężony ku ogonowi)
-    add(cylZ(0.78, 0.68, 1.0), livery, 0, 0, 2.8);                          // osłona silnika
-    const sp = new THREE.ConeGeometry(0.3, 0.6, 10); sp.rotateX(Math.PI / 2); add(sp, DARK, 0, 0, 3.55);
-    add(B(1.42, 0.55, 1.8), WIN, 0, 0.42, 1.0);                              // kabina (szyby)
-    add(B(11.2, 0.14, 1.55), WHITE, 0, 0.95, 0.85);                          // skrzydło (górnopłat)
+    /* kadłub z osłoną silnika: szyby kabiny i osłona malowane na bryle */
+    const prof = [[-3.5, 0.03], [-3.3, 0.16], [-2.5, 0.3], [-1.5, 0.48], [-0.6, 0.66], [0, 0.76], [0.5, 0.79], [1.0, 0.8], [1.6, 0.8], [2.3, 0.78], [2.8, 0.74], [3.3, 0.62], [3.42, 0.35], [3.45, 0.05]];
+    add(fuselage(prof, () => 0), WHITE, 0, 0, 0, (x, y, z) => {
+      if (z > 2.3) return livery;                                                                  // osłona silnika
+      if (z > 0.15 && z < 2.0 && y > 0.12) return WIN;                                             // kabina: szyby boczne i przednia
+      if (Math.abs(x) > 0.3 && y < 0 && y > -0.45 && z < 0.15 && z > -3) return livery;            // pas
+      return null;
+    });
+    const sp = new THREE.ConeGeometry(0.3, 0.6, 10); sp.rotateX(Math.PI / 2); add(sp, DARK, 0, 0, 3.72);   // kołpak śmigła
+    add(B(11.2, 0.14, 1.55), WHITE, 0, 0.86, 0.95);                          // skrzydło (górnopłat) — leży na dachu kabiny
+    add(B(1.0, 0.1, 1.2), WHITE, 0, 0.83, 0.95);                             // owiewka nasady skrzydła
     for (const sx of [-1, 1]){
-      add(B(0.9, 0.15, 1.56), livery, sx * 5.1, 0.95, 0.85);                 // końcówki skrzydeł
-      const st = B(0.06, 1.25, 0.08); st.rotateZ(sx * 0.95); add(st, GREY, sx * 1.05, 0.25, 0.6);   // zastrzał
-      add(B(0.08, 0.9, 0.08), GREY, sx * 0.95, -0.8, 0.4); add(cylZ(0.3, 0.3, 0.2), DARK, sx * 0.95, -1.15, 0.4);   // podwozie
+      add(B(0.9, 0.15, 1.56), livery, sx * 5.1, 0.86, 0.95);                 // końcówki skrzydeł
+      add(strut([sx * 0.6, -0.4, 0.9], [sx * 2.7, 0.79, 0.95], 0.07), GREY);   // zastrzał: dół kadłuba -> spód skrzydła
+      add(strut([sx * 0.45, -0.55, 0.5], [sx * 1.0, -1.15, 0.5], 0.08), GREY); add(wheelX(0.3, 0.16), DARK, sx * 1.08, -1.15, 0.5);   // podwozie główne
     }
-    add(B(3.6, 0.1, 0.95), WHITE, 0, 0.12, -3.0);                            // statecznik poziomy
-    add(planeFin([[-2.5, 0.2], [-3.6, 0.2], [-3.75, 1.5], [-3.2, 1.5]], 0.1), livery, 0, 0, 0);
-    add(B(0.08, 0.9, 0.08), GREY, 0, -0.75, 2.4); add(cylZ(0.25, 0.25, 0.16), DARK, 0, -1.15, 2.4);
+    add(B(3.6, 0.1, 0.95), WHITE, 0, 0.1, -2.95);                            // statecznik poziomy (nasada w ogonie)
+    add(planeFin([[-2.2, 0.12], [-3.35, 0.12], [-3.6, 1.45], [-3.0, 1.45]], 0.1), livery, 0, 0, 0);   // statecznik pionowy
+    add(strut([0, -0.6, 2.4], [0, -1.15, 2.4], 0.08), GREY); add(wheelX(0.25, 0.14), DARK, 0, -1.15, 2.4);   // koło przednie
     const pg = new THREE.BoxGeometry(0.16, 2.3, 0.05);
     prop = new THREE.Mesh(pg, new THREE.MeshLambertMaterial({ color: 0x1b1d21 }));
-    prop.position.set(0, 0, 3.42);
+    prop.position.set(0, 0, 3.55);
   }
   const group = new THREE.Group(), m = new THREE.Mesh(mergeColored(parts), _planeMat);
   m.castShadow = m.receiveShadow = true;

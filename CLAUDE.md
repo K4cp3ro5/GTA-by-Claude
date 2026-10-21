@@ -64,8 +64,8 @@ Klatka (`main-loop.js`): pauza (`gameStarted && !pointerLocked && !debugOpen`) =
 - Przesunięcie boczne toru `n.lat` → `n.latT` (objazd przeszkody `npcTryBypass`, zmiana pasa `npcHwyLanes` na punktach `p.ovt`); cel jazdy z `npcAim`. Przeszkody (auto gracza, atrapy) po obrysie: `rectInCorridor`.
 - Węzeł: nosy `HWY_GORES`, linia przerywana przy pasach przylegających `HWY_AUXGAPS`/`cwAuxAdj`; znaki na pomoście przez `hwySignAt` (korona bariery), tablice przez `hwyBoard` (bramownica).
 - Przepisy miejskie (światła, STOP, ronda z `RB.commit`, piesi, zebry, `speedLimitAt`, pierwszeństwo) tylko na poziomie ulic; na autostradzie limit z `vmax` punktu.
-- Profile kierowców (`n.profile`): ostrożny / zwykły / dynamiczny / pirat / rowerzysta. Pirat (`PIRATE_COLOR`, `npcMakePirate`) pomija światła, STOP, zebry, pieszych i pierwszeństwo (w `npcConflict` czeka tylko na auto wyraźnie pierwsze), ale ustępuje na rondzie; potrącenia: `npcPirate` (rowerzysta, `PIRATE_RAM_CHANCE`) i piesi przed maską.
-- Rowerzyści NPC jeżdżą po `offsetLoop(P, 2.3)` pętli bez rond (`bikeLoopOf`, `spawnNpcBike`).
+- Profile kierowców (`n.profile`): ostrożny / zwykły / dynamiczny / pirat / rowerzysta. Pirat (`PIRATE_COLOR`, `npcMakePirate`) pomija światła, STOP, zebry, pieszych, limity i pierwszeństwo (w `npcConflict` czeka tylko na auto wyraźnie pierwsze), ale ustępuje na rondzie; jedzie z `npc.pirV` (przyspieszenie `pirA`, hamowanie przed zakrętem `npcCornerCap`), slalom i wyprzedzanie przeciwnym pasem w `npcPirate` (`n.povt`); inni widzą go z dalszej odległości (zasięg wg prędkości); potrącenia: `npcPirate` (rowerzysta, `PIRATE_RAM_CHANCE`) i piesi przed maską.
+- Rower gracza nie wjedzie na rampę/pomost (`bikeHwyBan`, znak B-9 przy wjazdach). Rowerzyści NPC jeżdżą po `offsetLoop(P, 2.3)` pętli bez rond (`bikeLoopOf`, `spawnNpcBike`).
 - Skrzyżowanie poprzeczne: wolne auto (< 3 m/s), które wpełzło w strefę konfliktu, nie przejmuje pierwszeństwa przed autem, które nie wyhamuje (droga hamowania ≈ v / 5.5).
 
 ## Pułapki

@@ -334,7 +334,7 @@ function __sim(seconds){
       const tg = n.path[n.wp], onHwy = tg.hwy || (n.y || 0) > 1;
       const tp = n.path[(n.wp - 1 + n.path.length) % n.path.length];   // limit odcinka: większy z jego końców (hamowanie trwa)
       const lim = onHwy ? (((n.latT || 0) > 1 || (n.lat || 0) > 0.3) && tg.ovt ? HP.vmax : (tg.vmax !== undefined && tp.vmax !== undefined ? Math.max(tg.vmax, tp.vmax) : tg.vmax)) : speedLimitAt(n.pos.x, n.pos.y);   // lewy pas odcinka wyprzedzania: 100 km/h
-      if (n.profile === 'pirat'){ cnt.pirMax = Math.max(cnt.pirMax || 0, n.speed); if (lim && n.speed > lim * 1.1 + 0.3) cnt.pirOver = (cnt.pirOver || 0) + 1; }   // piraci osobno
+      if (n.profile === 'pirat'){ cnt.pirMax = Math.max(cnt.pirMax || 0, n.speed); if (!onHwy){ cnt.pirCityMax = Math.max(cnt.pirCityMax || 0, n.speed); cnt.pirCitySum = (cnt.pirCitySum || 0) + n.speed; cnt.pirCityN = (cnt.pirCityN || 0) + 1; } if (lim && n.speed > lim * 1.1 + 0.3) cnt.pirOver = (cnt.pirOver || 0) + 1; }   // piraci osobno
       else if (lim && n.speed > lim * 1.1 + 0.3) cnt.overLimit++;
       if (!onHwy && inZone30(n.pos.x, n.pos.y)) cnt.v30 = Math.max(cnt.v30, n.speed);
       else if (!onHwy && lim) cnt.v50 = Math.max(cnt.v50, n.speed);
@@ -362,12 +362,12 @@ function __sim(seconds){
   }
   if (report.stuckMax > 30){
     const sn = npcs[report.stuckId];
-    report.dump = npcs.map((m,i)=>({i, x:+m.pos.x.toFixed(1), z:+m.pos.y.toFixed(1), h:+m.heading.toFixed(2), sp:+Math.hypot(m.body.velocity.x,m.body.velocity.z).toFixed(2), blk:m.blocked, sp2:m.stopPass, hold:m.stopHold, wp:m.wp}))
+    report.dump = npcs.map((m,i)=>({i, x:+m.pos.x.toFixed(1), z:+m.pos.y.toFixed(1), h:+m.heading.toFixed(2), sp:+Math.hypot(m.body.velocity.x,m.body.velocity.z).toFixed(2), blk:m.blocked, why:m.why, id:m.id, pr:m.profile, t:m.type, lat:+(m.lat||0).toFixed(1), latT:+(m.latT||0).toFixed(1), povt:!!m.povt, byp:!!m.byp, wp:m.wp}))
       .filter(m => Math.hypot(m.x-sn.pos.x, m.z-sn.pos.y) < 20);
   }
   report.g7 = { objazdy: npcs.reduce((a, n) => a + (n.bypassCount || 0), 0), maksCzekaniePrzedPrzeszkoda: +Math.max(0, ...npcs.map(n => n.obstMax || 0)).toFixed(1),
                  wyprzedzenia: npcs.reduce((a, n) => a + (n.ovtCount || 0), 0), zjazdyZLewegoPasa: cnt.leftExit || 0, ucieczkiPieszych: Pedestrians.fled,
-                 piraci: npcs.filter(n => n.profile === 'pirat').length, piraciMaksKmh: Math.round((cnt.pirMax || 0) * 3.6), piraciKlatkiPonadLimit: cnt.pirOver || 0,
+                 piraci: npcs.filter(n => n.profile === 'pirat').length, piraciMaksKmh: Math.round((cnt.pirMax || 0) * 3.6), piraciMiastoMaksKmh: Math.round((cnt.pirCityMax || 0) * 3.6), piraciMiastoSredniaKmh: Math.round((cnt.pirCitySum || 0) / (cnt.pirCityN || 1) * 3.6), piraciKlatkiPonadLimit: cnt.pirOver || 0,
                  piraciWyprzedzeniaWMiescie: npcs.reduce((a, n) => a + (n.pirateOvt || 0), 0), potraceniaRowerzystow: npcs.reduce((a, n) => a + (n.rams || 0), 0), potraceniaPieszych: npcs.reduce((a, n) => a + (n.pedHits || 0), 0),
                  nakladaniaZPiratem: cnt.pirOverlap || 0,
                  profile: npcs.reduce((a, n) => (a[n.profile] = (a[n.profile] || 0) + 1, a), {}), typy: npcs.reduce((a, n) => (a[n.type] = (a[n.type] || 0) + 1, a), {}) };

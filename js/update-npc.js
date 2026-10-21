@@ -177,17 +177,17 @@ function updateNpc(n, i, dt, honk){
     if (tgt.vmax !== undefined){
       /* na autostradzie: tempo wg kierowcy (maks. +8%), na lewym pasie odcinka wyprzedzania limit 100 km/h */
       const pir = n.profile === 'pirat';
-      const f = tgt.hwy ? Math.min(tgt.vmax >= HP.vmax * 0.8 ? (pir ? 1.35 : 1.05) : (pir ? 1.15 : 1), (n.obey || 1) * (n.hwyF || 1)) : 1;   // łuki i rampy: bez naddatku (pirat: +15%)
+      const f = pir ? (tgt.vmax >= HP.vmax * 0.8 ? 9 : 1.35) : tgt.hwy ? Math.min(tgt.vmax >= HP.vmax * 0.8 ? 1.05 : 1, (n.obey || 1) * (n.hwyF || 1)) : 1;   // łuki i rampy: bez naddatku (pirat: jezdnia główna bez limitu, łuki +35%)
       cap = Math.min(cap, ((n.latT > 1 || n.lat > 1) && tgt.ovt ? Math.max(tgt.vmax, HP.vmax) : tgt.vmax) * f);
     }
-    if (!tgt.hwy){
+    if (!tgt.hwy && !pir){
       /* limit strefy (B-33, B-43, obszar zabudowany): bieżący i ~22 m przed autem, żeby hamowało przed znakiem */
       const lim0 = speedLimitAt(n.pos.x, n.pos.y), lim1 = speedLimitAt(n.pos.x + dx*22, n.pos.y + dz*22);
       const lim = Math.min(lim0 || Infinity, lim1 || Infinity);
       if (lim < Infinity) cap = Math.min(cap, lim * (n.obey || 1));
       /* skrzyżowanie z drogą z pierwszeństwem przed nami, a my na podporządkowanej (A-7/STOP): dojazd ~30 km/h */
       const pr = roadPriority(n.pos.x + dx*14, n.pos.y + dz*14);
-      if (!pir && pr && (pr === 'ew') !== (Math.abs(dx) > Math.abs(dz)) && roadPriority(n.pos.x, n.pos.y) === null) cap = Math.min(cap, 8.5);
+      if (pr && (pr === 'ew') !== (Math.abs(dx) > Math.abs(dz)) && roadPriority(n.pos.x, n.pos.y) === null) cap = Math.min(cap, 8.5);
     }
 
     if (n.ovtSlow) cap = Math.min(cap, n.speed * 0.85);
@@ -196,8 +196,13 @@ function updateNpc(n, i, dt, honk){
     if (n.bypCreep) cap = Math.min(cap, 2.5);                     // lewy pas przed końcem odcinka: przepuść prawy
     /* strzały w pobliżu: kierowcy przyspieszają do limitu */
     if (n.panicT > 0) n.panicT -= dt;
-    const want = block ? 0 : Math.min(tgt.hwy ? 99 : (n.panicT > 0 ? Math.max(n.target, 13.9) : n.target), cap);
-    n.speed = damp(n.speed, want, (block || want < n.speed - 1) ? 5.5 : n.accel, dt);
+    /* pirat: zawsze ile fabryka (i tuning) dała — hamuje tylko przed zakrętem trasy i przed przeszkodą */
+    if (pir && !tgt.hwy) cap = Math.min(cap, npcCornerCap(n));
+    const want = block ? 0 : Math.min(pir ? CAR_TYPES[n.type].npc.pirV : tgt.hwy ? 99 : (n.panicT > 0 ? Math.max(n.target, 13.9) : n.target), cap);
+    if (pir && !block && want > n.speed){                                        // przyspieszenie ograniczone mocą (maleje z prędkością)
+      const T = CAR_TYPES[n.type].npc;
+      n.speed = Math.min(want, n.speed + T.pirA * (1 - 0.6 * n.speed / T.pirV) * dt);
+    } else n.speed = damp(n.speed, want, (block || want < n.speed - 1) ? 5.5 : n.accel, dt);
     n.heading = angleDamp(n.heading, Math.atan2(dx, dz), n.rbPhase === 'ring' ? 8 : 5.5, dt);
 
     n.dirX = dx; n.dirZ = dz;
@@ -207,11 +212,28 @@ function updateNpc(n, i, dt, honk){
   }
 }
 
+/* pirat: prędkość, z której zdąży wyhamować (10 m/s²) do prędkości pokonania najbliższego narożnika trasy
+   (90° ≈ 45 km/h z poślizgiem, łagodniejsze szybciej); szuka do 220 m przed autem */
+function npcCornerCap(n){
+  let px = n.pos.x, pz = n.pos.y, d = 0, wp = n.wp;
+  let ux = n.dirX || Math.sin(n.heading), uz = n.dirZ || Math.cos(n.heading);
+  for (let k = 0; k < 24 && d < 220; k++){
+    const q = n.path[wp], lx = q.x - px, lz = q.z - pz, l = Math.hypot(lx, lz);
+    if (l > 0.3){
+      const vx = lx / l, vz = lz / l, c = clamp(ux * vx + uz * vz, -1, 1);
+      if (c < 0.94){ const ang = Math.acos(c), vc = 12.5 + 45 * Math.pow(Math.max(0, 1 - ang / (Math.PI / 2)), 2); return Math.sqrt(vc * vc + 2 * 10 * Math.max(0, d - 2)); }
+      ux = vx; uz = vz; d += l;
+    }
+    px = q.x; pz = q.z; wp = (wp + 1) % n.path.length;
+  }
+  return Infinity;
+}
 /* czy po mojej trasie (próbki co 1.5 m do 8 m) moje nadwozie zahaczy o auto stojące (v < 1 m/s) obok */
 function npcPathSweep(n, dx, dz){
   let cand = null;
   for (const m of npcs){
     if (m === n || m.speed > 1 || Math.abs((m.y || 0) - n.y) > 2.5) continue;
+    if (n.profile === 'pirat' && m.type === 'bike') continue;                    // pirat jedzie po rowerzyście (npcConflict go przewraca)
     if (Math.hypot(m.pos.x - n.pos.x, m.pos.y - n.pos.y) > 12) continue;
     if (m.why === 'tor:' + n.id) continue;                                   // ono czeka na mnie — jadę
     if ((m.pos.x - n.pos.x) * dx + (m.pos.y - n.pos.y) * dz < 0.5) continue;  // za mną albo obok — nie na moim torze
@@ -297,7 +319,10 @@ const _nearAxis = v => { let m = 1e9; for (let i = 0; i <= GRID; i++) m = Math.m
    przeciwnego pasa wolna), cały odcinek objazdu poza skrzyżowaniami i bez aut z naprzeciwka */
 function npcTryBypass(n, o, dx, dz, tgt){
   if (n.y > 1 || n.rb >= 0 || tgt.hwy || n.lat || n.type === 'bike') return;
-  const need = o.lMax + (n.halfW || 0.93) + 0.45;
+  /* o.lMax liczone od auta, a n.latT od osi toru — auto stojące obok toru (np. pirat po slalomie) dolicza swoje przesunięcie */
+  const prv = n.path[(n.wp - 1 + n.path.length) % n.path.length], sx = tgt.x - prv.x, sz = tgt.z - prv.z, sl = Math.hypot(sx, sz) || 1;
+  const latAct = ((n.pos.x - prv.x) * sz - (n.pos.y - prv.z) * sx) / sl;
+  const need = o.lMax + latAct + (n.halfW || 0.93) + 0.45;
   if (need > 4.2 || need < 0.3) return;
   const end = o.aMax + (n.halfL || 2.05) + 1.5;
   if (Math.hypot(tgt.x - n.pos.x, tgt.z - n.pos.y) < end + 4) return;            // przed zakrętem trasy — nie
@@ -353,7 +378,7 @@ function npcHwyLanes(n, dx, dz, tgt){
    — rowerzysta się przewraca, pirat jedzie dalej */
 let PIRATE_RAM_CHANCE = 0.15;
 function npcPirate(n, dx, dz, tgt, dt){
-  if (n.y > 1 || n.rb >= 0 || tgt.hwy || n.byp) return;
+  if (n.y > 1 || n.rb >= 0 || tgt.hwy || n.byp){ if (!n.byp && !n.povt && !n.ram && Math.abs(n.latT || 0) < 1.7) n.latT = 0; return; }   // rondo, autostrada: bez slalomu
   /* trwające taranowanie: zbliżenie w bok do rowerzysty, kontakt -> przewrócenie */
   if (n.ram){
     const m = n.ram.m; n.ram.t -= dt;
@@ -365,14 +390,25 @@ function npcPirate(n, dx, dz, tgt, dt){
     }
     return;
   }
-  /* trwające wyprzedzanie po przeciwnym pasie */
+  /* trwające wyprzedzanie po przeciwnym pasie: koniec po minięciu, a auto z naprzeciwka blisko — powrót na swój pas */
   if (n.povt){
     const m = n.povt.m, a = (m.pos.x - n.pos.x) * dx + (m.pos.y - n.pos.y) * dz;
     n.povt.t += dt;
-    if (npcs.indexOf(m) < 0 || a < -((n.halfL || 2.05) + (m.halfL || 2.05) + 4) || n.povt.t > 12){ n.latT = 0; n.povt = null; }
+    let oncoming = false;
+    for (const o of npcs){
+      if (o === n || Math.abs((o.y || 0) - n.y) > 2.5 || (o.dirX || 0) * dx + (o.dirZ || 0) * dz > -0.5) continue;
+      const ox = o.pos.x - n.pos.x, oz = o.pos.y - n.pos.y, oa = ox * dx + oz * dz, ol = ox * dz - oz * dx;
+      if (oa > 0 && oa < 14 + (n.speed + o.speed) * 1.2 && ol > 1.2 && ol < 6.5){ oncoming = true; break; }
+    }
+    if (npcs.indexOf(m) < 0 || a < -((n.halfL || 2.05) + (m.halfL || 2.05) + 3) || n.povt.t > 8 || oncoming){ n.latT = 0; n.latRate = 2.4; n.povt = null; n.weaveT = 1.5; }
     return;
   }
-  if (n.lat) return;
+  /* slalom: kołysanie w obrębie swojego pasa (−0.6 … +1.6 m od toru), poza skrzyżowaniami */
+  const nearX = _nearAxis(n.pos.x) < ROAD_H + 3 && _nearAxis(n.pos.y) < ROAD_H + 3;
+  n.weaveT = Math.max(0, (n.weaveT || 0) - dt);
+  n.weave = (n.weave || n.id * 1.7) + dt * (1.6 + (n.id % 3) * 0.35);
+  if (!nearX && !n.weaveT && n.speed > 6) { n.latT = 0.5 + 1.1 * Math.sin(n.weave); n.latRate = 1.8; }
+  else if (Math.abs(n.latT || 0) < 1.7) n.latT = 0;
   for (const m of npcs){
     if (m === n || Math.abs((m.y || 0) - n.y) > 2.5) continue;
     if ((m.dirX || 0) * dx + (m.dirZ || 0) * dz < 0.8) continue;
@@ -384,24 +420,23 @@ function npcPirate(n, dx, dz, tgt, dt){
       continue;
     }
     /* wolniejsze auto przed nami na tym samym pasie */
-    if (m.type === 'bike' || a < 3 || a > 16 || Math.abs(l) > 1.2 || m.speed < 0.5 || m.speed > (n.target || 10) - 2) continue;
-    const span = a + 30;
+    if (m.type === 'bike' || a < 3 || a > Math.max(16, n.speed * 1.6) || Math.abs(l) > 2 || m.speed < 0.5 || m.speed > n.speed - 1.5) continue;
+    const span = a + 20 + n.speed * 0.8;
     if (Math.hypot(tgt.x - n.pos.x, tgt.z - n.pos.y) < span + 6) return;
     /* skrzyżowania po drodze: pirat przejeżdża przez nie przeciwnym pasem tylko, gdy są puste (bez sygnalizacji, nie rondo) */
     for (let s = -2; s < span; s += 2){
       const x = n.pos.x + dx * s, z = n.pos.y + dz * s;
       if (!(_nearAxis(x) < ROAD_H + 2.6 && _nearAxis(z) < ROAD_H + 2.6)) continue;
       const ji = Math.round((x + HALF) / BLOCK), jj = Math.round((z + HALF) / BLOCK), jx = L(ji), jz = L(jj);
-      if (isRoundaboutPt(ji, jj) || TL_PTS.some(t => t[0] === ji && t[1] === jj)) return;
-      if (npcs.some(o => o !== n && o !== m && Math.hypot(o.pos.x - jx, o.pos.y - jz) < 24)) return;
-      if (Pedestrians.list.some(p => pedOnRoad(p) && Math.hypot(p.pos.x - jx, p.pos.y - jz) < 16)) return;
+      if (isRoundaboutPt(ji, jj)) return;                                        // światła, piesi, zebry — bez znaczenia
+      if (npcs.some(o => o !== n && o !== m && o.speed > 0.5 && Math.hypot(o.pos.x - jx, o.pos.y - jz) < 20)) return;   // ruch w skrzyżowaniu: tam nawet pirat nie zmieści się po lewej
     }
     for (const o of npcs){                                                      // nikt z naprzeciwka / na przeciwnym pasie w 40 m
       if (o === n || o === m || Math.abs((o.y || 0) - n.y) > 2.5) continue;
       const ox = o.pos.x - n.pos.x, oz = o.pos.y - n.pos.y, oa = ox * dx + oz * dz, ol = ox * dz - oz * dx;
-      if (oa > -8 && oa < span + 40 && ol > 1.5 && ol < 10) return;
+      if (oa > -8 && oa < span + 30 + o.speed * 3 && ol > 1.5 && ol < 10) return;
     }
-    return;   // wyprzedzanie po przeciwnym pasie w mieście wyłączone (myliło rozstrzyganie skrzyżowań — zakleszczenia)
+    n.latT = 3.5; n.latRate = 2.4; n.povt = { m: m, t: 0 }; n.pirateOvt = (n.pirateOvt || 0) + 1;
     return;
   }
 }
@@ -439,8 +474,12 @@ function npcConflict(n, m, dx, dz, onlyClose){
   if (n.ram && n.ram.m === m) return Infinity;                               // pirat wjeżdża w rowerzystę (rzadkie zdarzenie)
   if (m.type === 'bike' && m.hitT > 0 && m.rammedBy === n.id) return Infinity; // ucieka od przewróconego
   if (Math.abs((n.y || 0) - (m.y || 0)) > 2.5) return Infinity;             // inny poziom (estakada nad ulicą)
+  /* pirat, który najechał na rowerzystę, przewraca go i jedzie dalej (bez tego stałyby na sobie) */
+  if (n.profile === 'pirat' && m.type === 'bike' && !(m.hitT > 0) && __rectsOverlap(n.pos.x, n.pos.y, n.heading, n.halfW, n.halfL, m.pos.x, m.pos.y, m.heading, m.halfW, m.halfL)){
+    m.hitT = rand(6, 8); m.rammedBy = n.id; n.rams = (n.rams || 0) + 1; return Infinity;
+  }
   const rx = m.pos.x - n.pos.x, rz = m.pos.y - n.pos.y, dist = Math.hypot(rx, rz);
-  if (dist > 16) return Infinity;
+  if (dist > ((n.profile === 'pirat' || m.profile === 'pirat') ? Math.max(16, n.speed * 2, m.speed * 2.5) : 16)) return Infinity;   // pirat ~50 m/s: widziany z daleka
   const gapL = (n.halfL || 2.05) + (m.halfL || 2.05);              // suma półdługości (4.1 dla dwóch sedanów)
   const ahead = rx*dx + rz*dz, lat = Math.abs(rx*-dz + rz*dx);
   if (ahead > 0 && npcTouchAhead(n, m, dx, dz, rx, rz, ahead)){  // nadwozie m tuż przed naszym przodem — stop...
@@ -475,7 +514,7 @@ function npcConflict(n, m, dx, dz, onlyClose){
   if (dot > 0.8){                                                  // ten sam kierunek: kolejka
     /* obok siebie przy włączaniu / zmianie pasa: jedno (wyższe id) zwalnia i wjeżdża za drugie */
     if (lat < 3.0 && ahead > -1.5 && ahead < 0.5){
-      if (n.id < m.id) return Infinity;
+      if (Math.abs(ahead) > 0.15 ? ahead < 0 : n.id < m.id) return Infinity;   // jedzie to, które jest z przodu (zgodnie z regułą styku przodu), przy remisie niższe id
       return lat < (n.halfW || 0.93) + (m.halfW || 0.93) + 0.45 ? true : m.speed * 0.75;   // obrysy już prawie się stykają: ustąp całkiem
     }
     const look = Math.max(13, n.speed * 1.8);                      // przy 100 km/h ~50 m

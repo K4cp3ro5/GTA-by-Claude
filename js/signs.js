@@ -311,11 +311,23 @@ function texD9(end){
   if (end){ g.strokeStyle = '#c5161d'; g.lineWidth = 12; g.beginPath(); g.moveTo(S*0.12, S*0.88); g.lineTo(S*0.88, S*0.12); g.stroke(); }
   return toTex(c);
 }
+/* B-9 zakaz wjazdu rowerów: białe koło z czerwonym obrzeżem, czarny rower */
+function texB9(){
+  const S = 128, c = mkCanvas(S,S), g = c.getContext('2d');
+  g.fillStyle = '#c5161d'; g.beginPath(); g.arc(S/2,S/2,S/2-1,0,TAU); g.fill();
+  g.fillStyle = '#f2f0ea'; g.beginPath(); g.arc(S/2,S/2,S/2-15,0,TAU); g.fill();
+  g.strokeStyle = '#111'; g.lineWidth = 5; g.lineCap = 'round'; g.lineJoin = 'round';
+  for (const x of [38, 90]){ g.beginPath(); g.arc(x, 76, 15, 0, TAU); g.stroke(); }
+  g.beginPath(); g.moveTo(38, 76); g.lineTo(56, 52); g.lineTo(80, 52); g.lineTo(90, 76); g.moveTo(56, 52); g.lineTo(66, 76); g.lineTo(80, 52);
+  g.moveTo(66, 76); g.lineTo(38, 76); g.moveTo(52, 44); g.lineTo(62, 44); g.moveTo(78, 52); g.lineTo(76, 42); g.lineTo(84, 40); g.stroke();
+  return toTex(c);
+}
 function shapeDiamond(r){ return { pts: [[0,-r],[r,0],[0,r],[-r,0]], tw: 2*r, th: 2*r }; }
 const SIGN_TEX2 = { B2: texB2(), C2: texCArrow('C-2'), C4: texCArrow('C-4'), C5: texCArrow('C-5'), C6: texCArrow('C-6'), D1: texD1(), D3: texD3(), D6: texD6(),
-                    D42: texD42(false), D43: texD42(true), D9: texD9(false), D10: texD9(true), B43: texB43(30, false), B44: texB43(30, true) };
+                    D42: texD42(false), D43: texD42(true), D9: texD9(false), B9: texB9(), D10: texD9(true), B43: texB43(30, false), B44: texB43(30, true) };
 Object.assign(FACE, {
   B2:  () => signFace('B-2', SIGN_TEX2.B2, shapeCircle(0.35)),
+  B9:  () => signFace('B-9', SIGN_TEX2.B9, shapeCircle(0.35)),
   C2:  () => signFace('C-2', SIGN_TEX2.C2, shapeCircle(0.35)),
   C4:  () => signFace('C-4', SIGN_TEX2.C4, shapeCircle(0.35)),
   C5:  () => signFace('C-5', SIGN_TEX2.C5, shapeCircle(0.35)),
