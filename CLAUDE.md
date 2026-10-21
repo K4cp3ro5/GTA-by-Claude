@@ -23,8 +23,9 @@ Brak bundlera: `index.html` ładuje zwykłe `<script>` w kolejności z `loadorde
 | physics-world.js | świat cannon, materiały, statyczne kolizje w komórkach, poprawka `computeAABB` |
 | signs.js | znaki drogowe: tarcze, słupki, `placeSign`, `signSpotFree` |
 | car-types.js | typy aut (CAR_TYPES: sedan, pickup, sport, bike) — napęd, zawieszenie, bryła, części modelu (carParts; spojler tylko sport), kierunkowskazy (`addIndicators`, `indBlinkOn`) |
-| airport.js | lotnisko w północnym pasie podmiejskim (`AIRPORT`): pas, kołowanie, płyta, terminal, parking, dojazd z i=5; miejsca samolotów w `AIRPORT_PLANES` |
+| airport.js | lotnisko na wysepce (`AIRPORT`, z ≈ −650…−810): pas, kołowanie, płyta, terminal, parking, dojazd z przystani; miejsca samolotów w `AIRPORT_PLANES` |
 | hospital.js | szpital w południowym pasie podmiejskim (`HOSPITAL`): dojazd z i=4, budynek, lądowisko, karetki, parking; odrodzenie gracza `HOSPITAL_SPAWN` (`respawnPlayer`) |
+| islands.js | wyspy i morze: `WATER_Y`, `SEA_FLOOR`, `ISLANDS`, `isLand`/`islandAt`, `PIERS`, `BOAT_OBSTACLES`, `BOAT_SPOTS`, `PORTS`; bryły wysp w fizyce (dno = `groundBody` na `SEA_FLOOR`), nabrzeża z balustradą (przerwy `HARBOR_GAPS`), woda (`updateSea`), port (`buildMainPort`), przystań wysepki, `updateWaterHazards` (wyciąganie z wody) |
 | districts.js | zabudowa dzielnic (wieżowce, bloki, domki z działkami, parki, plac, galeria, stacja, przemysł); CB(kolor) = bufory scalane w jedną siatkę z kolorami wierzchołków |
 | city-generation.js | ulice, chodniki, przejścia, ronda, układ dzielnic, teren węzła (kopce, stawy, parkingi pod estakadą), pas podmiejski, mur |
 | highways.js | budowa autostrad z planu: pomosty, nasypy, bariery, filary, latarnie, znaki |
@@ -39,16 +40,18 @@ Brak bundlera: `index.html` ładuje zwykłe `<script>` w kolejności z `loadorde
 | sound.js | synteza dźwięku |
 | vehicle-entry.js | wsiadanie, wysiadanie, kradzież, atrapa głównego auta |
 | planes.js | samoloty (`PLANE_TYPES` jet/prop, `planes`): modele, ciało kinematyczne G_PLANE, `enterPlane`/`exitPlane`, lot `planeStep` (W/S gaz, strzałki = docelowe pochylenie/przechył, asystent lądowania), skok `bailOut` + `updateParachute` (prostokątna czasza, A/D skręt, W/S szybciej/hamowanie; wołane w main-loop po `updatePlayer`, kompensuje grawitację świata −20), samolot bez pilota (`p.free`), katastrofa `planeCrash` (gracz na wolne miejsce `safeSpot`, efekty `fxList`/`updateFx`, wrak `wreckEmit`, `camShake`, `Sound.boom`; pilot ginie) |
+| boats.js | łodzie (`BOAT_T`, `boats`): model, `enterBoat`/`exitBoat` (wysiadka tylko przy brzegu), `updateBoat`, `boatBlocked` (ląd, pomosty, statek, inne łodzie), `playerWorldPos()` |
 | daynight.js | cykl dobowy |
 | update-player.js / update-vehicle.js / update-npc.js | logika na klatkę |
-| camera.js / hud.js | kamera TPP / HUD, minimapa, mapa |
+| camera.js / hud.js | kamera TPP (osobne gałęzie: samolot, łódź; `camShake`) / HUD, minimapa (`mapStatic` obejmuje obie wyspy) |
+| navigation.js | pełna mapa (M, `openMap`/`closeMap`, PPM = cel), graf ulic `NAV` (jednokierunkowa obwodnica dla aut, dojazdy szpitala, portu, wysepki), `navCompute` (Dijkstra, przeprawa przez `PORTS`), słup celu, trasa na minimapie |
 | main-loop.js | pętla `frame` i start (`LOADER.finish()` chowa ekran ładowania z index.html) |
 
-Klatka (`main-loop.js`): pauza (`gameStarted && !pointerLocked && !debugOpen`) = tylko render; inaczej `updateSky` → `updateTrafficLights` → `updateNpcs` → `updatePedestrians` → `updateCar` → `updatePlane` / `updatePlanesIdle` → `updatePlayer` → `physicsStep` (akumulator 1/60, maks. 2 kroki, porzuca zaległość) → interpolacja modeli (`_p0/_q0`, `alpha`) → `syncCar` → kamera → HUD → render. Teleport ciała = `noLerp`.
+Tryby `mode`: foot / car / plane / boat. Klawisze: M = mapa (otwarta mapa też pauzuje), N = wyciszenie. Klatka (`main-loop.js`): pauza (`gameStarted && !pointerLocked && !debugOpen`) = tylko render; inaczej `updateSky` → `updateTrafficLights` → `updateNpcs` → `updatePedestrians` → `updateCar` → `updatePlane` / `updatePlanesIdle` → `updateBoat` / `updateBoatsIdle` → `updatePlayer` → `updateParachute` → `physicsStep` (po nim `updateWaterHazards`, `navUpdate`, `updateSea`; akumulator 1/60, maks. 2 kroki, porzuca zaległość) → interpolacja modeli (`_p0/_q0`, `alpha`) → `syncCar` → kamera → HUD → render. Teleport ciała = `noLerp`.
 
 ## Układ świata
 - Siatka 12×12: oś ulicy `L(i) = −264 + 44i`, `blockCenter(i) = L(i) + 22`, `ROAD_H = 7` (pół jezdni), `LOT = 30` (działka), `WALK_H = 0.25`.
-- `CITY_EDGE = 271`, pas podmiejski `BELT = 125`, mur `WALL_X = 397.5`.
+- `CITY_EDGE = 271`, pas podmiejski `BELT = 125`, brzeg wyspy (nabrzeże) `WALL_X = 397.5`. Dookoła morze (`WATER_Y = −0.9`); wysepka lotniska `ISLANDS[1]` (x ±190, z −812…−648). Port na północnym brzegu wyspy głównej, przystań na południowym brzegu wysepki.
 - Kurs h → kierunek (sin h, cos h); północ = −Z, wschód = +X; ruch prawostronny.
 - Autostrady: A1 na x = z, A2 na x = −z, pomost 7 m (A2 nad węzłem 14 m). Parametry w `HP`. Jezdnie `CW['A1+']` itd., węzeł koniczynowy w (0,0), terminale `HWY_TERM` w 4 narożnikach (0 SE, 1 SW, 2 NW, 3 NE). Budynki i detale omijają pas autostrady (`hwyCovered`, `hwyRectCovered`).
 
@@ -56,6 +59,7 @@ Klatka (`main-loop.js`): pauza (`gameStarted && !pointerLocked && !debugOpen`) =
 - Statyczne kolizje idą do złożonych ciał-komórek 48 m (`staticShape`, `staticBox`, `staticBoxQ`) — tysiące osobnych ciał zabijały wydajność.
 - `fixComputeAABB` (physics-world.js) poprawia błąd cannon 0.6.2 w AABB obróconych kształtów. **Nie usuwać** — bez tego koła przepadają przez pomost.
 - Jedno prowadzalne auto (`chassisBody`, typ `carType`, zmiana typu w locie: `applyCarType`); tożsamość w `driving` (owner `player` | `stolen`). Pozostałe auta gracza i skradzione to atrapy w `parkedCars` (statyczne ciało + model) — przesiadka zamienia prowadzone auto w atrapę (`parkActive`/`takeOver`).
+- Podłoże: `groundBody` (płaszczyzna) leży na dnie `SEA_FLOOR = −14`, wyspy to osobne bryły z wierzchem y = 0. Ciała kinematyczne (NPC, piesi, samoloty, łodzie) mają maskę `~G_WORLD` (bez kosztownych par z bryłami wysp); `rayHit` używa grupy −1, żeby je trafiać.
 - Domyślny `collisionFilterMask` w cannon to 1 — ustawiaj `-1`. Grupy: G_WORLD 1, G_PLAYER 2, G_CAR 4, G_PED 8, G_PLANE 16 (samoloty; lot sprawdza raycast tylko z G_WORLD).
 - Fizyczny przód auta gracza to lokalne −Z (kwaternion = kurs + π); model NPC jedzie w lokalne +Z.
 

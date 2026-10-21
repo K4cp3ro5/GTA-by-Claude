@@ -18,7 +18,7 @@ const DEFAULT_BINDS = {
   sprint:'ShiftLeft', jump:'Space',
   enter:'KeyF', horn:'KeyH', reload:'KeyR', wheel:'KeyQ', vehicleWheel:'KeyV', indLeft:'KeyQ', indRight:'KeyE',
   slot1:'Digit1', slot2:'Digit2', slot3:'Digit3',
-  daytime:'KeyT', mute:'KeyM'
+  daytime:'KeyT', mute:'KeyN', map:'KeyM'
 };
 const BIND_ROWS = [
   ['forward','Przód'], ['back','Tył'], ['left','Lewo'], ['right','Prawo'],
@@ -29,12 +29,16 @@ const BIND_ROWS = [
   ['vehicleWheel','Menu pojazdów (przytrzymaj)'],
   ['indLeft','Kierunkowskaz lewy (w aucie)'], ['indRight','Kierunkowskaz prawy (w aucie)'],
   ['slot1','Broń — slot 1'], ['slot2','Broń — slot 2'], ['slot3','Broń — slot 3'],
-  ['horn','Klakson'], ['daytime','Przyspiesz dobę'], ['mute','Wycisz dźwięk']
+  ['horn','Klakson'], ['daytime','Przyspiesz dobę'], ['map','Mapa (PPM — cel trasy)'], ['mute','Wycisz dźwięk']
 ];
 function loadBinds(){
   try {
     const raw = localStorage.getItem('nc_binds_v1');
-    if (raw) return Object.assign({}, DEFAULT_BINDS, JSON.parse(raw));
+    if (raw){
+      const saved = JSON.parse(raw);
+      if (saved.mute === 'KeyM' && !saved.map) saved.mute = 'KeyN';           // M to teraz mapa (stare zapisane sterowanie)
+      return Object.assign({}, DEFAULT_BINDS, saved);
+    }
   } catch(e){}
   return Object.assign({}, DEFAULT_BINDS);
 }
@@ -101,7 +105,7 @@ function lockPointer(){
 document.addEventListener('pointerlockchange', () => {
   pointerLocked = (document.pointerLockElement === renderer.domElement);
   if (pointerLocked) gameStarted = true;
-  gate.classList.toggle('hidden', pointerLocked);
+  gate.classList.toggle('hidden', pointerLocked || mapOpen);
   Sound.setPaused(!pointerLocked && !debugOpen);                // pauza (menu): dźwięk wyciszony
   if (!pointerLocked){
     goBtn.textContent = 'WRÓĆ DO GRY';
@@ -166,7 +170,9 @@ document.addEventListener('keydown', e => {
     return;
   }
   if (k === 'Backquote'){ e.preventDefault(); toggleDebugMenu(); return; }
+  if (mapOpen){ if (k === BIND.map || k === 'Escape'){ e.preventDefault(); closeMap(k === BIND.map); } return; }   // mapa: tylko zamknięcie
   if (!pointerLocked) return;   // menu/gate widoczne — klawisze nie sterują grą
+  if (k === BIND.map){ openMap(); return; }
 
   if (keys[k]) return;
   keys[k] = true;

@@ -209,9 +209,10 @@ function __static(){
   mapExtras.forEach(e => {
     const xs = e.t === 'rect' ? [e.x0, e.x1] : e.t === 'disc' ? [e.x - e.r, e.x + e.r] : e.pts.map(q => q[0]);
     const zs = e.t === 'rect' ? [e.z0, e.z1] : e.t === 'disc' ? [e.z - e.r, e.z + e.r] : e.pts.map(q => q[1]);
-    if (Math.min(...xs) < -WALL_X || Math.max(...xs) > WALL_X || Math.min(...zs) < -WALL_X || Math.max(...zs) > WALL_X) outside.push(JSON.stringify(e).slice(0,80));
+    const ok = (x, z) => isLand(x, z) || BOAT_OBSTACLES.some(o => inRect(o, x, z, 0.5)) || PIERS.some(o => inRect(o, x, z, 0.5));   // ląd (wyspy, pomosty) albo statek w porcie
+    if (!ok(Math.min(...xs) + 0.01, Math.min(...zs) + 0.01) || !ok(Math.max(...xs) - 0.01, Math.max(...zs) - 0.01)) outside.push(JSON.stringify(e).slice(0,80));
   });
-  signLog.forEach(g => { if (Math.abs(g.x) > WALL_X || Math.abs(g.z) > WALL_X) outside.push(g.kind+'@'+g.x.toFixed(0)+','+g.z.toFixed(0)); });
+  signLog.forEach(g => { if (!isLand(g.x, g.z)) outside.push(g.kind+'@'+g.x.toFixed(0)+','+g.z.toFixed(0)); });
   HWY_WAYS.forEach(w => w.pts.forEach(p => { if (Math.max(Math.abs(p.x), Math.abs(p.z)) + p.hw + 0.5 > WALL_X - 0.6) outside.push(w.name); }));
   out.outsideWall = outside;
   /* autostrady: filary nie na jezdni ani chodniku (pas 3.5 m przy krawędzi kwartału), prześwit nad ulicami,
@@ -397,7 +398,7 @@ console.log('Normalne (poziome ściany patrzące w górę/w dół):', JSON.strin
 console.log('Problemy ze znakami (poza jezdnią, przodem, po prawej):', st.signProblems.length, st.signProblems.slice(0,8));
 console.log('Ronda (trasy NPC):', JSON.stringify(st.roundabout));
 console.log('Znaki wg rodzaju:', JSON.stringify(st.signKinds));
-console.log('Elementy poza murem:', st.outsideWall.length, st.outsideWall.slice(0,5));
+console.log('Elementy poza lądem:', st.outsideWall.length, st.outsideWall.slice(0,5));
 console.log('Świat:', JSON.stringify(st.world));
 console.log('Autostrady (statycznie):', JSON.stringify(st.hwy));
 console.log('Teren węzła:', JSON.stringify(st.terrain));

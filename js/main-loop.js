@@ -66,6 +66,7 @@ function frame(now){
 
   const alpha = physicsStep(dt);
   updateWaterHazards(dt);
+  navUpdate(dt);
   updateSea(dt);
 
   if (mode === 'foot'){

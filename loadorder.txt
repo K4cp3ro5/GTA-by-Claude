@@ -30,4 +30,5 @@ update-vehicle.js
 update-npc.js
 camera.js
 hud.js
+navigation.js
 main-loop.js

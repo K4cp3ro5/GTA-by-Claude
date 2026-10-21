@@ -91,6 +91,7 @@ function drawMinimap(){
   mg.drawImage(mapStatic, Math.round(MM/2 - cx), Math.round(MM/2 - cz));
 
   const toMap = (wx, wz) => [ MM/2 + (wx - px) * MAP_SCALE, MM/2 + (wz - pz) * MAP_SCALE ];
+  navDrawMinimap(mg, toMap, MM);                       // trasa do celu (navigation.js)
 
   /* NPC (piraci drogowi większym kwasowo zielonym punktem, jak lakier) */
   for (let i = 0; i < npcs.length; i++){

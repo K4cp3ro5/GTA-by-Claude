@@ -1,6 +1,6 @@
 # GTA by Claude
 
-**Mini-GTA w przeglądarce.** Miasto 12 × 12 kwartałów z ruchem ulicznym, pieszymi, rowerzystami i piratami drogowymi, dwie autostrady na estakadach z węzłem koniczynowym, lotnisko z samolotami, którymi można latać (i z których można wyskoczyć ze spadochronem), cykl dnia i nocy, broń i kradzież aut.
+**Mini-GTA w przeglądarce.** Miasto na wyspie: 12 × 12 kwartałów z ruchem ulicznym, pieszymi, rowerzystami i piratami drogowymi, dwie autostrady na estakadach z węzłem koniczynowym, port z łodziami, a za cieśniną wysepka z lotniskiem i samolotami, którymi można latać (i z których można wyskoczyć ze spadochronem). Do tego pełna mapa z wyznaczaniem trasy, cykl dnia i nocy, broń i kradzież aut.
 
 Wszystko — asfalt, okna, modele aut i samolotów, znaki, dźwięk silnika i wybuchów — jest generowane w kodzie. Nie ma ani jednego pliku graficznego czy dźwiękowego, nie ma bundlera ani serwera: wystarczy otworzyć `index.html`.
 
@@ -56,14 +56,37 @@ Klawisze można zmienić w menu (**STEROWANIE**). `Esc` w trakcie gry to pauza �
 | `Spacja` | hamulce kół |
 | `F` | wysiądź na ziemi, **w locie — skok ze spadochronem** |
 
+**Łodzią** (wsiadasz `F` z pomostu): `W` / `S` — naprzód / wstecz, `A` / `D` — ster, `Spacja` — hamowanie, `F` — wysiadka przy pomoście lub nabrzeżu.
+
 **Na spadochronie**: `A` / `D` — skręt (czasza się przechyla), `W` — szybciej i stromiej, `S` — hamowanie (wolniej i łagodniej). Lądowanie jest bezpieczne.
 | mysz | rozglądanie się (kamera wraca za ogon) |
 
 Jak wystartować: ustaw samolot na pasie, trzymaj `W`, a gdy prędkościomierz pokaże ok. 160 km/h (awionetka ok. 85 km/h) — `↑`. Jak wylądować: podejdź nad pas na kilkadziesiąt metrów, zdejmij gaz (`S`) i puść strzałki — asystent lądowania sam zniży lot i łagodnie przyziemi, potem `Spacja`.
 
-**Zawsze**: `T` — szybszy upływ doby, `M` — wyciszenie, `` ` `` — menu debug.
+**Zawsze**: `M` — mapa (prawy klik ustawia cel, trasa pojawia się na minimapie), `T` — szybszy upływ doby, `N` — wyciszenie, `` ` `` — menu debug.
 
 ## Co jest w grze
+
+### Wyspa, port i łodzie
+
+| Wyspa i morze | Port | Łódź |
+|---|---|---|
+| ![Wyspa](screenshots/wyspa.jpg) | ![Port](screenshots/port.jpg) | ![Łódź](screenshots/lodz.jpg) |
+
+- Miasto leży na wyspie otoczonej morzem, z nabrzeżem i balustradą dookoła.
+- Na północnym brzegu jest **port**: plac kontenerowy z suwnicą, dwa dźwigi nabrzeżowe, statek kontenerowy, magazyn, biuro portu i przystań z motorówkami.
+- Za cieśniną, ok. 250 m na północ, leży **wysepka z lotniskiem** i własną przystanią. Dopłyniesz tam łodzią z portu, a wrócisz łodzią albo samolotem.
+- Kto wpadnie do wody (pieszo albo autem), zostaje wyciągnięty na brzeg; auto ląduje obok. Samolot, który dotknie wody, rozbija się i tonie.
+
+### Mapa i nawigacja
+
+| Pełna mapa z trasą | Strzałka nad lotniskiem |
+|---|---|
+| ![Mapa](screenshots/mapa.jpg) | ![Strzałka](screenshots/strzalka.jpg) |
+
+- `M` otwiera mapę całego świata (gra stoi): kółko przybliża, przeciąganie przesuwa, **prawy klik ustawia fioletowy znacznik celu** (drugi klik na znaczniku go usuwa).
+- Trasa prowadzi pieszo i autem **po drogach** (autem z poszanowaniem jednokierunkowej obwodnicy), na drugą wyspę — przez przystanie, a samolotem i łodzią — w linii prostej. Widać ją na minimapie i mapie, a w świecie stoi fioletowy słup celu.
+- W samolocie nad pasem startowym unosi się żółta strzałka widoczna z daleka, a nad progami — strzałki kierunku podejścia.
 
 ### Miasto
 
@@ -107,21 +130,21 @@ Jak wystartować: ustaw samolot na pasie, trzymaj `W`, a gdy prędkościomierz p
 |---|---|---|
 | ![Spadochron](screenshots/spadochron.jpg) | ![Katastrofa](screenshots/katastrofa.jpg) | ![Odrzutowiec](screenshots/odrzutowiec.jpg) |
 
-- Lotnisko na północ od miasta: pas startowy 336 × 30 m, droga kołowania, płyta z rękawami, terminal, wieża, hangar, parking.
+- Lotnisko na osobnej wysepce na północ od miasta: pas startowy 336 × 30 m, droga kołowania, płyta z rękawami, terminal, wieża, hangar, parking, przystań.
 - Dwa samoloty: szybki odrzutowiec i zwrotna awionetka. Sterowanie strzałkami z autopoziomowaniem, ochroną przed przeciągnięciem i asystentem lądowania.
 - `F` w locie — wyskakujesz, otwiera się prostokątna czasza (skręty `A`/`D`, `W` szybciej, `S` hamowanie), a samolot bez pilota nurkuje i rozbija się.
 - Zderzenie z budynkiem albo twarde lądowanie to katastrofa: kula ognia przechodząca w dym, błysk, odłamki, płonący wrak, wstrząs kamery i huk. Pilot nie przeżywa (z nieśmiertelnością z menu debug ląduje obok wraku). Po kilkunastu sekundach samolot wraca na lotnisko — gdy jego stanowisko jest wolne.
 
 ### Menu debug (`` ` ``)
 
-Liczba aut i pieszych, pora dnia, nieśmiertelność, amunicja, teleporty (start, lotnisko, autostrada, zjazd, obwodnica), zmiana typu auta w trakcie jazdy i rower, kierunkowskazy, samolot na lotnisku albo od razu w powietrzu, dodawanie piratów i rowerzystów, szansa potrącenia rowerzysty, przełącznik LOD.
+Liczba aut i pieszych, pora dnia, nieśmiertelność, amunicja, teleporty (start, port, lotnisko, autostrada, zjazd, obwodnica), zmiana typu auta w trakcie jazdy i rower, kierunkowskazy, samolot na lotnisku albo od razu w powietrzu, dodawanie piratów i rowerzystów, szansa potrącenia rowerzysty, przełącznik LOD.
 
 ![Ekran ładowania](screenshots/ladowanie.jpg)
 
 ## Jak to jest zrobione
 
 - **Three.js r128** (grafika) i **cannon.js 0.6.2** (fizyka) z CDN, reszta to czysty JavaScript bez frameworków. Dźwięk syntezuje Web Audio, tekstury rysuje Canvas 2D.
-- 31 zwykłych skryptów ze wspólnym zakresem globalnym, ładowanych w kolejności z `loadorder.txt` (bez bundlera, więc gra działa z `file://`).
+- 34 zwykłe skrypty ze wspólnym zakresem globalnym, ładowanych w kolejności z `loadorder.txt` (bez bundlera, więc gra działa z `file://`).
 - Geometria miasta scalana w kilkadziesiąt siatek (ok. 200 wywołań rysowania), statyczne kolizje w komórkach 48 m.
 - Auta NPC to ciała kinematyczne na trasach z punktów; skrzyżowania rozstrzygane wg czasu dojazdu, ronda, światła, kolejki, objazdy i zmiana pasa.
 
@@ -142,11 +165,12 @@ npm run test:drive   # jazda prawdziwym autem: autostrady, węzeł, zjazdy, koli
 npm run bundle       # cała gra w jednym pliku gta-by-claude-single.html
 ```
 
-Symulacja (`node test/sim.js <sekundy>`, `SEED=…`) sprawdza m.in. nakładanie się aut, zakleszczenia, auta w budynkach, ronda, pieszych, przepisy i znaki. Zmiany wizualne i lot samolotu są sprawdzane zrzutami z przeglądarki (Playwright).
+Symulacja (`node test/sim.js <sekundy>`, `SEED=…`) sprawdza m.in. nakładanie się aut, zakleszczenia, auta w budynkach, ronda, pieszych, przepisy, znaki i to, czy wszystko stoi na lądzie. Zmiany wizualne i lot samolotu są sprawdzane zrzutami z przeglądarki (Playwright).
 
 ## Ograniczenia
 
-- Ulice to siatka ortogonalna, a trasy NPC to stałe pętle, nie graf dróg.
+- Ulice to siatka ortogonalna, a trasy NPC to stałe pętle, nie graf dróg. Nawigacja gracza nie prowadzi przez autostrady (tylko ulice i dojazdy).
+- Wyspy są prostokątne (sztuczne nabrzeża), łodzie to prosty model zręcznościowy (bez fal i fizyki wody), w porcie nie pływają łodzie NPC.
 - Uproszczony model lotu (bez wiatru i klap), brak samolotów NPC; samolot zderza się z budynkami i terenem, nie z autami.
 - Piraci biorą zakręty kinematycznie (bez prawdziwego poślizgu); potrącenie rowerzysty to zdarzenie skryptowe.
 - AI dalekich aut liczone rzadziej, ale modele są pełne także z daleka.

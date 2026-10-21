@@ -136,6 +136,11 @@
   #deadScreen.on{opacity:1;background:rgba(10,4,4,.72)}
   #deadScreen span{font-size:34px;font-weight:200;letter-spacing:.1em;color:var(--brake)}
 
+  /* ---- pełna mapa (M) ---- */
+  #bigmap{position:fixed;inset:0;z-index:45;display:none;background:#16384b;cursor:grab}
+  #bigmap.on{display:block}
+  #bigmap canvas{display:block;width:100%;height:100%}
+
   /* ---- ekran ładowania (przed menu startowym) ---- */
   #loader{
     position:fixed;inset:0;z-index:60;display:flex;flex-direction:column;
@@ -299,7 +304,7 @@
 
 <!-- ekran ładowania: pasek liczy wczytane skrypty (data-scripts = 2 biblioteki + pliki z loadorder.txt, sprawdza harness);
      main-loop.js woła LOADER.finish(), błąd podczas ładowania odsłania menu z komunikatem (#err) -->
-<div id="loader" data-scripts="35">
+<div id="loader" data-scripts="36">
   <div class="ltitle">GTA by <em>Claude</em></div>
   <div class="lbar"><i id="lfill"></i></div>
   <div id="lstat">Wczytywanie bibliotek…</div>
@@ -365,6 +370,7 @@ var LOADER = (function(){
   <div id="fps">— fps</div>
 </div>
 
+<div id="bigmap"><canvas id="bigmapCv"></canvas></div>
 <div id="hurtFlash"></div>
 <div id="deadScreen"><span>ROZBITY</span></div>
 
@@ -375,7 +381,7 @@ var LOADER = (function(){
   <p id="gatetxt">Dwanaście na dwanaście kwartałów, ekwipunek, mieszkańcy na chodnikach i pełna doba do dyspozycji. Wszystko — asfalt, okna, silnik — generowane w locie.</p>
   <button id="go" disabled>BUDUJĘ MIASTO…</button>
   <button id="settingsBtn">STEROWANIE</button>
-  <div id="gatefoot">Kliknięcie przejmuje kursor myszy. Esc pauzuje grę (świat stoi, dźwięk cichnie) i otwiera to menu.</div>
+  <div id="gatefoot">Kliknięcie przejmuje kursor myszy. Esc pauzuje grę (świat stoi, dźwięk cichnie) i otwiera to menu. M — mapa.</div>
   <div id="err"></div>
 </div>
 
@@ -497,6 +503,7 @@ var LOADER = (function(){
 <script src="js/update-npc.js"></script>
 <script src="js/camera.js"></script>
 <script src="js/hud.js"></script>
+<script src="js/navigation.js"></script>
 <script src="js/main-loop.js"></script>
 </body>
 </html>
