@@ -202,6 +202,6 @@ function buildAirportHarbor(){
   CB(0xb98b5e).box(60, 3, z1 - 18, 16, 6, 10, 2, true);                                             // kasa biletowa (drewno; dach: landmarks.js)
   staticBox(60, 3, z1 - 18, 16, 6, 10); buildings.push({ x: 60, z: z1 - 18, w: 16, d: 10 });
   wordSignQuad('PRZYSTAŃ', '#1f3550', '#ffffff', [53, 4.2, z1 - 12.9], [67, 4.2, z1 - 12.9], [67, 5.6, z1 - 12.9], [53, 5.6, z1 - 12.9]);
-  for (let x = -100; x <= 20; x += 30) lampSpots.push({ x: x, z: z1 - 13.5, rot: Math.PI, y: 0 });
+  for (let x = -100; x <= 20; x += 30) lampSpots.push({ x: x, z: z1 - 13.5, rot: 0, y: 0 });             // wysięgnik nad deptakiem
   mapExtras.push({ t: 'rect', x0: -110, x1: 30, z0: z1 - 14, z1: z1, c: '#4a4c50' });
 }

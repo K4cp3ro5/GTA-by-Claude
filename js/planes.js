@@ -212,13 +212,17 @@ function buildParachute(){
   }
   canopy.position.y = 5.2; g.add(canopy);
   const lineMat = new THREE.MeshBasicMaterial({ color: 0x2a2a2a }), lineGeo = new THREE.BoxGeometry(0.025, 1, 0.025);
-  for (let k = 0; k <= cells; k += 1) for (const zc of [-chord * 0.35, chord * 0.35]){       // linki: spód brzegów komór -> uprząż (nad barkami)
-    const a = k / cells * arc - arc / 2, ex = Math.sin(a) * R, ey = 5.2 + Math.cos(a) * R - R - 0.21, from = new THREE.Vector3(Math.sign(ex) * 0.25, 0.9, 0), to = new THREE.Vector3(ex, ey, zc);
-    const d = to.clone().sub(from), l = new THREE.Mesh(lineGeo, lineMat);
-    l.scale.y = d.length(); l.position.copy(from).addScaledVector(d, 0.5); l.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize());
-    g.add(l);
+  /* linki: od uprzęży (nad barkami) do spodu brzegów komór; zaczep w układzie czaszy — co klatkę przeliczany
+     po przechyle i pochyleniu czaszy (syncParachute), więc linki nie przechodzą przez czaszę w skręcie */
+  const lines = [];
+  for (let k = 0; k <= cells; k += 1) for (const zc of [-chord * 0.35, chord * 0.35]){
+    const a = k / cells * arc - arc / 2, ex = Math.sin(a) * R;
+    const l = new THREE.Mesh(lineGeo, lineMat);
+    l.userData.from = new THREE.Vector3(Math.sign(ex) * 0.25, 0.9, 0);
+    l.userData.anchor = new THREE.Vector3(ex - Math.sin(a) * 0.24, Math.cos(a) * R - R - Math.cos(a) * 0.24, zc);   // spód komory (wzdłuż jej normalnej)
+    g.add(l); lines.push(l);
   }
-  g.userData.canopy = canopy;
+  g.userData.canopy = canopy; g.userData.lines = lines;
   g.visible = false; scene.add(g);
   return g;
 }
@@ -284,8 +288,16 @@ function syncParachute(){
   m.scale.set(0.25 + 0.75 * s, 0.6 + 0.4 * s, 0.25 + 0.75 * s);
   m.position.copy(player.mesh.position);
   m.rotation.set(0, parachute.heading, 0);
-  m.userData.canopy.rotation.set(parachute.pitch || 0, 0, parachute.bank);
+  const c = m.userData.canopy;
+  c.rotation.set(parachute.pitch || 0, 0, parachute.bank); c.updateMatrix();
+  for (const l of m.userData.lines){
+    _paraTo.copy(l.userData.anchor).applyMatrix4(c.matrix);
+    _paraD.copy(_paraTo).sub(l.userData.from);
+    l.scale.y = _paraD.length(); l.position.copy(l.userData.from).addScaledVector(_paraD, 0.5);
+    l.quaternion.setFromUnitVectors(_paraUp, _paraD.normalize());
+  }
 }
+const _paraTo = new THREE.Vector3(), _paraD = new THREE.Vector3(), _paraUp = new THREE.Vector3(0, 1, 0);
 
 /* --- katastrofa: kula ognia, błysk, odłamki, dym, płonący wrak, wstrząs kamery, huk --- */
 const _fxSphere = new THREE.SphereGeometry(1, 14, 10), _fxBox = new THREE.BoxGeometry(1, 1, 1);

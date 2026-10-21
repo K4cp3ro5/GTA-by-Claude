@@ -249,10 +249,11 @@ function buildAirportWest(){
     const type = randomCarType(), col = NPC_COLORS_AIR[randInt(0, NPC_COLORS_AIR.length - 1)], T = CAR_TYPES[type], hd2 = -Math.PI / 2, cs = Math.cos(hd2), sn = Math.sin(hd2), px = (pk.x0 + pk.x1) / 2 + 1, pz = z;
     const COL = { paint: col, dark: 0x15171b, glass: 0x141d22, chrome: 0xb9bec6, lampF: 0xfff3d0, lampR: 0x5a1512 };
     carParts(type).forEach(q => { const lx = q[4], lz = q[6]; CB(COL[q[3]]).boxRot(px + lx * cs + lz * sn, q[5], pz - lx * sn + lz * cs, q[0], q[1], q[2], hd2, 2, true); });
+    [[T.track, -T.wbF], [-T.track, -T.wbF], [T.track, -T.wbR], [-T.track, -T.wbR]].forEach(wv => CB(0x141518).boxRot(px + wv[0] * cs + wv[1] * sn, T.wheelR, pz - wv[0] * sn + wv[1] * cs, 0.28, T.wheelR * 2, T.wheelR * 2, hd2, 1, true));   // koła
     staticBoxRot(px, carTopOf2(type) / 2, pz, T.half[0] * 2, carTopOf2(type), T.half[2] * 2, hd2);
   }
   placeSign(ac.x0 - 7, ac.z + ac.hw + 1.0, -Math.PI / 2, [FACE.A7(), FACE.C4()], { base: 0 });
-  for (let z = fr.z0 + 6; z < fr.z1; z += 18) lampSpots.push({ x: fr.x + fr.hw + 0.8, z: z, rot: Math.PI / 2, y: 0 });
+  for (let z = fr.z0 + 6; z < fr.z1; z += 18) lampSpots.push({ x: fr.x + fr.hw + 0.8, z: z, rot: -Math.PI / 2, y: 0 });   // wysięgnik nad drogą
   /* minimapa */
   mapExtras.push({ t: 'rect', x0: rw.x - rw.hw, x1: rw.x + rw.hw, z0: rw.z0, z1: rw.z1, c: '#3b3f47' });
   mapExtras.push({ t: 'rect', x0: tx.x - tx.hw, x1: tx.x + tx.hw, z0: tx.z0, z1: tx.z1, c: '#33363d' });
