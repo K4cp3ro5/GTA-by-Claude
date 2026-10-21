@@ -28,7 +28,7 @@ Klawisze można zmienić w menu (**STEROWANIE**). `Esc` w trakcie gry to pauza �
 |---|---|
 | `W` `A` `S` `D` / strzałki, mysz | ruch, kamera |
 | `Shift` / `Spacja` | bieg / skok |
-| `F` (albo `E`) | wsiądź do auta lub samolotu, ukradnij auto NPC, przejażdżka kolejką górską (na peronie) |
+| `F` (albo `E`) | wsiądź do auta lub samolotu, ukradnij auto NPC, przejażdżka w parku rozrywki (przy wejściu na atrakcję) |
 | `V` (przytrzymaj) | menu pojazdów: twoje auto (zwykły, pickup, sportowy) albo rower |
 | `1` `2` `3` `4`, `Q` (przytrzymaj) | broń: pięści, kij, pistolet, karabin / koło broni |
 | lewy przycisk myszy (karabin: przytrzymaj), `R` | atak, strzał / przeładowanie |
@@ -88,13 +88,19 @@ Jak wystartować: ustaw samolot na pasie, trzymaj `W`, a gdy prędkościomierz p
 
 ### Park rozrywki
 
-| Park z lotu ptaka | Atrakcje | Przejażdżka kolejką |
-|---|---|---|
-| ![Park rozrywki](screenshots/park.jpg) | ![Atrakcje](screenshots/park-atrakcje.jpg) | ![Kolejka](screenshots/kolejka.jpg) |
+| Park z lotu ptaka | Brama | Plac z fontanną | Przejażdżka kolejką |
+|---|---|---|---|
+| ![Park rozrywki](screenshots/park.jpg) | ![Brama](screenshots/park-brama.jpg) | ![Plac z fontanną](screenshots/park-atrakcje.jpg) | ![Kolejka](screenshots/kolejka.jpg) |
 
-- We wschodnim pasie zieleni wyspy głównej (112 × 320 m), wejście przez bramę „PARK ROZRYWKI” z alei w środku miasta. Promenada z budkami (jedzenie, pamiątki), bulwar, ławki, latarnie, klomby i spacerujący zwiedzający; całość można obejść pieszo.
-- **Kolejka SMOK** (370 m toru, wyciąg na 42 m, pierwszy zjazd ok. 70°, do 103 km/h, trzy górki o malejącej wysokości, tor przechylony w zakrętach) i rodzinna **kolejka ŻABKA** (142 m, 12 m, do 53 km/h). Pociągi jeżdżą cały czas z pasażerami; na peronie, gdy pociąg stoi na stacji, `F` — przejażdżka z perspektywy pierwszego wagonu (mysz rozgląda się, licznik pokazuje prędkość i wysokość). Po okrążeniu wysiadasz na peron.
-- **Diabelski młyn** (średnica 42 m, 16 gondoli zawsze w pionie), **karuzela z konikami** (koniki unoszą się i opadają), **karuzela łańcuchowa** (krzesełka odchylają się z prędkością), **wieża swobodnego spadania** (52 m: powolny wjazd, zawis, spadek), **autodrom** z samochodzikami.
+- We wschodnim pasie zieleni wyspy głównej (112 × 320 m). Brama z dwiema wieżami, flagami i podświetlaną tablicą, kasy, kołowrotki. Alejki z krawężnikami, plac z fontanną, budki z szyldami i markizami (lody, wata, hot dog, popcorn…), stoliki z parasolami, ławki, kosze, klomby, żywopłoty, drogowskazy, tablice i barierki przy atrakcjach, spacerujący zwiedzający (niektórzy z balonikami); całość można obejść pieszo.
+- **Kolejka SMOK** (370 m toru, wyciąg na 42 m, pierwszy zjazd ok. 70°, do 103 km/h, trzy górki o malejącej wysokości, tor przechylony w zakrętach) i rodzinna **kolejka ŻABKA** (142 m, 12 m, do 53 km/h). Pociągi jeżdżą cały czas z pasażerami.
+- **Diabelski młyn** (średnica 42 m, 16 gondoli zawsze w pionie), **karuzela z konikami**, **karuzela łańcuchowa** (krzesełka odchylają się z prędkością), **wieża swobodnego spadania** (52 m: powolny wjazd, zawis, spadek), **autodrom**.
+- **Przejażdżki** — `F` przy wejściu na atrakcję (podpowiedź na ekranie):
+  - kolejki: gdy pociąg stoi na stacji, jazda z perspektywy pierwszego wagonu (kamera wygładzona, tor przechylony w zakrętach); po okrążeniu wysiadasz na peron;
+  - diabelski młyn: gondola, która jest przy peronie, jeden pełny obrót;
+  - wieża, karuzela, karuzela łańcuchowa: wsiadanie na postoju, wysiadka po zakończeniu jazdy;
+  - autodrom: prowadzisz samochodzik (`W` / `S` / `A` / `D`), odbijasz się od band i innych aut, `F` — wysiadka w dowolnej chwili.
+  - Mysz rozgląda się, licznik pokazuje prędkość i wysokość.
 
 ### Mapa i nawigacja
 
@@ -209,7 +215,7 @@ Symulacja (`node test/sim.js <sekundy>`, `SEED=…`) sprawdza m.in. nakładanie 
 ## Ograniczenia
 
 - Ulice to siatka ortogonalna, a trasy NPC to stałe pętle, nie graf dróg. Nawigacja gracza nie prowadzi przez autostrady (tylko ulice i dojazdy).
-- Kolejki w parku jeżdżą po wyliczonym profilu prędkości (energia z wyciągu minus tarcie), a nie fizyką; z wagonika nie można wysiąść w trakcie jazdy. Zwiedzający w parku chodzą między punktami alejek bez kolizji.
+- Kolejki w parku jeżdżą po wyliczonym profilu prędkości (energia z wyciągu minus tarcie), a nie fizyką; z atrakcji (poza autodromem) nie można wysiąść w trakcie jazdy. Zwiedzający chodzą między punktami alejek bez kolizji; wagoniki i samochodziki nie zderzają się z pieszym graczem.
 - Wyspy są prostokątne (sztuczne nabrzeża), łodzie to prosty model zręcznościowy (bez fal i fizyki wody); łodzie NPC pływają po losowych celach, nie po trasach.
 - Uproszczony model lotu (bez wiatru i klap); samoloty NPC lecą po wyliczonej trasie (nie fizyką) i nie kołują po drogach kołowania — zawracają na końcu pasa. Samolot gracza zderza się z budynkami, terenem i samolotami NPC, nie z autami.
 - Postać ma ręce z jednego segmentu — przy karabinie lewa dłoń tylko sięga w stronę łoża.
