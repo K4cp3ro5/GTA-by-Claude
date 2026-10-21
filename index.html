@@ -214,12 +214,17 @@
   #weaponhud.on{opacity:1}
   #weaponhud .wname{font-size:12px;letter-spacing:.1em;color:var(--paint)}
   #weaponhud .wammo{font-size:15px;font-weight:600;color:var(--sodium);font-variant-numeric:tabular-nums}
-  #crosshair{
-    position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-    width:6px;height:6px;border-radius:50%;background:rgba(242,240,234,.85);
-    box-shadow:0 0 0 1px rgba(0,0,0,.5);opacity:0;transition:opacity .15s ease;
-  }
+  /* celownik: 4 kreski odsunięte o rozrzut (--gap, weapons.js) + kropka; .hit = trafienie */
+  #crosshair{position:absolute;top:50%;left:50%;width:0;height:0;opacity:0;transition:opacity .15s ease;--gap:4px}
   #crosshair.on{opacity:1}
+  #crosshair i{position:absolute;display:block;background:rgba(246,244,238,.95);box-shadow:0 0 0 1px rgba(0,0,0,.45);border-radius:1px;transition:background .08s}
+  #crosshair .ct,#crosshair .cb{width:2px;height:8px;left:-1px}
+  #crosshair .cl,#crosshair .cr{width:8px;height:2px;top:-1px}
+  #crosshair .ct{bottom:var(--gap)} #crosshair .cb{top:var(--gap)}
+  #crosshair .cl{right:var(--gap)} #crosshair .cr{left:var(--gap)}
+  #crosshair .cd{width:2px;height:2px;left:-1px;top:-1px}
+  #crosshair.hit i{background:#ff5a47}
+  #crosshair.hit .cd{width:4px;height:4px;left:-2px;top:-2px}
 
   /* ---- koło broni ---- */
   #wheelWrap{
@@ -377,7 +382,7 @@ var LOADER = (function(){
   <div id="toast"></div>
   <div id="prompt">Naciśnij <kbd>F</kbd> lub <kbd>E</kbd>, aby wsiąść</div>
   <section class="panel" id="weaponhud"><span class="wname" id="wname">Pięści</span><span class="wammo" id="wammo"></span></section>
-  <div id="crosshair"></div>
+  <div id="crosshair"><i class="ct"></i><i class="cb"></i><i class="cl"></i><i class="cr"></i><i class="cd"></i></div>
   <div id="fps">— fps</div>
 </div>
 

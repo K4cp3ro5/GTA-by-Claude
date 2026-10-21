@@ -195,17 +195,17 @@ const Sound = {
     o.start(t); o.stop(t + 0.28);
   },
 
-  shoot(){
+  shoot(rifle){
     if (!this.ready) return;
     const ctx = this.ctx, t = ctx.currentTime;
     const src = ctx.createBufferSource();
     src.buffer = this.noise;
-    src.playbackRate.value = 1.6;
+    src.playbackRate.value = rifle ? 1.25 : 1.6;
     const f = ctx.createBiquadFilter();
-    f.type = 'bandpass'; f.frequency.value = 1800; f.Q.value = 0.7;
+    f.type = 'bandpass'; f.frequency.value = rifle ? 1250 : 1800; f.Q.value = 0.7;
     const g = ctx.createGain();
-    g.gain.setValueAtTime(0.34, t);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.09);
+    g.gain.setValueAtTime(rifle ? 0.3 : 0.34, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + (rifle ? 0.13 : 0.09));
     src.connect(f); f.connect(g); g.connect(this.master);
     src.start(t); src.stop(t + 0.1);
 

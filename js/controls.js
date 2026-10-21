@@ -17,7 +17,7 @@ const DEFAULT_BINDS = {
   forward:'KeyW', back:'KeyS', left:'KeyA', right:'KeyD',
   sprint:'ShiftLeft', jump:'Space',
   enter:'KeyF', horn:'KeyH', reload:'KeyR', wheel:'KeyQ', vehicleWheel:'KeyV', indLeft:'KeyQ', indRight:'KeyE',
-  slot1:'Digit1', slot2:'Digit2', slot3:'Digit3',
+  slot1:'Digit1', slot2:'Digit2', slot3:'Digit3', slot4:'Digit4',
   daytime:'KeyT', mute:'KeyN', map:'KeyM'
 };
 const BIND_ROWS = [
@@ -28,7 +28,7 @@ const BIND_ROWS = [
   ['wheel','Koło broni (przytrzymaj)'],
   ['vehicleWheel','Menu pojazdów (przytrzymaj)'],
   ['indLeft','Kierunkowskaz lewy (w aucie)'], ['indRight','Kierunkowskaz prawy (w aucie)'],
-  ['slot1','Broń — slot 1'], ['slot2','Broń — slot 2'], ['slot3','Broń — slot 3'],
+  ['slot1','Broń — slot 1'], ['slot2','Broń — slot 2'], ['slot3','Broń — slot 3'], ['slot4','Broń — slot 4'],
   ['horn','Klakson'], ['daytime','Przyspiesz dobę'], ['map','Mapa (PPM — cel trasy)'], ['mute','Wycisz dźwięk']
 ];
 function loadBinds(){
@@ -111,7 +111,7 @@ document.addEventListener('pointerlockchange', () => {
     goBtn.textContent = 'WRÓĆ DO GRY';
     if (gameStarted) document.getElementById('gatetxt').textContent = 'Pauza — miasto czeka, dźwięk wyciszony.';
     for (const k in keys) keys[k] = false;
-    mouseDown = false;
+    mouseDown = false; mouseDownR = false;
   } else {
     closeSettings();
   }
@@ -146,13 +146,15 @@ document.addEventListener('mousemove', e => {
   if (Math.abs(e.movementX) + Math.abs(e.movementY) > 1.5) lastMouseMove = clock;
 });
 
-let mouseDown = false;
+let mouseDown = false, mouseDownR = false;          // PPM = przycelowanie (broń palna)
+document.addEventListener('contextmenu', e => { if (pointerLocked) e.preventDefault(); });
 document.addEventListener('mousedown', e => {
+  if (e.button === 2 && pointerLocked){ mouseDownR = true; return; }
   if (!pointerLocked || e.button !== 0 || wheelOpen) return;
   mouseDown = true;
   Weapons.trigger();
 });
-document.addEventListener('mouseup', e => { if (e.button === 0) mouseDown = false; });
+document.addEventListener('mouseup', e => { if (e.button === 0) mouseDown = false; if (e.button === 2) mouseDownR = false; });
 document.addEventListener('wheel', e => {
   if (!pointerLocked || mode !== 'foot') return;
   Weapons.cycle(e.deltaY > 0 ? 1 : -1);
@@ -185,13 +187,14 @@ document.addEventListener('keydown', e => {
     if (k === BIND.slot1) Weapons.select(0);
     if (k === BIND.slot2) Weapons.select(1);
     if (k === BIND.slot3) Weapons.select(2);
+    if (k === BIND.slot4) Weapons.select(3);
   }
 });
 document.addEventListener('keyup', e => {
   keys[e.code] = false;
   if (e.code === BIND.horn) Sound.horn(false);
 });
-window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; mouseDown = false; Sound.horn(false); });
+window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; mouseDown = false; mouseDownR = false; Sound.horn(false); });
 
 /* --- debug menu --- */
 let godMode = false, timeFrozen = false, debugOpen = false, wasLockedBeforeDebug = false, carSpeedMult = 1, fogMult = 1;
@@ -312,7 +315,7 @@ dbg.speed.addEventListener('input', () => {
 });
 dbg.heal.addEventListener('click', ev => { ev.stopPropagation(); player.health = 100; player.stamina = 100; });
 dbg.clearStolen.addEventListener('click', ev => { ev.stopPropagation(); parkedCars.filter(q => q.owner === 'stolen').forEach(removeParked); refreshDebugInfo(); });
-dbg.ammo.addEventListener('click', ev => { ev.stopPropagation(); Weapons.reserve += 200; });
+dbg.ammo.addEventListener('click', ev => { ev.stopPropagation(); Weapons.fillAmmo(200); });
 /* --- pojazdy, samoloty, teleporty, piraci, rowerzyści (debug) --- */
 function dbgOnFoot(){                                    // samolot: wysiadka; auto: trzeba wysiąść samemu (F)
   if (mode === 'plane') exitPlane(true);
