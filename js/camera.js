@@ -23,7 +23,7 @@ function updateCamera(dt, kmh){
     camera.position.copy(camCur);
     camera.lookAt(b.pos.x + Math.sin(b.heading) * 6, WATER_Y + 1.2, b.pos.z + Math.cos(b.heading) * 6);
     camFov = damp(camFov, 66 + clamp(kmh / 60, 0, 1) * 8, 2, dt);
-    if (Math.abs(camera.fov - camFov) > 0.01){ camera.fov = camFov; camera.updateProjectionMatrix(); }
+    if (Math.abs(camera.fov - camFov - fovAdd) > 0.01){ camera.fov = camFov + fovAdd; camera.updateProjectionMatrix(); }
     sun.target.position.set(b.pos.x, 0, b.pos.z);
     sun.position.set(b.pos.x + lightDir.x * 95, lightDir.y * 95 + 2, b.pos.z + lightDir.z * 95);
     camYaw = h + Math.PI;
@@ -41,7 +41,7 @@ function updateCamera(dt, kmh){
     camera.position.copy(camCur);
     _cpL.copy(p.pos).addScaledVector(_cpF, planeCamYaw ? 0 : 25); camera.lookAt(_cpL);
     camFov = damp(camFov, 70 + clamp(kmh / 400, 0, 1) * 10, 2, dt);
-    if (Math.abs(camera.fov - camFov) > 0.01){ camera.fov = camFov; camera.updateProjectionMatrix(); }
+    if (Math.abs(camera.fov - camFov - fovAdd) > 0.01){ camera.fov = camFov + fovAdd; camera.updateProjectionMatrix(); }
     sun.target.position.set(p.pos.x, 0, p.pos.z);
     sun.position.set(p.pos.x + lightDir.x * 95, lightDir.y * 95 + 2, p.pos.z + lightDir.z * 95);
     camYaw = Math.atan2(-_cpF.x, -_cpF.z);
@@ -67,10 +67,13 @@ function updateCamera(dt, kmh){
   } else {
     const p = player.mesh.position;
     const para = typeof parachute !== 'undefined' && parachute.on && parachute.t > 0.7;
-    tx = p.x; ty = p.y + 0.85 + 0.72 + (para ? 1.6 : 0); tz = p.z;
-    dist = para ? 10.5 : 5.3;
-    height = para ? 1.2 : 0.35;
-    camFov = damp(camFov, 68, 4, dt);
+    /* broń palna: kamera zza prawego ramienia (cel przesunięty w prawo od postaci) — celownik na środku ekranu
+       nie jest zasłonięty przez postać; PPM (przycelowanie): bliżej i węższe pole widzenia */
+    const k = Weapons.aimK, ads = Weapons.adsK, sh = k * (0.82 - ads * 0.2);
+    tx = p.x + Math.cos(camYaw) * sh; ty = p.y + 0.85 + 0.72 + (para ? 1.6 : 0) - k * 0.1; tz = p.z - Math.sin(camYaw) * sh;
+    dist = para ? 10.5 : lerp(5.3, 3.3, k) - ads * 1.2;
+    height = para ? 1.2 : lerp(0.35, 0.16, k);
+    camFov = damp(camFov, 68 - ads * 18, k > 0.05 ? 10 : 4, dt);
   }
 
   camTarget.set(tx, ty, tz);
@@ -107,8 +110,8 @@ function updateCamera(dt, kmh){
   lookAt.y += mode === 'car' ? 0.35 : 0.30;
   camera.lookAt(lookAt);
 
-  if (Math.abs(camera.fov - camFov) > 0.01){
-    camera.fov = camFov;
+  if (Math.abs(camera.fov - camFov - fovAdd) > 0.01){
+    camera.fov = camFov + fovAdd;
     camera.updateProjectionMatrix();
   }
 

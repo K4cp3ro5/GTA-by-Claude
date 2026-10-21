@@ -234,6 +234,7 @@ const HWY_GORES = [];    // { cw, wi, pts: [{ex, ez, lx, lz, y, s, d}], gap }
 /* czy wzdłuż jezdni cw w miejscu s przylega pas zbierający / wyłączenia (linia przerywana zamiast krawędziowej) */
 function cwAuxAdj(cw, s){ return HWY_AUXGAPS.some(g => g.cw === cw && s > Math.min(g.s0, g.s1) && s < Math.max(g.s0, g.s1)); }
 /* przerwy w barierze zewnętrznej jezdni: segment jezdni w zakresie s którejś przerwy => bez bariery */
+function cwSideOpen(cw, s0, s1){ const a = Math.min(s0, s1), b = Math.max(s0, s1); return HWY_GAPS.some(g => g.cw === cw && a >= Math.min(g.s0, g.s1) - 0.05 && b <= Math.max(g.s0, g.s1) + 0.05); }
 function cwBarrierGap(cw, s){ return HWY_GAPS.some(g => g.cw === cw && s > Math.min(g.s0, g.s1) - 0.5 && s < Math.max(g.s0, g.s1) + 0.5); }
 
 /* ---------------------------------------------------------------

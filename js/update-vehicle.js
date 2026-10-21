@@ -180,3 +180,34 @@ function syncCar(alpha){
   }
 }
 let _pedal = 0;
+
+/* ślizg po ścianie (bariery autostrad, łuki pętli, mury, budynki): przy otarciu pod małym kątem koła stały w poprzek
+   ściany i ich przyczepność boczna zatrzymywała auto do zera. Po każdym kroku fizyki, gdy nadwozie dotyka statycznej
+   ściany (normalna pozioma), a nos jest skierowany w ścianę: auto obraca się wzdłuż ściany i zachowuje prędkość
+   styczną sprzed kontaktu (× cos kąta uderzenia, z małą stratą); czołowe uderzenie (cos ≈ 0) nadal zatrzymuje. */
+const _wsF = new CANNON.Vec3(), _wsZ = new CANNON.Vec3(0, 0, -1);
+let _wsPrev = 0;
+world.addEventListener('postStep', () => {
+  if (mode !== 'car') return;
+  const v = chassisBody.velocity, sp = Math.hypot(v.x, v.z);
+  let nx = 0, nz = 0, hit = false;
+  for (const c of world.contacts){
+    let o, s;
+    if (c.bi === chassisBody){ o = c.bj; s = -1; } else if (c.bj === chassisBody){ o = c.bi; s = 1; } else continue;
+    if (o.type !== CANNON.Body.STATIC || o.npcRef || o.isPlane) continue;
+    if (Math.abs(c.ni.y) > 0.45) continue;                                         // podłoże, pochylnia
+    nx += c.ni.x * s; nz += c.ni.z * s; hit = true;                                 // normalna od ściany do auta
+  }
+  if (!hit || _wsPrev < 4){ _wsPrev = hit ? _wsPrev * 0.98 : sp; return; }
+  const nl = Math.hypot(nx, nz) || 1; nx /= nl; nz /= nl;
+  chassisBody.quaternion.vmult(_wsZ, _wsF);                                        // fizyczny przód auta = lokalne −Z
+  const fl = Math.hypot(_wsF.x, _wsF.z) || 1, fx = _wsF.x / fl, fz = _wsF.z / fl, fn = fx * nx + fz * nz;
+  if (fn > -0.06){ _wsPrev = sp; return; }                                         // nos nie w ścianę (ociera bokiem)
+  let tx = fx - fn * nx, tz = fz - fn * nz; const tl = Math.hypot(tx, tz) || 1; tx /= tl; tz /= tl;
+  const cosA = Math.sqrt(Math.max(0, 1 - fn * fn)), keep = _wsPrev * cosA * 0.9;
+  const vt = v.x * tx + v.z * tz, vn = Math.max(0, v.x * nx + v.z * nz), vNew = Math.max(vt, keep);
+  v.x = tx * vNew + nx * vn; v.z = tz * vNew + nz * vn;
+  const err = Math.atan2(fx * tz - fz * tx, fx * tx + fz * tz);                    // kąt od przodu do stycznej (wokół Y)
+  chassisBody.angularVelocity.y = clamp(-err * 9, -4, 4);
+  _wsPrev = Math.max(vNew, _wsPrev * 0.985);
+});

@@ -1,6 +1,6 @@
 # GTA by Claude
 
-**Mini-GTA w przeglądarce.** Miasto na wyspie: 12 × 12 kwartałów z ruchem ulicznym, pieszymi, rowerzystami i piratami drogowymi, dwie autostrady na estakadach z węzłem koniczynowym, lotnisko miejskie i port z łodziami, a za cieśniną wysepka z drugim lotniskiem — samolotami z obu można latać (i z których można wyskoczyć ze spadochronem). Do tego pełna mapa z wyznaczaniem trasy, cykl dnia i nocy, broń i kradzież aut.
+**Mini-GTA w przeglądarce.** Miasto na wyspie: 12 × 12 kwartałów z ruchem ulicznym, pieszymi, rowerzystami i piratami drogowymi, dwie autostrady na estakadach z węzłem koniczynowym, lotnisko miejskie i port z łodziami, a za cieśniną wysepka z drugim lotniskiem — samolotami z obu można latać (i z których można wyskoczyć ze spadochronem), a po drugich pasach kursuje ruch lotniczy NPC. Po morzu pływają łodzie NPC. Do tego pełna mapa z wyznaczaniem trasy, cykl dnia i nocy, broń (pistolet, karabin) z kamerą zza ramienia i kradzież aut.
 
 Wszystko — asfalt, okna, modele aut i samolotów, znaki, dźwięk silnika i wybuchów — jest generowane w kodzie. Nie ma ani jednego pliku graficznego czy dźwiękowego, nie ma bundlera ani serwera: wystarczy otworzyć `index.html`.
 
@@ -30,8 +30,9 @@ Klawisze można zmienić w menu (**STEROWANIE**). `Esc` w trakcie gry to pauza �
 | `Shift` / `Spacja` | bieg / skok |
 | `F` (albo `E`) | wsiądź do auta lub samolotu, ukradnij auto NPC |
 | `V` (przytrzymaj) | menu pojazdów: twoje auto (zwykły, pickup, sportowy) albo rower |
-| `1` `2` `3`, `Q` (przytrzymaj) | broń: pięści, kij, pistolet / koło broni |
-| lewy przycisk myszy, `R` | atak, strzał / przeładowanie |
+| `1` `2` `3` `4`, `Q` (przytrzymaj) | broń: pięści, kij, pistolet, karabin / koło broni |
+| lewy przycisk myszy (karabin: przytrzymaj), `R` | atak, strzał / przeładowanie |
+| prawy przycisk myszy | przycelowanie (bliżej, mniejszy rozrzut, wolniejszy chód) |
 
 **W aucie**
 
@@ -73,12 +74,13 @@ Jak wystartować: ustaw samolot na pasie, trzymaj `W`, a gdy prędkościomierz p
 |---|---|---|
 | ![Wyspa](screenshots/wyspa.jpg) | ![Port](screenshots/port.jpg) | ![Łódź](screenshots/lodz.jpg) |
 
-| Przystań na wysepce | Mewy nad miastem |
-|---|---|
-| ![Przystań](screenshots/przystan.jpg) | ![Ptaki](screenshots/ptaki.jpg) |
+| Przystań na wysepce | Mewy nad miastem | Łódź NPC |
+|---|---|---|
+| ![Przystań](screenshots/przystan.jpg) | ![Ptaki](screenshots/ptaki.jpg) | ![Łódź NPC](screenshots/lodz-npc.jpg) |
 
 - Miasto leży na wyspie otoczonej morzem, z nabrzeżem i balustradą dookoła.
 - Na północnym brzegu jest **port towarowy**: plac kontenerowy z suwnicą, dwa dźwigi nabrzeżowe, statek kontenerowy i holownik, zbiorniki paliw, magazyn, biuro portu, przystań z motorówkami i falochron z biało-czerwoną latarnią.
+- Po morzu wokół wysp pływają **łodzie NPC** ze sternikami: między losowymi punktami, z dala od brzegu, omijają ląd, statek, pomosty i inne łodzie (także twoją). Łódź NPC przy pomoście można przejąć (`F`).
 - Na wysepce jest **przystań pasażerska**: drewniany deptak, kasa biletowa z czerwonym dachem, ławki, prom, jachty i latarnie wejścia (zielona i czerwona).
 - Nad miastem i portem latają **mewy**. Co jakiś czas któraś „zrzuca balast”: na ziemi albo dachu zostaje biała plama, która po kilku sekundach znika. Trafienie w ciebie albo w szybę auta kończy się komunikatem i plamą na ekranie.
 - Za cieśniną, ok. 250 m na północ, leży **wysepka z drugim lotniskiem** i własną przystanią. Dopłyniesz tam łodzią z portu albo dolecisz samolotem z lotniska miejskiego.
@@ -118,12 +120,13 @@ Jak wystartować: ustaw samolot na pasie, trzymaj `W`, a gdy prędkościomierz p
 
 ### Ty
 
-| HUD w aucie | W nocy | Szpital |
+| HUD w aucie | Karabin zza ramienia | Szpital |
 |---|---|---|
-| ![HUD](screenshots/hud-auto.jpg) | ![Noc w aucie](screenshots/hud-noc.jpg) | ![Szpital](screenshots/szpital.jpg) |
+| ![HUD](screenshots/hud-auto.jpg) | ![Broń](screenshots/bron.jpg) | ![Szpital](screenshots/szpital.jpg) |
 
 - Jazda z fizyką zawieszenia. Trzy typy aut: zwykły (0–100 km/h w 4,4 s, 181 km/h), pickup (6,9 s, 160 km/h), sportowy (3,0 s, 250 km/h), do tego rower. Twoje auto przywołujesz menu `V`, skradzione zostają tam, gdzie je porzucisz.
-- Broń (pięści, kij, pistolet), zdrowie i kondycja, upadki z wysokości. Po śmierci odradzasz się przed **szpitalem** w południowym pasie zieleni (dojazd z obwodnicy, lądowisko na dachu, karetki, parking).
+- Broń: pięści, kij, pistolet i karabin (ogień ciągły, magazynek 30). Z bronią palną kamera przechodzi za prawe ramię — postać jest z lewej i nie zasłania celownika na środku ekranu, a obraca się w stronę celownika. Strzał leci przez środek celownika (z kontrolą, czy przed lufą nie ma ściany); rozrzut rośnie w ruchu i przy serii, odrzut podbija kamerę; smugacz, błysk, iskry na metalu, pył na murze, znacznik trafienia. Strzały w auto NPC zatrzymują je na światłach awaryjnych.
+- Zdrowie i kondycja, upadki z wysokości. Uderzenie w ścianę lub barierę pod małym kątem nie zatrzymuje auta — ślizga się wzdłuż ściany; zatrzymuje dopiero uderzenie czołowe. Po śmierci odradzasz się przed **szpitalem** w południowym pasie zieleni (dojazd z obwodnicy, lądowisko na dachu, karetki, parking).
 - HUD: kompas, zegarowy prędkościomierz, zegar, minimapa z całym światem.
 
 ### Lotnisko i samoloty
@@ -136,16 +139,36 @@ Jak wystartować: ustaw samolot na pasie, trzymaj `W`, a gdy prędkościomierz p
 |---|---|---|
 | ![Spadochron](screenshots/spadochron.jpg) | ![Katastrofa](screenshots/katastrofa.jpg) | ![Odrzutowiec](screenshots/odrzutowiec.jpg) |
 
-- **Dwa różne lotniska**: miejskie (regionalne) w zachodnim pasie zieleni wyspy głównej — pas 18/36 (326 × 26 m), ceglany terminal z dachem dwuspadowym, ceglana wieża z ośmiokątną kabiną, dwa hangary łukowe, zbiorniki paliwa; oraz międzynarodowe na wysepce — pas 09/27 (336 × 30 m) ze światłami podejścia, terminal z łukowym dachem i rękawami, okrągła wieża ze szklaną kabiną, radar, cysterna i wózki bagażowe, hangar, parking, przystań. Na każdym stoi odrzutowiec i awionetka — można przelecieć z jednego na drugie.
+| Ruch lotniczy NPC — podejście do pasa 36L |
+|---|
+| ![Ruch lotniczy](screenshots/ruch-lotniczy.jpg) |
+
+- **Dwa różne lotniska**: miejskie (regionalne) w zachodnim pasie zieleni wyspy głównej — pas 18L/36R (326 × 26 m) i drugi pas 18R/36L na nasypie przy brzegu, ceglany terminal z dachem dwuspadowym, ceglana wieża z ośmiokątną kabiną, dwa hangary łukowe, zbiorniki paliwa; oraz międzynarodowe na wysepce — pas 09R/27L (336 × 30 m) ze światłami podejścia i drugi, północny pas 09L/27R, terminal z łukowym dachem i rękawami, okrągła wieża ze szklaną kabiną, radar, cysterna i wózki bagażowe, hangar, parking, przystań. Na każdym stoi odrzutowiec i awionetka — można przelecieć z jednego na drugie.
+- **Ruch lotniczy NPC** na drugich pasach: samoloty (odrzutowce i awionetka) startują, wznoszą się, przelatują na drugie lotnisko, podchodzą po ścieżce schodzenia (kierunek lądowania — krótsza trasa), lądują, hamują, zawracają na końcu pasa i startują z powrotem. Na pasie jest naraz jeden samolot — następny odchodzi na drugi krąg. Zderzenie twojego samolotu z NPC w powietrzu to katastrofa.
 - Dwa samoloty: szybki odrzutowiec i zwrotna awionetka. Sterowanie strzałkami z autopoziomowaniem, ochroną przed przeciągnięciem i asystentem lądowania.
 - `F` w locie — wyskakujesz, otwiera się prostokątna czasza (skręty `A`/`D`, `W` szybciej, `S` hamowanie), a samolot bez pilota nurkuje i rozbija się.
 - Zderzenie z budynkiem albo twarde lądowanie to katastrofa: kula ognia przechodząca w dym, błysk, odłamki, płonący wrak, wstrząs kamery i huk. Pilot nie przeżywa (z nieśmiertelnością z menu debug ląduje obok wraku). Po kilkunastu sekundach samolot wraca na lotnisko — gdy jego stanowisko jest wolne.
 
-### Menu debug (`` ` ``)
+### Menu deweloperskie (`` ` ``)
 
-Panel na całą szerokość ekranu, sekcje w kolumnach. Liczba aut i pieszych, pora dnia, nieśmiertelność, amunicja, teleporty (start, port, lotnisko miejskie, wysepka, autostrada, zjazd, obwodnica), zmiana typu auta w trakcie jazdy i rower, kierunkowskazy, samolot na lotnisku albo od razu w powietrzu, dodawanie piratów i rowerzystów, szansa potrącenia rowerzysty, przełącznik LOD, gęstość mgły, zrzut balastu przez ptaka (obok albo na ciebie), szybki cel nawigacji (szpital, lotnisko) i jego usunięcie, wejście do łodzi w porcie.
+![Menu deweloperskie](screenshots/debug.jpg)
 
-![Ekran ładowania](screenshots/ladowanie.jpg)
+Pełnoekranowy panel z bieżącymi statystykami w nagłówku (FPS, ciała fizyczne, auta, piesi, łodzie, samoloty, tryb) i kartami w kolumnach — suwaki, przełączniki, przyciski:
+
+- **Populacja**: auta NPC i piesi do 200, rowerzyści, łodzie i samoloty NPC; „Domyślne” i „Puste ulice”. Na słabszym komputerze wystarczy zmniejszyć liczbę aut i pieszych.
+- **Ruch drogowy**: zatrzymanie ruchu, LOD AI, szansa potrącenia rowerzysty przez pirata, dodawanie piratów.
+- **Czas i świat**: godzina, zatrzymanie i tempo doby, tempo gry (zwolnione tempo), mgła.
+- **Grafika i wydajność**: cienie, rozdzielczość renderowania, pole widzenia, ukrycie HUD.
+- **Gracz**: nieśmiertelność, nieskończona amunicja, moc auta, leczenie, amunicja, postawienie auta, usunięcie skradzionych aut.
+- **Pojazdy, teleporty, nawigacja i ptaki**: typ auta, samolot na ziemi albo w powietrzu, łódź, 9 miejsc teleportu, szybki cel trasy, zrzut balastu.
+
+### Ekran ładowania i pauza
+
+| Ładowanie | Pauza |
+|---|---|
+| ![Ekran ładowania](screenshots/ladowanie.jpg) | ![Pauza](screenshots/pauza.jpg) |
+
+Ładowanie: sylwetka miasta o zmierzchu z mrugającymi oknami, pasek z procentem, etapy (grafika, fizyka, dzielnice, autostrady, ruch, lotniska, shadery) i zmieniające się wskazówki. Pauza (`Esc`): rozmyte zatrzymane miasto, stan gry w jednym wierszu, powrót, sterowanie, mapa, menu deweloperskie i ściągawka klawiszy (z aktualnych ustawień).
 
 ## Jak to jest zrobione
 
@@ -176,8 +199,9 @@ Symulacja (`node test/sim.js <sekundy>`, `SEED=…`) sprawdza m.in. nakładanie 
 ## Ograniczenia
 
 - Ulice to siatka ortogonalna, a trasy NPC to stałe pętle, nie graf dróg. Nawigacja gracza nie prowadzi przez autostrady (tylko ulice i dojazdy).
-- Wyspy są prostokątne (sztuczne nabrzeża), łodzie to prosty model zręcznościowy (bez fal i fizyki wody), w porcie nie pływają łodzie NPC.
-- Uproszczony model lotu (bez wiatru i klap), brak samolotów NPC; samolot zderza się z budynkami i terenem, nie z autami.
+- Wyspy są prostokątne (sztuczne nabrzeża), łodzie to prosty model zręcznościowy (bez fal i fizyki wody); łodzie NPC pływają po losowych celach, nie po trasach.
+- Uproszczony model lotu (bez wiatru i klap); samoloty NPC lecą po wyliczonej trasie (nie fizyką) i nie kołują po drogach kołowania — zawracają na końcu pasa. Samolot gracza zderza się z budynkami, terenem i samolotami NPC, nie z autami.
+- Postać ma ręce z jednego segmentu — przy karabinie lewa dłoń tylko sięga w stronę łoża.
 - Piraci biorą zakręty kinematycznie (bez prawdziwego poślizgu); potrącenie rowerzysty to zdarzenie skryptowe.
 - AI dalekich aut liczone rzadziej, ale modele są pełne także z daleka.
 - Piesi nie chodzą alejkami parków.

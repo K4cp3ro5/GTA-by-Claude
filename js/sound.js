@@ -195,17 +195,17 @@ const Sound = {
     o.start(t); o.stop(t + 0.28);
   },
 
-  shoot(){
+  shoot(rifle){
     if (!this.ready) return;
     const ctx = this.ctx, t = ctx.currentTime;
     const src = ctx.createBufferSource();
     src.buffer = this.noise;
-    src.playbackRate.value = 1.6;
+    src.playbackRate.value = rifle ? 1.25 : 1.6;
     const f = ctx.createBiquadFilter();
-    f.type = 'bandpass'; f.frequency.value = 1800; f.Q.value = 0.7;
+    f.type = 'bandpass'; f.frequency.value = rifle ? 1250 : 1800; f.Q.value = 0.7;
     const g = ctx.createGain();
-    g.gain.setValueAtTime(0.34, t);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.09);
+    g.gain.setValueAtTime(rifle ? 0.3 : 0.34, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + (rifle ? 0.13 : 0.09));
     src.connect(f); f.connect(g); g.connect(this.master);
     src.start(t); src.stop(t + 0.1);
 
@@ -252,11 +252,13 @@ const Sound = {
   }
 };
 
+let _crashT = -9, _crashD = 0;
 /* dźwięk uderzenia karoserii + obrażenia od kraksy + potrącenie pieszego */
 chassisBody.addEventListener('collide', e => {
   const v = e.contact ? Math.abs(e.contact.getImpactVelocityAlongNormal()) : 0;
   if (v > 3.2) Sound.thud(v);
-  if (mode === 'car' && v > 10) damagePlayer((v - 10) * 4, 'kraksa');
+  /* obrażenia raz na kraksę (kilka kształtów naraz = kilka zdarzeń): najmocniejsze uderzenie w oknie 0.4 s */
+  if (mode === 'car' && v > 11){ const d = (v - 11) * 3.6; if (clock - _crashT > 0.4){ _crashT = clock; _crashD = 0; } if (d > _crashD){ damagePlayer(d - _crashD, 'kraksa'); _crashD = d; } }
   if (e.body && e.body.isPed && v > 2.2) Pedestrians.hit(e.body.pedRef, v);   // body.pedRef = obiekt pieszego (samo ciało nie ma group/state)
   if (e.body && e.body.npcRef && v > 5.6) npcHitByPlayer(e.body.npcRef, v);    // > 20 km/h: NPC staje ze światłami awaryjnymi
 });

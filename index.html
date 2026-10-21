@@ -25,6 +25,7 @@
     cursor:default;
   }
   canvas{display:block}
+  button,input,kbd{font-family:inherit}
 
   #hud{position:fixed;inset:0;pointer-events:none;z-index:10}
 
@@ -53,7 +54,7 @@
   kbd{
     display:inline-block;min-width:19px;text-align:center;
     background:#2a2e37;border:1px solid #3c414c;border-bottom-width:2px;
-    border-radius:3px;padding:1px 5px;font:500 11px/1.4 inherit;color:var(--paint);
+    border-radius:3px;padding:1px 5px;font-weight:500;font-size:11px;line-height:1.4;color:var(--paint);
   }
   #help .sep{height:1px;background:var(--line);margin:9px 0}
 
@@ -149,54 +150,86 @@
   #bigmap.on{display:block}
   #bigmap canvas{display:block;width:100%;height:100%}
 
-  /* ---- ekran ładowania (przed menu startowym) ---- */
+  /* ---- ekran ładowania (przed menu startowym): niebo o zmierzchu, sylwetka miasta z oknami, pasek z procentem,
+     etapy wczytywania i zmieniające się wskazówki ---- */
   #loader{
-    position:fixed;inset:0;z-index:60;display:flex;flex-direction:column;
-    align-items:center;justify-content:center;gap:22px;text-align:center;
-    background:
-      radial-gradient(1100px 620px at 50% 30%,rgba(255,176,58,.10),transparent 68%),
-      linear-gradient(#0a0c11,#05060a);
-    transition:opacity .5s ease;
+    position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;overflow:hidden;
+    background:linear-gradient(180deg,#07080d 0%,#0d1018 46%,#2a1a14 78%,#4a2a14 100%);
+    transition:opacity .6s ease;
   }
   #loader.done{opacity:0;pointer-events:none}
-  #loader .ltitle{font-size:clamp(30px,5vw,54px);font-weight:200;letter-spacing:-.03em}
-  #loader .ltitle em{font-style:normal;font-weight:600;color:var(--sodium)}
-  #loader .lbar{width:min(360px,70vw);height:4px;border-radius:2px;background:#1d2027;overflow:hidden}
-  #lfill{display:block;height:100%;width:2%;background:var(--sodium);box-shadow:0 0 12px rgba(255,176,58,.6);transition:width .25s ease}
-  #lstat{font-size:12px;letter-spacing:.08em;color:#8d8b86;min-height:1.4em}
+  #loader .lsun{position:absolute;left:50%;bottom:16%;width:520px;height:520px;margin-left:-260px;border-radius:50%;
+    background:radial-gradient(circle,rgba(255,176,58,.38),rgba(255,120,40,.12) 45%,transparent 70%);filter:blur(4px)}
+  #lcity{position:absolute;left:0;right:0;bottom:0;width:100%;height:42%;display:block}
+  #lcity .w{fill:#ffcf7a;opacity:.8;animation:lwin 4s ease-in-out infinite}
+  @keyframes lwin{0%,100%{opacity:.85}50%{opacity:.25}}
+  #loader .lbox{position:relative;z-index:1;width:min(520px,88vw);display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center;margin-bottom:12vh}
+  .lkicker,.gkicker{font-size:11px;font-weight:600;letter-spacing:.32em;color:#a08c74}
+  #loader .ltitle{font-size:clamp(40px,7vw,78px);font-weight:200;letter-spacing:-.035em;line-height:.95;text-shadow:0 6px 40px rgba(0,0,0,.6)}
+  #loader .ltitle em,#gate h1 em{font-style:normal;font-weight:700;color:var(--sodium);text-shadow:0 0 44px rgba(255,176,58,.42)}
+  .lprog{display:flex;align-items:center;gap:12px;width:100%;margin-top:10px}
+  #loader .lbar{flex:1;height:6px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden}
+  #lfill{display:block;height:100%;width:2%;border-radius:3px;background:linear-gradient(90deg,#ff8a2a,var(--sodium));box-shadow:0 0 14px rgba(255,176,58,.6);transition:width .25s ease}
+  #lpct{width:42px;text-align:right;font-size:13px;font-weight:600;color:var(--paint);font-variant-numeric:tabular-nums}
+  #lstat{font-size:12px;letter-spacing:.06em;color:#9b9890;min-height:1.4em}
   #lstat.err{color:var(--brake)}
-  #loader .lspin{width:26px;height:26px;border-radius:50%;border:2px solid #2a2d34;border-top-color:var(--sodium);animation:lspin .9s linear infinite}
-  @keyframes lspin{to{transform:rotate(360deg)}}
+  #lsteps{list-style:none;display:flex;flex-wrap:wrap;justify-content:center;gap:6px}
+  #lsteps li{font-size:11px;color:#77746d;border:1px solid rgba(255,255,255,.08);border-radius:20px;padding:4px 10px 4px 9px;display:flex;align-items:center;gap:6px;background:rgba(10,12,16,.45)}
+  #lsteps li::before{content:"";width:7px;height:7px;border-radius:50%;border:1px solid #55524c}
+  #lsteps li.cur{color:#e6e3dc;border-color:rgba(255,176,58,.4)}
+  #lsteps li.cur::before{border-color:var(--sodium);animation:pulse 1s infinite}
+  #lsteps li.ok{color:#c9c6bf}
+  #lsteps li.ok::before{background:var(--sodium);border-color:var(--sodium)}
+  #ltip{margin-top:6px;font-size:12.5px;color:#b7b2a8;line-height:1.55;max-width:460px;min-height:3.1em;transition:opacity .3s}
+  #ltip b{color:var(--sodium);font-weight:600}
 
-  /* ---- ekran startowy ---- */
+  /* ---- ekran startowy i pauza: karta z tytułem i przyciskami + ściągawka sterowania;
+     w pauzie półprzezroczyste tło z rozmyciem (widać zatrzymane miasto) ---- */
   #gate{
-    position:fixed;inset:0;z-index:40;display:flex;flex-direction:column;
-    align-items:center;justify-content:center;gap:26px;text-align:center;
+    position:fixed;inset:0;z-index:40;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:24px;overflow-y:auto;
     background:
-      radial-gradient(1100px 620px at 50% 30%,rgba(255,176,58,.10),transparent 68%),
+      radial-gradient(1100px 620px at 30% 30%,rgba(255,176,58,.10),transparent 68%),
       linear-gradient(#0a0c11,#05060a);
-    transition:opacity .45s ease;
+    transition:opacity .35s ease;
   }
+  #gate.paused{background:radial-gradient(900px 520px at 28% 40%,rgba(255,176,58,.08),transparent 70%),rgba(5,6,10,.64);backdrop-filter:blur(7px) saturate(.85);-webkit-backdrop-filter:blur(7px) saturate(.85)}
   #gate.hidden{opacity:0;pointer-events:none}
-  #gate h1{
-    font-size:clamp(44px,9vw,104px);font-weight:200;letter-spacing:-.035em;line-height:.88;
+  .gcard{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(280px,1fr);gap:40px;width:min(1000px,100%);align-items:center}
+  .gmain{display:flex;flex-direction:column;align-items:flex-start;gap:16px}
+  .gbadge{display:none;font-size:11px;font-weight:700;letter-spacing:.24em;color:#14161b;background:var(--sodium);border-radius:4px;padding:6px 10px}
+  #gate.paused .gbadge{display:inline-block}
+  #gate.paused .gkicker{display:none}
+  #gate h1{font-size:clamp(48px,8vw,104px);font-weight:200;letter-spacing:-.035em;line-height:.9}
+  #gate h1 em{display:block}
+  #gate.paused h1{font-size:clamp(36px,5vw,60px)}
+  #gate p{max-width:470px;color:#9a978f;font-size:14px;line-height:1.65}
+  #gate.paused p{color:#d8d5ce;font-size:15px;font-variant-numeric:tabular-nums}
+  .gbtns{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}
+  #go,#settingsBtn,.gbtn{
+    pointer-events:auto;cursor:pointer;border-radius:6px;padding:15px 30px;font-weight:700;font-size:12.5px;line-height:1;letter-spacing:.14em;
+    transition:transform .14s ease,box-shadow .14s ease,background .14s,color .14s,border-color .14s;
   }
-  #gate h1 em{
-    display:block;font-style:normal;font-weight:600;
-    color:var(--sodium);text-shadow:0 0 44px rgba(255,176,58,.42);
-  }
-  #gate p{max-width:430px;color:#8d8b86;font-size:14px;line-height:1.65;padding:0 24px}
-  #go{
-    pointer-events:auto;cursor:pointer;
-    background:var(--sodium);color:#14161b;border:0;border-radius:3px;
-    padding:14px 34px;font:600 13px/1 inherit;letter-spacing:.12em;
-    transition:transform .14s ease,box-shadow .14s ease;
-  }
-  #go:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(255,176,58,.28)}
+  #go{background:var(--sodium);color:#14161b;border:0;min-width:220px}
+  #go:hover{transform:translateY(-2px);box-shadow:0 12px 34px rgba(255,176,58,.32)}
   #go:focus-visible{outline:2px solid var(--paint);outline-offset:3px}
-  #go[disabled]{background:#3a3d45;color:#8d8b86;cursor:progress;transform:none;box-shadow:none}
-  #gatefoot{font-size:11px;color:#56544f;letter-spacing:.08em}
-  #err{color:var(--brake);font-size:13px;max-width:520px;line-height:1.6;padding:0 24px}
+  #go[disabled]{background:#30333b;color:#8d8b86;cursor:progress;transform:none;box-shadow:none}
+  #settingsBtn,.gbtn{background:rgba(255,255,255,.04);color:#d8d5ce;border:1px solid #3a3e48}
+  #settingsBtn:hover,.gbtn:hover{border-color:var(--sodium);color:#fff}
+  .gpause{display:none;gap:8px;flex-wrap:wrap}
+  #gate.paused .gpause{display:flex}
+  .gbtn{padding:11px 16px;font-size:11px;letter-spacing:.1em;font-weight:600}
+  .gside{background:rgba(18,20,26,.82);border:1px solid #2a2e37;border-radius:12px;padding:16px 18px 12px;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+  .gside h3{font-size:11px;font-weight:600;letter-spacing:.2em;color:var(--sodium);margin-bottom:10px;text-transform:uppercase}
+  #gateKeys{display:grid;grid-template-columns:auto 1fr;gap:7px 14px;align-items:center;font-size:12.5px;color:#b9b6ae}
+  #gateKeys .k{display:flex;gap:4px;justify-content:flex-end}
+  #gateKeys .sep{grid-column:1 / -1;height:1px;background:var(--line);margin:3px 0}
+  #gatefoot{font-size:11px;color:#615e58;letter-spacing:.06em;text-align:center}
+  #err{color:var(--brake);font-size:13px;max-width:520px;line-height:1.6}
+  @media (max-width:780px){
+    .gcard{grid-template-columns:1fr;gap:22px}
+    .gmain{align-items:center;text-align:center}
+    .gbtns,.gpause{justify-content:center}
+  }
 
   /* ---- zdrowie / stamina ---- */
   .vtrack i{display:block;height:100%;border-radius:2px;transition:width .15s ease}
@@ -214,12 +247,17 @@
   #weaponhud.on{opacity:1}
   #weaponhud .wname{font-size:12px;letter-spacing:.1em;color:var(--paint)}
   #weaponhud .wammo{font-size:15px;font-weight:600;color:var(--sodium);font-variant-numeric:tabular-nums}
-  #crosshair{
-    position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-    width:6px;height:6px;border-radius:50%;background:rgba(242,240,234,.85);
-    box-shadow:0 0 0 1px rgba(0,0,0,.5);opacity:0;transition:opacity .15s ease;
-  }
+  /* celownik: 4 kreski odsunięte o rozrzut (--gap, weapons.js) + kropka; .hit = trafienie */
+  #crosshair{position:absolute;top:50%;left:50%;width:0;height:0;opacity:0;transition:opacity .15s ease;--gap:4px}
   #crosshair.on{opacity:1}
+  #crosshair i{position:absolute;display:block;background:rgba(246,244,238,.95);box-shadow:0 0 0 1px rgba(0,0,0,.45);border-radius:1px;transition:background .08s}
+  #crosshair .ct,#crosshair .cb{width:2px;height:8px;left:-1px}
+  #crosshair .cl,#crosshair .cr{width:8px;height:2px;top:-1px}
+  #crosshair .ct{bottom:var(--gap)} #crosshair .cb{top:var(--gap)}
+  #crosshair .cl{right:var(--gap)} #crosshair .cr{left:var(--gap)}
+  #crosshair .cd{width:2px;height:2px;left:-1px;top:-1px}
+  #crosshair.hit i{background:#ff5a47}
+  #crosshair.hit .cd{width:4px;height:4px;left:-2px;top:-2px}
 
   /* ---- koło broni ---- */
   #wheelWrap{
@@ -230,12 +268,6 @@
   #wheelCanvas{filter:drop-shadow(0 8px 28px rgba(0,0,0,.5))}
 
   /* ---- ekran ustawień ---- */
-  #settingsBtn{
-    pointer-events:auto;cursor:pointer;background:transparent;color:#8d8b86;
-    border:1px solid var(--line);border-radius:3px;padding:9px 20px;
-    font:500 11px/1 inherit;letter-spacing:.1em;margin-top:14px;transition:color .14s,border-color .14s;
-  }
-  #settingsBtn:hover{color:var(--paint);border-color:#565b64}
   #settings{
     position:fixed;inset:0;z-index:45;display:none;align-items:center;justify-content:center;
     background:rgba(5,6,10,.72);backdrop-filter:blur(4px);
@@ -254,60 +286,76 @@
   .bind-row:last-of-type{border-bottom:0}
   .keybtn{
     min-width:64px;text-align:center;background:#2a2e37;border:1px solid #3c414c;border-bottom-width:2px;
-    border-radius:3px;padding:5px 10px;font:500 12px/1.3 inherit;color:var(--paint);
+    border-radius:3px;padding:5px 10px;font-weight:500;font-size:12px;line-height:1.3;color:var(--paint);
     cursor:pointer;pointer-events:auto;transition:border-color .12s,background .12s;
   }
   .keybtn:hover{border-color:var(--sodium)}
   .keybtn.waiting{background:var(--sodium);color:#14161b;border-color:var(--sodium)}
   #settingsFoot{display:flex;justify-content:space-between;gap:10px;margin-top:18px}
   #settingsFoot button{
-    pointer-events:auto;cursor:pointer;flex:1;border-radius:3px;padding:11px;font:600 11px/1 inherit;letter-spacing:.1em;
+    pointer-events:auto;cursor:pointer;flex:1;border-radius:3px;padding:11px;font-weight:600;font-size:11px;line-height:1;letter-spacing:.1em;
   }
   #resetBinds{background:transparent;color:#8d8b86;border:1px solid var(--line)}
   #resetBinds:hover{color:var(--paint)}
   #closeSettings{background:var(--sodium);color:#14161b;border:0}
 
-  /* ---- debug menu ---- */
+  /* ---- menu deweloperskie (`) — pełny ekran, karty w kolumnach; świat działa w tle ---- */
   #debugMenu{
-    position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;
-    background:rgba(5,6,10,.82);backdrop-filter:blur(5px);
+    position:fixed;inset:0;z-index:50;display:none;
+    background:linear-gradient(180deg,rgba(6,7,11,.86),rgba(6,7,11,.74));backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
   }
-  #debugMenu.on{display:flex}
-  /* panel na całą szerokość: sekcje jako karty w siatce kolumn (wszystko widać naraz) */
-  #debugPanel{
-    width:calc(100vw - 32px);max-height:calc(100vh - 32px);overflow-y:auto;
-    background:#14161bee;border:1px solid #4a3320;border-radius:6px;padding:18px 20px 14px;
-    display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;align-content:start;
-  }
-  #debugPanel .dhead{grid-column:1 / -1;display:flex;align-items:baseline;gap:14px}
-  #debugPanel h2{font-size:13px;letter-spacing:.16em;color:#ff9a3a}
-  #debugPanel .sub{font-size:11px;color:#68665f}
-  .dsec{background:#1b1e25;border:1px solid #2c3039;border-radius:5px;padding:12px 14px 6px}
-  .dsec h3{font-size:10px;letter-spacing:.14em;color:#ff9a3a;text-transform:uppercase;margin-bottom:9px;opacity:.85}
-  .drow{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px 10px;margin-bottom:8px;font-size:12.5px;color:#c8c6bf}
-  .drow span.dval{color:var(--paint);font-variant-numeric:tabular-nums}
+  #debugMenu.on{display:block}
+  #debugPanel{position:absolute;inset:14px;display:flex;flex-direction:column;
+    background:rgba(17,19,24,.94);border:1px solid #2b2f38;border-radius:10px;box-shadow:0 24px 70px rgba(0,0,0,.55);overflow:hidden}
+  .dhead{display:flex;align-items:center;gap:18px;padding:12px 16px;border-bottom:1px solid #262a32;background:#14161c}
+  .dtitle{display:flex;align-items:center;gap:10px;min-width:0}
+  .dbadge{font-weight:700;font-size:10px;line-height:1;letter-spacing:.14em;color:#14161b;background:var(--sodium);border-radius:4px;padding:5px 7px}
+  .dtitle h2{font-size:15px;font-weight:600;letter-spacing:.01em;color:var(--paint);white-space:nowrap}
+  .dtitle .sub{font-size:11px;color:#77756f;white-space:nowrap}
+  .dstats{display:flex;flex-wrap:wrap;gap:6px;margin-left:auto;justify-content:flex-end}
+  .dchip{display:flex;align-items:baseline;gap:6px;background:#1c1f26;border:1px solid #2a2e37;border-radius:20px;padding:5px 11px;font-size:11px;color:#8d8b86;white-space:nowrap}
+  .dchip b{color:var(--paint);font-weight:600;font-variant-numeric:tabular-nums}
+  #closeDebug{pointer-events:auto;cursor:pointer;flex:none;width:34px;height:34px;border-radius:8px;border:1px solid #2f343e;background:#1c1f26;color:#c8c6bf;font-weight:500;font-size:16px;line-height:1;transition:background .12s,color .12s}
+  #closeDebug:hover{background:var(--sodium);color:#14161b;border-color:var(--sodium)}
+  .dgrid{flex:1;overflow-y:auto;padding:14px 16px 18px;display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px;align-content:start}
+  .dsec{background:#1a1d23;border:1px solid #272b33;border-radius:8px;padding:12px 14px 10px;display:flex;flex-direction:column;gap:9px}
+  .dsec h3{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:600;letter-spacing:.12em;color:#d7d5cf;text-transform:uppercase;padding-bottom:8px;border-bottom:1px solid #252931}
+  .dsec h3 i{font-style:normal;width:20px;height:20px;border-radius:5px;display:grid;place-items:center;background:rgba(255,176,58,.13);color:var(--sodium);font-size:11px;letter-spacing:0}
+  .dsec .hint{font-size:10.5px;color:#6d6b66;line-height:1.45;margin-top:-3px}
+  /* suwak: etykieta | suwak | wartość */
+  .dctl{display:grid;grid-template-columns:minmax(96px,auto) 1fr 52px;align-items:center;gap:10px;font-size:12px;color:#b9b7b0}
+  .dctl output{text-align:right;color:var(--paint);font-variant-numeric:tabular-nums;font-weight:600;font-size:12px}
+  .dctl input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:2px;background:#2b2f38;outline:none;pointer-events:auto;cursor:pointer}
+  .dctl input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--sodium);border:2px solid #1a1d23;box-shadow:0 0 0 1px var(--sodium)}
+  .dctl input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:var(--sodium);border:2px solid #1a1d23}
+  /* przełącznik */
+  .dtog{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12px;color:#b9b7b0;cursor:pointer;pointer-events:auto;user-select:none}
+  .dtog input{display:none}
+  .dtog i{position:relative;flex:none;width:32px;height:18px;border-radius:9px;background:#2b2f38;transition:background .15s}
+  .dtog i::after{content:"";position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:#8d8b86;transition:transform .15s,background .15s}
+  .dtog input:checked + i{background:rgba(255,176,58,.35)}
+  .dtog input:checked + i::after{transform:translateX(14px);background:var(--sodium)}
+  /* przyciski: wiersz z etykietą albo siatka */
+  .drow{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;color:#b9b7b0}
   .dbtnrow{display:flex;flex-wrap:wrap;gap:5px;justify-content:flex-end}
-  .dbtn{
-    pointer-events:auto;cursor:pointer;background:#2a2e37;border:1px solid #3c414c;border-bottom-width:2px;
-    border-radius:3px;padding:6px 10px;font:500 11px/1 inherit;color:var(--paint);white-space:nowrap;
-    transition:border-color .12s;
-  }
-  .dbtn:hover{border-color:#ff9a3a}
-  .drow input[type=range]{flex:1;accent-color:#ff9a3a}
-  .drow input[type=checkbox]{width:15px;height:15px;accent-color:#ff9a3a;pointer-events:auto}
-  #debugInfo{grid-column:1 / -2;font-size:11px;color:#8d8b86;line-height:1.7;display:flex;flex-wrap:wrap;gap:4px 22px;align-items:center;border-top:1px solid var(--line);padding-top:10px}
-  #debugFoot{grid-column:-2 / -1;display:flex;justify-content:flex-end;align-items:center;border-top:1px solid var(--line);padding-top:10px}
-  #closeDebug{
-    pointer-events:auto;cursor:pointer;background:#ff9a3a;color:#14161b;border:0;border-radius:3px;
-    padding:10px 20px;font:600 11px/1 inherit;letter-spacing:.1em;
-  }
+  .dbtngrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:5px}
+  .dbtngrid .dbtn{white-space:normal}
+  .dbtn{pointer-events:auto;cursor:pointer;background:#232730;border:1px solid #323743;border-radius:6px;padding:7px 10px;
+    font-weight:500;font-size:11.5px;line-height:1.15;color:var(--paint);white-space:nowrap;transition:border-color .12s,background .12s,color .12s}
+  .dbtn:hover{border-color:var(--sodium);background:#2a2e38}
+  .dbtn:active{background:var(--sodium);color:#14161b}
+  .dbtn.warn:hover{border-color:var(--brake)}
+  .dbtn.on{background:rgba(255,176,58,.18);border-color:var(--sodium);color:#ffd08a}
+  .dseg{display:flex;border:1px solid #323743;border-radius:6px;overflow:hidden}
+  .dseg .dbtn{border:0;border-radius:0;border-right:1px solid #323743;flex:1}
+  .dseg .dbtn:last-child{border-right:0}
 
   @media (max-width:900px){
     #kmh{font-size:42px}
   }
   @media (prefers-reduced-motion:reduce){
     #go,#speedo,#prompt,#gate,#loader{transition:none}
-    #loader .lspin{animation:none}
+    #lcity .w,#lsteps li.cur::before{animation:none}
   }
 </style>
 </head>
@@ -315,34 +363,84 @@
 
 <!-- ekran ładowania: pasek liczy wczytane skrypty (data-scripts = 2 biblioteki + pliki z loadorder.txt, sprawdza harness);
      main-loop.js woła LOADER.finish(), błąd podczas ładowania odsłania menu z komunikatem (#err) -->
-<div id="loader" data-scripts="38">
-  <div class="ltitle">GTA by <em>Claude</em></div>
-  <div class="lbar"><i id="lfill"></i></div>
-  <div id="lstat">Wczytywanie bibliotek…</div>
-  <div class="lspin"></div>
+<div id="loader" data-scripts="39">
+  <div class="lsun"></div>
+  <svg id="lcity" viewBox="0 0 1600 400" preserveAspectRatio="xMidYMax slice" aria-hidden="true"></svg>
+  <div class="lbox">
+    <div class="lkicker">PRZEGLĄDARKOWE MINI-GTA · 3D</div>
+    <div class="ltitle">GTA by <em>Claude</em></div>
+    <div class="lprog"><div class="lbar"><i id="lfill"></i></div><span id="lpct">0%</span></div>
+    <div id="lstat">Wczytywanie bibliotek…</div>
+    <ul id="lsteps">
+      <li data-s="three.min.js">Grafika 3D</li><li data-s="cannon.min.js">Fizyka</li><li data-s="districts.js">Dzielnice</li>
+      <li data-s="highways.js">Autostrady</li><li data-s="traffic-npc.js">Ruch uliczny</li><li data-s="air-traffic.js">Lotniska i port</li><li data-s="main-loop.js">Shadery</li>
+    </ul>
+    <div id="ltip"></div>
+  </div>
 </div>
 <script>
 var LOADER = (function(){
-  var el = document.getElementById('loader'), fill = document.getElementById('lfill'), stat = document.getElementById('lstat');
+  var el = document.getElementById('loader'), fill = document.getElementById('lfill'), stat = document.getElementById('lstat'), pct = document.getElementById('lpct'), tip = document.getElementById('ltip');
   var total = +el.getAttribute('data-scripts') || 1, done = 0, over = false;
   var WHAT = { 'three.min.js': 'grafika 3D', 'cannon.min.js': 'fizyka', 'textures.js': 'tekstury', 'districts.js': 'dzielnice',
-    'airport.js': 'lotnisko', 'city-generation.js': 'ulice i kwartały', 'highways.js': 'autostrady', 'city-props.js': 'latarnie i drzewa',
-    'traffic-npc.js': 'ruch uliczny', 'pedestrians.js': 'piesi', 'planes.js': 'samoloty', 'main-loop.js': 'shadery' };
-  function set(p, txt){ fill.style.width = Math.round(2 + 96 * Math.min(1, p)) + '%'; if (txt) stat.textContent = txt; }
+    'airport.js': 'lotniska', 'city-generation.js': 'ulice i kwartały', 'highways.js': 'autostrady', 'city-props.js': 'latarnie i drzewa',
+    'traffic-npc.js': 'ruch uliczny', 'pedestrians.js': 'piesi', 'planes.js': 'samoloty', 'air-traffic.js': 'ruch lotniczy', 'boats.js': 'łodzie', 'main-loop.js': 'shadery' };
+  var steps = [].slice.call(document.querySelectorAll('#lsteps li'));
+  /* sylwetka miasta: losowe bryły z oknami (część okien mruga) */
+  (function(){
+    var svg = document.getElementById('lcity'), ns = 'http://www.w3.org/2000/svg', x = -10, s = 7;
+    function r(){ s = (s * 16807) % 2147483647; return s / 2147483647; }
+    function add(tag, a){ var e = document.createElementNS(ns, tag); for (var k in a) e.setAttribute(k, a[k]); svg.appendChild(e); return e; }
+    for (var layer = 0; layer < 2; layer++){
+      x = -10 - layer * 23;
+      while (x < 1610){
+        var w = 34 + r() * 70, h = (layer ? 90 : 60) + r() * (layer ? 240 : 150) * (Math.abs(x - 800) < 330 ? 1.25 : 0.8), y = 400 - h;
+        add('rect', { x: x, y: y, width: w, height: h + 2, fill: layer ? '#07080c' : '#141019' });
+        if (layer) for (var wy = y + 10; wy < 392; wy += 13) for (var wx = x + 6; wx < x + w - 8; wx += 11) if (r() < 0.22){
+          var q = add('rect', { x: wx, y: wy, width: 5, height: 6, 'class': r() < 0.25 ? 'w' : '' });
+          if (q.getAttribute('class') !== 'w') q.setAttribute('fill', r() < 0.5 ? '#ffcf7a' : '#ffe2a8'), q.setAttribute('opacity', (0.35 + r() * 0.5).toFixed(2));
+          else q.style.animationDelay = (r() * 4).toFixed(2) + 's';
+        }
+        if (layer && r() < 0.2) add('rect', { x: x + w / 2 - 1, y: y - 22, width: 2, height: 22, fill: '#07080c' });
+        x += w + (layer ? 3 : 8) + r() * 10;
+      }
+    }
+  })();
+  var TIPS = ['<b>PPM</b> z bronią palną — przycelowanie: bliżej, ciaśniejszy rozrzut.',
+    '<b>Q</b> (przytrzymaj) — koło broni; <b>1–4</b> — szybki wybór. Karabin strzela seriami.',
+    '<b>M</b> — mapa świata; <b>PPM</b> na mapie wyznacza trasę z nawigacją.',
+    'Na lotniskach czekają odrzutowiec i awionetka. W powietrzu <b>F</b> — skok ze spadochronem.',
+    'Przy pomostach w porcie stoją motorówki — <b>F</b>, żeby wsiąść.',
+    '<b>`</b> — menu deweloperskie: liczba aut i pieszych, pora dnia, tempo gry, teleporty.',
+    'Piraci drogowi mają jaskrawy, kwasowo-zielony lakier — uważaj na skrzyżowaniach.',
+    '<b>Esc</b> pauzuje grę. <b>N</b> wycisza dźwięk, <b>T</b> przyspiesza dobę.'];
+  var ti = Math.floor(Math.random() * TIPS.length);
+  function nextTip(){ tip.style.opacity = 0; setTimeout(function(){ tip.innerHTML = TIPS[ti++ % TIPS.length]; tip.style.opacity = 1; }, 300); }
+  tip.innerHTML = TIPS[ti++ % TIPS.length];
+  var tipTimer = setInterval(nextTip, 3200);
+  function set(p, txt){ var v = Math.round(2 + 96 * Math.min(1, p)); fill.style.width = v + '%'; pct.textContent = Math.round(Math.min(1, p) * 100) + '%'; if (txt) stat.textContent = txt; }
+  function stepsUpdate(f){
+    var hit = -1; steps.forEach(function(li, i){ if (li.getAttribute('data-s') === f) hit = i; });
+    if (hit < 0) return;
+    for (var i = 0; i <= hit; i++){ steps[i].className = 'ok'; }
+    if (steps[hit + 1]) steps[hit + 1].className = 'cur';
+  }
+  if (steps[0]) steps[0].className = 'cur';
   document.addEventListener('load', function(e){
     var t = e.target; if (over || !t || t.tagName !== 'SCRIPT' || !t.src) return;
     var f = t.src.split('/').pop(); done++;
     set(done / total, 'Wczytano ' + done + ' / ' + total + (WHAT[f] ? ' · ' + WHAT[f] : ''));
+    stepsUpdate(f);
   }, true);
   function fail(){
-    if (over) return; over = true;
+    if (over) return; over = true; clearInterval(tipTimer);
     stat.className = 'err'; stat.textContent = 'Błąd podczas ładowania — szczegóły w menu';
     setTimeout(function(){ el.classList.add('done'); }, 900);
   }
   document.addEventListener('error', function(e){ if (e.target && e.target.tagName === 'SCRIPT') fail(); }, true);
   window.addEventListener('error', fail);
   return {
-    finish: function(){ if (over) return; over = true; set(1, 'Gotowe'); setTimeout(function(){ el.classList.add('done'); }, 280); }
+    finish: function(){ if (over) return; over = true; clearInterval(tipTimer); set(1, 'Gotowe — miasto czeka'); steps.forEach(function(li){ li.className = 'ok'; }); setTimeout(function(){ el.classList.add('done'); }, 380); }
   };
 })();
 </script>
@@ -377,7 +475,7 @@ var LOADER = (function(){
   <div id="toast"></div>
   <div id="prompt">Naciśnij <kbd>F</kbd> lub <kbd>E</kbd>, aby wsiąść</div>
   <section class="panel" id="weaponhud"><span class="wname" id="wname">Pięści</span><span class="wammo" id="wammo"></span></section>
-  <div id="crosshair"></div>
+  <div id="crosshair"><i class="ct"></i><i class="cb"></i><i class="cl"></i><i class="cr"></i><i class="cd"></i></div>
   <div id="fps">— fps</div>
 </div>
 
@@ -389,12 +487,19 @@ var LOADER = (function(){
 <div id="wheelWrap"><canvas id="wheelCanvas" width="360" height="360"></canvas></div>
 
 <div id="gate">
-  <h1>GTA by <em>Claude</em></h1>
-  <p id="gatetxt">Dwanaście na dwanaście kwartałów, ekwipunek, mieszkańcy na chodnikach i pełna doba do dyspozycji. Wszystko — asfalt, okna, silnik — generowane w locie.</p>
-  <button id="go" disabled>BUDUJĘ MIASTO…</button>
-  <button id="settingsBtn">STEROWANIE</button>
-  <div id="gatefoot">Kliknięcie przejmuje kursor myszy. Esc pauzuje grę (świat stoi, dźwięk cichnie) i otwiera to menu. M — mapa.</div>
-  <div id="err"></div>
+  <div class="gcard">
+    <div class="gmain">
+      <span class="gbadge">PAUZA</span>
+      <div class="gkicker">PRZEGLĄDARKOWE MINI-GTA · 3D</div>
+      <h1>GTA by <em>Claude</em></h1>
+      <p id="gatetxt">Dwie wyspy, dwanaście na dwanaście kwartałów, autostrady z koniczyną, lotniska, port, łodzie, mieszkańcy na chodnikach i pełna doba. Wszystko — asfalt, okna, silnik — generowane w locie.</p>
+      <div class="gbtns"><button id="go" disabled>BUDUJĘ MIASTO…</button><button id="settingsBtn">STEROWANIE</button></div>
+      <div class="gpause"><button class="gbtn" id="gMap">MAPA (M)</button><button class="gbtn" id="gDev">MENU DEWELOPERSKIE (`)</button></div>
+      <div id="err"></div>
+    </div>
+    <div class="gside"><h3>Sterowanie</h3><div id="gateKeys"></div></div>
+  </div>
+  <div id="gatefoot">Kliknięcie przejmuje kursor myszy · Esc — pauza (świat stoi, dźwięk cichnie)</div>
 </div>
 
 <div id="settings">
@@ -411,81 +516,88 @@ var LOADER = (function(){
 
 <div id="debugMenu">
   <div id="debugPanel">
-    <div class="dhead"><h2>DEBUG</h2><div class="sub">Klawisz <kbd>`</kbd> otwiera i zamyka to menu.</div></div>
-
-    <div class="dsec">
-      <h3>Ruch drogowy</h3>
-      <div class="drow"><span>Auta NPC: <b class="dval" id="dbgCarCount">0</b></span>
-        <span class="dbtnrow"><button class="dbtn" id="dbgAddCars">+5</button><button class="dbtn" id="dbgSubCars">-5</button><button class="dbtn" id="dbgClearCars">Wyczyść</button></span></div>
-      <div class="drow"><span>Piesi: <b class="dval" id="dbgPedCount">0</b></span>
-        <span class="dbtnrow"><button class="dbtn" id="dbgAddPeds">+10</button><button class="dbtn" id="dbgSubPeds">-10</button><button class="dbtn" id="dbgClearPeds">Wyczyść</button></span></div>
+    <div class="dhead">
+      <div class="dtitle"><span class="dbadge">DEV</span><h2>Menu deweloperskie</h2><span class="sub"><kbd>`</kbd> otwiera i zamyka · świat działa w tle</span></div>
+      <div class="dstats">
+        <span class="dchip">FPS <b id="dbgFps">—</b></span>
+        <span class="dchip">ciała fizyczne <b id="dbgBodies">—</b></span>
+        <span class="dchip">auta / rowery <b id="dbgCars">—</b></span>
+        <span class="dchip">piesi <b id="dbgPeds">—</b></span>
+        <span class="dchip">łodzie / samoloty <b id="dbgSeaAir">—</b></span>
+        <span class="dchip">tryb <b id="dbgMode">—</b></span>
+      </div>
+      <button id="closeDebug" title="Zamknij (`)">✕</button>
     </div>
+    <div class="dgrid">
 
-    <div class="dsec">
-      <h3>Pora dnia</h3>
-      <div class="drow"><span id="dbgTimeLabel">12:00</span><input type="range" id="dbgTime" min="0" max="1439" value="720"></div>
-      <div class="drow"><span>Zatrzymaj czas</span><input type="checkbox" id="dbgFreeze"></div>
-    </div>
+      <section class="dsec">
+        <h3><i>◉</i>Populacja</h3>
+        <div class="dctl"><span>Auta NPC</span><input type="range" data-dbg="cars" min="0" max="200" step="1"><output></output></div>
+        <div class="dctl"><span>Rowerzyści</span><input type="range" data-dbg="bikes" min="0" max="40" step="1"><output></output></div>
+        <div class="dctl"><span>Piesi</span><input type="range" data-dbg="peds" min="0" max="200" step="1"><output></output></div>
+        <div class="dctl"><span>Łodzie NPC</span><input type="range" data-dbg="boats" min="0" max="24" step="1"><output></output></div>
+        <div class="dctl"><span>Samoloty NPC</span><input type="range" data-dbg="air" min="0" max="6" step="1"><output></output></div>
+        <div class="hint">Na słabszym komputerze zmniejsz liczbę aut i pieszych — to one najbardziej obciążają fizykę.</div>
+        <div class="dbtnrow"><button class="dbtn" data-act="popDefault">Domyślne</button><button class="dbtn warn" data-act="popClear">Puste ulice</button></div>
+      </section>
 
-    <div class="dsec">
-      <h3>Gracz</h3>
-      <div class="drow"><span>Zdrowie i kondycja</span><button class="dbtn" id="dbgHeal">Pełne</button></div>
-      <div class="drow"><span>Amunicja pistoletu</span><button class="dbtn" id="dbgAmmo">+200</button></div>
-      <div class="drow"><span>Nieśmiertelność</span><input type="checkbox" id="dbgGod"></div>
-      <div class="drow"><span>Pozycja</span><button class="dbtn" id="dbgTeleport">Teleportuj do startu</button></div>
-      <div class="drow"><span>Zaparkowane skradzione auta</span><button class="dbtn" id="dbgClearStolen">Usuń</button></div>
-      <div class="drow"><span>Mnożnik prędkości auta: <b class="dval" id="dbgSpeedVal">1.0×</b></span><input type="range" id="dbgSpeed" min="0.2" max="3" step="0.1" value="1"></div>
-    </div>
+      <section class="dsec">
+        <h3><i>⇄</i>Ruch drogowy</h3>
+        <label class="dtog"><span>Zatrzymaj ruch (auta i piesi stoją)</span><input type="checkbox" data-dbg="freezeNpc"><i></i></label>
+        <label class="dtog"><span>LOD AI (dalekie auta co 2. klatkę)</span><input type="checkbox" data-dbg="lod"><i></i></label>
+        <div class="dctl"><span>Pirat → rowerzysta</span><input type="range" data-dbg="ram" min="0" max="1" step="0.05"><output></output></div>
+        <div class="drow"><span>Piraci: <b id="dbgPirCount">0</b></span><span class="dbtnrow"><button class="dbtn" data-act="addPirate">+1 pirat</button><button class="dbtn" data-act="nearPirate">Najbliższe → pirat</button></span></div>
+      </section>
 
-    <div class="dsec">
-      <h3>Pojazdy</h3>
-      <div class="drow"><span>Twój pojazd</span>
-        <span class="dbtnrow"><button class="dbtn" data-car="sedan">Zwykły</button><button class="dbtn" data-car="pickup">Pickup</button><button class="dbtn" data-car="sport">Sportowy</button><button class="dbtn" data-car="bike">Rower</button></span></div>
-      <div class="drow"><span>Kierunkowskazy (Q / E)</span>
-        <span class="dbtnrow"><button class="dbtn" data-ind="L">◀ Lewy</button><button class="dbtn" data-ind="R">Prawy ▶</button><button class="dbtn" data-ind="">Wył.</button></span></div>
-      <div class="drow"><span>Samolot na lotnisku</span>
-        <span class="dbtnrow"><button class="dbtn" data-plane="jet">Odrzutowiec</button><button class="dbtn" data-plane="prop">Awionetka</button></span></div>
-      <div class="drow"><span>Samolot w powietrzu (150 m)</span>
-        <span class="dbtnrow"><button class="dbtn" data-plane="jet" data-air="1">Odrzutowiec</button><button class="dbtn" data-plane="prop" data-air="1">Awionetka</button></span></div>
-    </div>
+      <section class="dsec">
+        <h3><i>☀</i>Czas i świat</h3>
+        <div class="dctl"><span>Godzina</span><input type="range" data-dbg="time" min="0" max="1439" step="1"><output></output></div>
+        <label class="dtog"><span>Zatrzymaj czas doby</span><input type="checkbox" data-dbg="freezeTime"><i></i></label>
+        <div class="dctl"><span>Tempo doby</span><input type="range" data-dbg="daySpeed" min="1" max="60" step="1"><output></output></div>
+        <div class="dctl"><span>Tempo gry</span><input type="range" data-dbg="gameSpeed" min="0.1" max="2" step="0.05"><output></output></div>
+        <div class="dctl"><span>Mgła</span><input type="range" data-dbg="fog" min="0.2" max="2" step="0.1"><output></output></div>
+      </section>
 
-    <div class="dsec">
-      <h3>Teleport</h3>
-      <div class="drow"><span>Dokąd</span>
-        <span class="dbtnrow"><button class="dbtn" data-tp="port">Port</button><button class="dbtn" data-tp="airportW">Lotnisko</button><button class="dbtn" data-tp="airport">Wysepka</button><button class="dbtn" data-tp="hwy">Autostrada</button><button class="dbtn" data-tp="exit">Zjazd SE</button><button class="dbtn" data-tp="ring">Obwodnica</button></span></div>
-    </div>
+      <section class="dsec">
+        <h3><i>▣</i>Grafika i wydajność</h3>
+        <label class="dtog"><span>Cienie</span><input type="checkbox" data-dbg="shadows"><i></i></label>
+        <div class="dctl"><span>Rozdzielczość</span><input type="range" data-dbg="res" min="0.5" max="2" step="0.05"><output></output></div>
+        <div class="dctl"><span>Pole widzenia</span><input type="range" data-dbg="fov" min="-15" max="25" step="1"><output></output></div>
+        <label class="dtog"><span>Interfejs (HUD)</span><input type="checkbox" data-dbg="hud"><i></i></label>
+      </section>
 
-    <div class="dsec">
-      <h3>Piraci drogowi i rowerzyści</h3>
-      <div class="drow"><span>Piraci: <b class="dval" id="dbgPirCount">0</b></span>
-        <span class="dbtnrow"><button class="dbtn" id="dbgAddPirate">+1 pirat</button><button class="dbtn" id="dbgNearPirate">Najbliższe auto → pirat</button></span></div>
-      <div class="drow"><span>Rowerzyści: <b class="dval" id="dbgBikeCount">0</b></span>
-        <span class="dbtnrow"><button class="dbtn" id="dbgAddBikes">+2</button></span></div>
-      <div class="drow"><span>Szansa, że pirat wjedzie w rowerzystę: <b class="dval" id="dbgRamVal">15%</b></span><input type="range" id="dbgRam" min="0" max="1" step="0.05" value="0.15"></div>
-      <div class="drow"><span>LOD AI (dalekie auta co drugą klatkę)</span><input type="checkbox" id="dbgLod" checked></div>
-    </div>
+      <section class="dsec">
+        <h3><i>♥</i>Gracz</h3>
+        <label class="dtog"><span>Nieśmiertelność</span><input type="checkbox" data-dbg="god"><i></i></label>
+        <label class="dtog"><span>Nieskończona amunicja</span><input type="checkbox" data-dbg="infAmmo"><i></i></label>
+        <div class="dctl"><span>Moc auta</span><input type="range" data-dbg="carSpeed" min="0.2" max="3" step="0.1"><output></output></div>
+        <div class="dbtngrid"><button class="dbtn" data-act="heal">Ulecz</button><button class="dbtn" data-act="ammo">+200 amunicji</button><button class="dbtn" data-act="fixCar">Postaw auto</button><button class="dbtn warn" data-act="clearStolen">Usuń skradzione</button></div>
+      </section>
 
-    <div class="dsec">
-      <h3>Świat i nawigacja</h3>
-      <div class="drow"><span>Mgła: <b class="dval" id="dbgFogVal">100%</b></span><input type="range" id="dbgFog" min="0.2" max="2" step="0.1" value="1"></div>
-      <div class="drow"><span>Ptaki</span>
-        <span class="dbtnrow"><button class="dbtn" id="dbgBirdDrop">Zrzut obok</button><button class="dbtn" id="dbgBirdHit">Zrzut na mnie</button></span></div>
-      <div class="drow"><span>Cel nawigacji</span>
-        <span class="dbtnrow"><button class="dbtn" id="dbgWpHospital">Szpital</button><button class="dbtn" id="dbgWpAirport">Lotnisko</button><button class="dbtn" id="dbgWpClear">Usuń</button></span></div>
-      <div class="drow"><span>Łódź</span>
-        <span class="dbtnrow"><button class="dbtn" id="dbgBoat">Wsiądź w porcie</button></span></div>
-    </div>
+      <section class="dsec">
+        <h3><i>➜</i>Pojazdy</h3>
+        <div class="drow"><span>Twoje auto</span></div>
+        <div class="dseg"><button class="dbtn" data-car="sedan">Zwykły</button><button class="dbtn" data-car="pickup">Pickup</button><button class="dbtn" data-car="sport">Sportowy</button><button class="dbtn" data-car="bike">Rower</button></div>
+        <div class="drow"><span>Samolot</span><span class="dbtnrow"><button class="dbtn" data-plane="jet">Odrzutowiec</button><button class="dbtn" data-plane="prop">Awionetka</button></span></div>
+        <div class="drow"><span>W powietrzu (150 m)</span><span class="dbtnrow"><button class="dbtn" data-plane="jet" data-air="1">Odrzutowiec</button><button class="dbtn" data-plane="prop" data-air="1">Awionetka</button></span></div>
+        <div class="drow"><span>Łódź</span><span class="dbtnrow"><button class="dbtn" data-act="boat">Wsiądź w porcie</button></span></div>
+      </section>
 
-    <div id="debugInfo">
-      <div>Ciała fizyczne: <span id="dbgBodies">—</span></div>
-      <div>NPC / piesi / pociski: <span id="dbgCounts">—</span></div>
-      <div>Tryb / pojazd: <span id="dbgMode">—</span></div>
-      <div>NPC z kierunkowskazem / pirackie potrącenia: <span id="dbgNpcInd">—</span></div>
-      <div>FPS: <span id="dbgFps">—</span></div>
-    </div>
+      <section class="dsec">
+        <h3><i>⌖</i>Teleport</h3>
+        <div class="dbtngrid">
+          <button class="dbtn" data-tp="start">Start</button><button class="dbtn" data-tp="hospital">Szpital</button><button class="dbtn" data-tp="port">Port</button>
+          <button class="dbtn" data-tp="airportW">Lotnisko miejskie</button><button class="dbtn" data-tp="airport">Wysepka</button><button class="dbtn" data-tp="hwy">Autostrada</button>
+          <button class="dbtn" data-tp="clover">Pod koniczyną</button><button class="dbtn" data-tp="exit">Zjazd SE</button><button class="dbtn" data-tp="ring">Obwodnica</button>
+        </div>
+      </section>
 
-    <div id="debugFoot">
-      <button id="closeDebug">Zamknij</button>
+      <section class="dsec">
+        <h3><i>⚑</i>Nawigacja i ptaki</h3>
+        <div class="drow"><span>Cel trasy</span><span class="dbtnrow"><button class="dbtn" data-act="wpHospital">Szpital</button><button class="dbtn" data-act="wpAirport">Lotnisko</button><button class="dbtn" data-act="wpClear">Usuń</button></span></div>
+        <div class="drow"><span>Zrzut mewy</span><span class="dbtnrow"><button class="dbtn" data-act="birdNear">Obok</button><button class="dbtn" data-act="birdMe">Na mnie</button></span></div>
+      </section>
+
     </div>
   </div>
 </div>
@@ -519,6 +631,7 @@ var LOADER = (function(){
 <script src="js/sound.js"></script>
 <script src="js/vehicle-entry.js"></script>
 <script src="js/planes.js"></script>
+<script src="js/air-traffic.js"></script>
 <script src="js/boats.js"></script>
 <script src="js/birds.js"></script>
 <script src="js/daynight.js"></script>

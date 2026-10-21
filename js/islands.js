@@ -9,12 +9,15 @@
 const WATER_Y = -0.9, SEA_FLOOR = -14;
 const ISLANDS = [
   { name: 'main',    x0: -WALL_X, x1: WALL_X, z0: -WALL_X, z1: WALL_X },
-  { name: 'airport', x0: -190,    x1: 190,    z0: -812,    z1: -648 }
+  { name: 'airport', x0: -190,    x1: 190,    z0: -862,    z1: -648 },          // z drugim pasem (NPC) na północy
+  { name: 'airportW', x0: -454,   x1: -WALL_X + 0.5, z0: -186, z1: 186 }    // nasyp lotniska miejskiego (drugi pas) przy zachodnim brzegu
 ];
-/* odcinki nabrzeża bez balustrady (porty): wyspa, bok (N/S/E/W), zakres wzdłuż boku */
+/* odcinki nabrzeża bez balustrady (porty) albo całkiem bez nabrzeża (wall: styk wyspy z nasypem): wyspa, bok (N/S/E/W), zakres wzdłuż boku */
 const HARBOR_GAPS = [
   { island: 'main', side: 'N', a0: -150, a1: 150 },
-  { island: 'airport', side: 'S', a0: -110, a1: 30 }
+  { island: 'airport', side: 'S', a0: -110, a1: 30 },
+  { island: 'main', side: 'W', a0: -186, a1: 186, wall: true },
+  { island: 'airportW', side: 'E', a0: -186, a1: 186, wall: true }
 ];
 const PIERS = [];            // { x0, x1, z0, z1 } — pomosty nad wodą
 const BOAT_OBSTACLES = [];   // { x0, x1, z0, z1 } — przeszkody w wodzie dla łodzi (kadłub statku)
@@ -84,22 +87,26 @@ function buildIslands(){
   const quay = new GeoBuf(), H = 1.1, T = 0.6;
   ISLANDS.forEach(r => {
     if (r.name !== 'main') lawnBuf.plane((r.x0 + r.x1) / 2, -0.008, (r.z0 + r.z1) / 2, r.x1 - r.x0, r.z1 - r.z0, (r.x1 - r.x0) / 10, (r.z1 - r.z0) / 10);
-    /* ściana nabrzeża od wody do terenu (widoczna nad wodą) */
-    const w = r.x1 - r.x0, d = r.z1 - r.z0, cx = (r.x0 + r.x1) / 2, cz = (r.z0 + r.z1) / 2, fy = (WATER_Y - 2.5) / 2, fh = -(WATER_Y - 2.5);
-    quay.box(cx, fy, r.z0 + 0.5, w, fh, 1.0, 4, true); quay.box(cx, fy, r.z1 - 0.5, w, fh, 1.0, 4, true);
-    quay.box(r.x0 + 0.5, fy, cz, 1.0, fh, d, 4, true); quay.box(r.x1 - 0.5, fy, cz, 1.0, fh, d, 4, true);
-    /* balustrada (z kolizją 1.6 m) — z przerwami w portach */
-    const sides = { N: [r.x0, r.x1, r.z0 + T / 2, 'x'], S: [r.x0, r.x1, r.z1 - T / 2, 'x'], W: [r.z0, r.z1, r.x0 + T / 2, 'z'], E: [r.z0, r.z1, r.x1 - T / 2, 'z'] };
-    Object.keys(sides).forEach(sd => {
-      const [a0, a1, at, ax] = sides[sd], gaps = HARBOR_GAPS.filter(g => g.island === r.name && g.side === sd).sort((p, q) => p.a0 - q.a0);
+    /* ściana nabrzeża od wody do terenu (widoczna nad wodą) i balustrada (z kolizją 1.6 m) — z przerwami w portach;
+       na styku wyspy z nasypem (wall) bez ściany i balustrady */
+    const fy = (WATER_Y - 2.5) / 2, fh = -(WATER_Y - 2.5);
+    const sides = { N: [r.x0, r.x1, r.z0, 'x', 1], S: [r.x0, r.x1, r.z1, 'x', -1], W: [r.z0, r.z1, r.x0, 'z', 1], E: [r.z0, r.z1, r.x1, 'z', -1] };
+    const segsOf = (sd, a0, a1, wallOnly) => {
+      const gaps = HARBOR_GAPS.filter(g => g.island === r.name && g.side === sd && (!wallOnly || g.wall)).sort((p, q) => p.a0 - q.a0);
       let a = a0; const segs = [];
-      gaps.forEach(g => { if (g.a0 > a) segs.push([a, g.a0]); a = Math.max(a, g.a1); });
+      gaps.forEach(g => { if (g.a0 > a) segs.push([a, Math.min(a1, g.a0)]); a = Math.max(a, g.a1); });
       if (a < a1) segs.push([a, a1]);
-      segs.forEach(([s0, s1]) => {
-        const m = (s0 + s1) / 2, l = s1 - s0, bx = ax === 'x' ? m : at, bz = ax === 'x' ? at : m, bw = ax === 'x' ? l : T, bd = ax === 'x' ? T : l;
-        quay.box(bx, H / 2, bz, bw, H, bd, 3, true);
-        staticBox(bx, 0.8, bz, bw, 1.6, bd);
-      });
+      return segs;
+    };
+    Object.keys(sides).forEach(sd => {
+      const [a0, a1, e, ax, inw] = sides[sd];
+      const put = (s0, s1, off, th, cy, hh, tile, coll) => {
+        const m = (s0 + s1) / 2, l = s1 - s0, at = e + inw * off, bx = ax === 'x' ? m : at, bz = ax === 'x' ? at : m, bw = ax === 'x' ? l : th, bd = ax === 'x' ? th : l;
+        quay.box(bx, cy, bz, bw, hh, bd, tile, true);
+        if (coll) staticBox(bx, 0.8, bz, bw, 1.6, bd);
+      };
+      segsOf(sd, a0, a1, true).forEach(([s0, s1]) => put(s0, s1, 0.5, 1.0, fy, fh, 4, false));
+      segsOf(sd, a0, a1, false).forEach(([s0, s1]) => put(s0, s1, T / 2, T, H / 2, H, 3, true));
     });
   });
   const mesh = new THREE.Mesh(quay.geometry(), new THREE.MeshLambertMaterial({ map: texs.curb, color: 0xb9b6ad }));

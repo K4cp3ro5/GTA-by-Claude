@@ -166,6 +166,7 @@ function drawBigMap(){
   MAP_LABELS.forEach(([t, f]) => { const q = f(), m = bigToScreen(q[0], q[1]); g.fillStyle = 'rgba(10,12,16,.65)'; const w = g.measureText(t).width + 10; g.fillRect(m[0] - w / 2, m[1] - 9, w, 18); g.fillStyle = '#e9e7e1'; g.fillText(t, m[0], m[1]); });
   /* łodzie, samoloty, twoje auto */
   for (const b of boats){ const m = bigToScreen(b.pos.x, b.pos.z); g.fillStyle = '#7fc4e8'; g.fillRect(m[0] - 2.5, m[1] - 2.5, 5, 5); }
+  for (const a of airPlanes){ const m = bigToScreen(a.pos.x, a.pos.z); g.save(); g.translate(m[0], m[1]); g.rotate(-a.heading + Math.PI); g.fillStyle = '#cfe3ee'; g.fillRect(-1.3, -6, 2.6, 12); g.fillRect(-6, -1.4, 12, 2.8); g.restore(); }
   for (const q of planes){ if (q.wreckT > 0 || q === curPlane) continue; const m = bigToScreen(q.pos.x, q.pos.z); g.fillStyle = '#f2f0ea'; g.beginPath(); g.arc(m[0], m[1], 3, 0, TAU); g.fill(); }
   const own = driving.owner === 'player' && mode !== 'car' ? chassisBody.position : (parkedCars.find(q => q.owner === 'player') || null);
   if (own){ const m = bigToScreen(own.x, own.z); g.fillStyle = '#4aa3ff'; g.strokeStyle = '#fff'; g.lineWidth = 1.5; g.fillRect(m[0] - 4, m[1] - 4, 8, 8); g.strokeRect(m[0] - 4, m[1] - 4, 8, 8); }

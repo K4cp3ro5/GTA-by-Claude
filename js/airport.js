@@ -5,7 +5,8 @@
    wieża, hangar, rękaw wiatrowy. Wywoływane z city-generation.js (buildAirport).
    --------------------------------------------------------------- */
 const AIRPORT = {
-  runway: { x0: -168, x1: 168, z: -778, hw: 15 },          // pas startowy 336 × 30 m
+  runway: { x0: -168, x1: 168, z: -778, hw: 15 },          // pas startowy 336 × 30 m (09R/27L)
+  runway2: { x0: -150, x1: 150, z: -834, hw: 12 },         // drugi pas 300 × 24 m (09L/27R) — ruch lotniczy NPC (air-traffic.js)
   taxi:   { x0: -140, x1: 140, z: -756, hw: 5 },           // droga kołowania
   apron:  { x0: -70, x1: 85, z0: -751, z1: -720 },         // płyta postojowa
   term:   { x0: -30, x1: 40, z0: -720, z1: -704 },         // terminal
@@ -17,6 +18,26 @@ const AIRPORT = {
 const AIRPORT_PARKED = [];   // miejsca aut zaparkowanych na parkingu (vehicle-entry.js stawia tam auta „ambient”)
 const AIRPORT_PLANES = [];
 const NPC_COLORS_AIR = [0x2e4d8f, 0xd9d4c8, 0x2f6f4e, 0x8a8f96, 0xe0a52c, 0x6b3a8f, 0x1b1d22, 0xb3272b];
+/* drugi pas (ruch NPC): nawierzchnia, krawędzie, oś, progi, numery czytane od strony podejścia, światła; r = { cx, cz, ax: 'x'|'z', half, hw, nums: [od u−, od u+] } */
+const NPC_RUNWAYS = [];
+function buildRunway2(r, paint, y){
+  const P = (u, v) => r.ax === 'x' ? [r.cx + u, r.cz + v] : [r.cx + v, r.cz + u];
+  const ln = (u0, v0, u1, v1, w, col) => { const a = P(u0, v0), b = P(u1, v1); paint(a[0], a[1], b[0], b[1], w, col); };
+  const c0 = P(-r.half, -r.hw), c1 = P(r.half, r.hw);
+  crossBuf.plane((c0[0] + c1[0]) / 2, y, (c0[1] + c1[1]) / 2, Math.abs(c1[0] - c0[0]), Math.abs(c1[1] - c0[1]), Math.abs(c1[0] - c0[0]) / 6, Math.abs(c1[1] - c0[1]) / 6);
+  ln(-r.half + 2, -r.hw + 0.6, r.half - 2, -r.hw + 0.6, 0.4); ln(-r.half + 2, r.hw - 0.6, r.half - 2, r.hw - 0.6, 0.4);
+  for (let u = -r.half + 32; u < r.half - 32; u += 28) ln(u, 0, u + 16, 0, 0.55);
+  for (const e of [-1, 1]){
+    const ue = e < 0 ? -r.half + 4 : r.half - 4, s = -e;
+    for (let k = 0; k < 6; k++){ const v = -r.hw + 2 + k * (2 * r.hw - 4) / 5; ln(ue, v, ue + s * 15, v, 1.1); }
+    for (const v of [-3.8, 3.8]) ln(ue + s * 50, v, ue + s * 68, v, 1.8);
+    const un = ue + s * 24, f = 3.5 * s, q = [[un - s * 5, f], [un - s * 5, -f], [un + s * 5, -f], [un + s * 5, f]].map(t => { const w = P(t[0], t[1]); return [w[0], y + 0.02, w[1]]; });
+    wordSignQuad(r.nums[e < 0 ? 0 : 1], '#3d3f43', '#eeeeea', q[0], q[1], q[2], q[3]);
+  }
+  for (let u = -r.half + 2; u <= r.half - 2; u += 25) for (const sd of [-1, 1]){ const w = P(u, sd * (r.hw + 1.2)); CB(0xf4f1e6).box(w[0], 0.25, w[1], 0.3, 0.5, 0.3, 1, true); }
+  mapExtras.push({ t: 'rect', x0: Math.min(c0[0], c1[0]), x1: Math.max(c0[0], c1[0]), z0: Math.min(c0[1], c1[1]), z1: Math.max(c0[1], c1[1]), c: '#3b3f47' });
+  NPC_RUNWAYS.push(r);
+}
 const carTopOf2 = type => Math.max(...carParts(type).map(q => q[5] + q[1] / 2));   // { x, z, heading, kind } — przyszłe latanie
 
 /* samolot na lotnisku: tylko miejsce i typ — model, kolizję i latanie buduje planes.js */
@@ -43,12 +64,21 @@ function buildAirport(){
     for (let k = 0; k < 8; k++){ const zz = rw.z - rw.hw + 2 + k * (2 * rw.hw - 4) / 7; paint(xe, zz, xe - e * 18, zz, 1.2); }   // progi „zebra”
     for (const zz of [rw.z - 4.5, rw.z + 4.5]) paint(xe - e * 60, zz, xe - e * 82, zz, 2.0);              // strefa przyziemienia
     /* numer pasa (leżący napis, czytany od strony podejścia) */
-    const xn = xe - e * 26, num = e < 0 ? '09' : '27';
+    const xn = xe - e * 26, num = e < 0 ? '09R' : '27L';
     const p = e < 0 ? [[xn - 5, y + 0.02, rw.z + 3.5], [xn - 5, y + 0.02, rw.z - 3.5], [xn + 5, y + 0.02, rw.z - 3.5], [xn + 5, y + 0.02, rw.z + 3.5]]
                     : [[xn + 5, y + 0.02, rw.z - 3.5], [xn + 5, y + 0.02, rw.z + 3.5], [xn - 5, y + 0.02, rw.z + 3.5], [xn - 5, y + 0.02, rw.z - 3.5]];
     wordSignQuad(num, '#3d3f43', '#eeeeea', p[0], p[1], p[2], p[3]);
   }
   for (let x = rw.x0 + 2; x <= rw.x1 - 2; x += 25) for (const sd of [-1, 1]){ CB(0xf4f1e6).box(x, 0.25, rw.z + sd * (rw.hw + 1.2), 0.3, 0.5, 0.3, 1, true); }
+
+  /* --- drugi pas (północny, ruch NPC) i łączniki między pasami --- */
+  const r2 = A.runway2;
+  buildRunway2({ name: 'wysepka', cx: (r2.x0 + r2.x1) / 2, cz: r2.z, ax: 'x', half: (r2.x1 - r2.x0) / 2, hw: r2.hw, nums: ['09L', '27R'] }, paint, y);
+  for (const xc of [-125, 125]){
+    flat(crossBuf, xc - 5, xc + 5, r2.z + r2.hw, rw.z - rw.hw, y + 0.001);
+    paint(xc, r2.z + r2.hw - 2, xc, rw.z - rw.hw + 2, 0.25, YEL);
+    mapExtras.push({ t: 'rect', x0: xc - 5, x1: xc + 5, z0: r2.z + r2.hw, z1: rw.z - rw.hw, c: '#33363d' });
+  }
 
   /* --- droga kołowania z łącznikami do pasa (żółta oś) --- */
   const tx = A.taxi;
@@ -152,8 +182,8 @@ function buildAirport(){
 
   /* --- ogrodzenie strony lotniczej z bramą techniczną przy hangarze --- */
   const fz = A.fenceZ;
-  fenceLine(-155, fz, tm.x0 - 0.5, fz); fenceLine(tm.x1 + 0.5, fz, 92, fz); fenceLine(100, fz, 155, fz);
-  fenceLine(-155, fz, -155, -806); fenceLine(155, fz, 155, -806);
+  fenceLine(-184, fz, tm.x0 - 0.5, fz); fenceLine(tm.x1 + 0.5, fz, 92, fz); fenceLine(100, fz, 184, fz);
+  fenceLine(-184, fz, -184, -857); fenceLine(184, fz, 184, -857);                // boki strony lotniczej (za końcami obu pasów)
   CB(0xd8402c).box(96, 1.0, fz, 7.6, 0.12, 0.12, 1, true);                       // szlaban (podniesiony — wjazd możliwy)
   CB(0xd8402c).boxRot(92.3, 2.6, fz, 0.12, 3.4, 0.12, 0, 1, true);
 
@@ -176,7 +206,8 @@ function buildAirport(){
    terminal, wieża, hangar, parking; dojazd z alei j=6 (skrzyżowanie z obwodnicą przy z = 0).
    --------------------------------------------------------------- */
 const AIRPORT_W = {
-  runway: { x: -378, hw: 13, z0: -163, z1: 163 },        // pas 326 × 26 m
+  runway: { x: -378, hw: 13, z0: -163, z1: 163 },        // pas 326 × 26 m (18L/36R)
+  runway2: { x: -428, hw: 12, z0: -150, z1: 150 },       // drugi pas 300 × 24 m na nasypie (18R/36L) — ruch lotniczy NPC
   taxi:   { x: -354, hw: 5, z0: -150, z1: 150 },
   apron:  { x0: -349, x1: -318, z0: -70, z1: 50 },
   term:   { x0: -312, x1: -298, z0: -40, z1: 12 },
@@ -201,12 +232,20 @@ function buildAirportWest(){
     const ze = e < 0 ? rw.z0 + 4 : rw.z1 - 4;
     for (let k = 0; k < 7; k++){ const xx = rw.x - rw.hw + 2 + k * (2 * rw.hw - 4) / 6; paint(xx, ze, xx, ze - e * 16, 1.2); }
     for (const xx of [rw.x - 4, rw.x + 4]) paint(xx, ze - e * 55, xx, ze - e * 75, 2.0);
-    const zn = ze - e * 24, num = e > 0 ? '36' : '18';
+    const zn = ze - e * 24, num = e > 0 ? '36R' : '18L';
     const p = e > 0 ? [[rw.x - 3.5, y + 0.02, zn + 5], [rw.x + 3.5, y + 0.02, zn + 5], [rw.x + 3.5, y + 0.02, zn - 5], [rw.x - 3.5, y + 0.02, zn - 5]]
                     : [[rw.x + 3.5, y + 0.02, zn - 5], [rw.x - 3.5, y + 0.02, zn - 5], [rw.x - 3.5, y + 0.02, zn + 5], [rw.x + 3.5, y + 0.02, zn + 5]];
     wordSignQuad(num, '#3d3f43', '#eeeeea', p[0], p[1], p[2], p[3]);
   }
   for (let z = rw.z0 + 2; z <= rw.z1 - 2; z += 25) for (const sd of [-1, 1]) CB(0xf4f1e6).box(rw.x + sd * (rw.hw + 1.2), 0.25, z, 0.3, 0.5, 0.3, 1, true);
+  /* drugi pas na nasypie (zachodni, ruch NPC) i łączniki do pierwszego */
+  const r2 = A.runway2;
+  buildRunway2({ name: 'miejskie', cx: r2.x, cz: (r2.z0 + r2.z1) / 2, ax: 'z', half: (r2.z1 - r2.z0) / 2, hw: r2.hw, nums: ['18R', '36L'] }, paint, y);
+  for (const zc of [-130, 130]){
+    flat(crossBuf, r2.x + r2.hw, rw.x - rw.hw, zc - 5, zc + 5, y + 0.001);
+    paint(r2.x + r2.hw - 2, zc, rw.x - rw.hw + 2, zc, 0.25, YEL);
+    mapExtras.push({ t: 'rect', x0: r2.x + r2.hw, x1: rw.x - rw.hw, z0: zc - 5, z1: zc + 5, c: '#33363d' });
+  }
   /* droga kołowania z łącznikami do pasa (żółta oś) i płyta */
   const tx = A.taxi;
   flat(crossBuf, tx.x - tx.hw, tx.x + tx.hw, tx.z0, tx.z1, y + 0.002);

@@ -19,7 +19,7 @@ const skyCol   = new THREE.Color();
 const fogCol   = new THREE.Color();
 
 function updateSky(dt){
-  if (!timeFrozen) timeOfDay = (timeOfDay + dt / DAY_LENGTH * (down('daytime') ? 30 : 1)) % 1;
+  if (!timeFrozen) timeOfDay = (timeOfDay + dt / DAY_LENGTH * (down('daytime') ? 30 : 1) * dayMult) % 1;
   const th = (timeOfDay - 0.25) * TAU;
   sunDir.set(Math.cos(th) * 0.55, Math.sin(th), Math.cos(th) * 0.83).normalize();
   lightDir.set(sunDir.x, Math.max(Math.abs(sunDir.y), 0.12), sunDir.z).normalize();

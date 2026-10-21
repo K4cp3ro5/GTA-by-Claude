@@ -33,8 +33,8 @@ function updatePlayer(dt){
   if (has) moveDir.normalize();
 
   const wantSprint = down('sprint') || !!(keys['ShiftLeft'] || keys['ShiftRight']);
-  const running = wantSprint && has && player.stamina > 0.5;
-  const maxSpd = running ? 8.2 : 4.3;
+  const running = wantSprint && has && player.stamina > 0.5 && !Weapons.ads;
+  const maxSpd = (running ? 8.2 : 4.3) * (Weapons.ads ? 0.62 : 1);                // przycelowanie (PPM): wolniejszy chód
   const accel = (player.grounded ? 30 : 7) * dt;
 
   const tx = has ? moveDir.x * maxSpd : 0;
