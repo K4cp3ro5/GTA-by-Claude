@@ -1,6 +1,6 @@
 # GTA by Claude
 
-**Mini-GTA w przeglądarce.** Miasto na wyspie: 12 × 12 kwartałów z ruchem ulicznym, pieszymi, rowerzystami i piratami drogowymi, dwie autostrady na estakadach z węzłem koniczynowym, lotnisko miejskie i port z łodziami, a za cieśniną wysepka z drugim lotniskiem — samolotami z obu można latać (i z których można wyskoczyć ze spadochronem), a po drugich pasach kursuje ruch lotniczy NPC. Po morzu pływają łodzie NPC. Do tego pełna mapa z wyznaczaniem trasy, cykl dnia i nocy, broń (pistolet, karabin) z kamerą zza ramienia i kradzież aut.
+**Mini-GTA w przeglądarce.** Miasto na wyspie: 12 × 12 kwartałów z ruchem ulicznym, pieszymi, rowerzystami i piratami drogowymi, dwie autostrady na estakadach z węzłem koniczynowym, lotnisko miejskie i port z łodziami, a za cieśniną wysepka z drugim lotniskiem — samolotami z obu można latać (i z których można wyskoczyć ze spadochronem), a po drugich pasach kursuje ruch lotniczy NPC. Po morzu pływają łodzie NPC, a na wschodzie wyspy jest duży park rozrywki z kolejkami górskimi, którymi można się przejechać. Do tego pełna mapa z wyznaczaniem trasy, cykl dnia i nocy, broń (pistolet, karabin) z kamerą zza ramienia i kradzież aut.
 
 Wszystko — asfalt, okna, modele aut i samolotów, znaki, dźwięk silnika i wybuchów — jest generowane w kodzie. Nie ma ani jednego pliku graficznego czy dźwiękowego, nie ma bundlera ani serwera: wystarczy otworzyć `index.html`.
 
@@ -28,7 +28,7 @@ Klawisze można zmienić w menu (**STEROWANIE**). `Esc` w trakcie gry to pauza �
 |---|---|
 | `W` `A` `S` `D` / strzałki, mysz | ruch, kamera |
 | `Shift` / `Spacja` | bieg / skok |
-| `F` (albo `E`) | wsiądź do auta lub samolotu, ukradnij auto NPC |
+| `F` (albo `E`) | wsiądź do auta lub samolotu, ukradnij auto NPC, przejażdżka kolejką górską (na peronie) |
 | `V` (przytrzymaj) | menu pojazdów: twoje auto (zwykły, pickup, sportowy) albo rower |
 | `1` `2` `3` `4`, `Q` (przytrzymaj) | broń: pięści, kij, pistolet, karabin / koło broni |
 | lewy przycisk myszy (karabin: przytrzymaj), `R` | atak, strzał / przeładowanie |
@@ -85,6 +85,16 @@ Jak wystartować: ustaw samolot na pasie, trzymaj `W`, a gdy prędkościomierz p
 - Nad miastem i portem latają **mewy**. Co jakiś czas któraś „zrzuca balast”: na ziemi albo dachu zostaje biała plama, która po kilku sekundach znika. Trafienie w ciebie albo w szybę auta kończy się komunikatem i plamą na ekranie.
 - Za cieśniną, ok. 250 m na północ, leży **wysepka z drugim lotniskiem** i własną przystanią. Dopłyniesz tam łodzią z portu albo dolecisz samolotem z lotniska miejskiego.
 - Kto wpadnie do wody (pieszo albo autem), zostaje wyciągnięty na brzeg; auto ląduje obok. Samolot, który dotknie wody, rozbija się i tonie.
+
+### Park rozrywki
+
+| Park z lotu ptaka | Atrakcje | Przejażdżka kolejką |
+|---|---|---|
+| ![Park rozrywki](screenshots/park.jpg) | ![Atrakcje](screenshots/park-atrakcje.jpg) | ![Kolejka](screenshots/kolejka.jpg) |
+
+- We wschodnim pasie zieleni wyspy głównej (112 × 320 m), wejście przez bramę „PARK ROZRYWKI” z alei w środku miasta. Promenada z budkami (jedzenie, pamiątki), bulwar, ławki, latarnie, klomby i spacerujący zwiedzający; całość można obejść pieszo.
+- **Kolejka SMOK** (370 m toru, wyciąg na 42 m, pierwszy zjazd ok. 70°, do 103 km/h, trzy górki o malejącej wysokości, tor przechylony w zakrętach) i rodzinna **kolejka ŻABKA** (142 m, 12 m, do 53 km/h). Pociągi jeżdżą cały czas z pasażerami; na peronie, gdy pociąg stoi na stacji, `F` — przejażdżka z perspektywy pierwszego wagonu (mysz rozgląda się, licznik pokazuje prędkość i wysokość). Po okrążeniu wysiadasz na peron.
+- **Diabelski młyn** (średnica 42 m, 16 gondoli zawsze w pionie), **karuzela z konikami** (koniki unoszą się i opadają), **karuzela łańcuchowa** (krzesełka odchylają się z prędkością), **wieża swobodnego spadania** (52 m: powolny wjazd, zawis, spadek), **autodrom** z samochodzikami.
 
 ### Mapa i nawigacja
 
@@ -199,6 +209,7 @@ Symulacja (`node test/sim.js <sekundy>`, `SEED=…`) sprawdza m.in. nakładanie 
 ## Ograniczenia
 
 - Ulice to siatka ortogonalna, a trasy NPC to stałe pętle, nie graf dróg. Nawigacja gracza nie prowadzi przez autostrady (tylko ulice i dojazdy).
+- Kolejki w parku jeżdżą po wyliczonym profilu prędkości (energia z wyciągu minus tarcie), a nie fizyką; z wagonika nie można wysiąść w trakcie jazdy. Zwiedzający w parku chodzą między punktami alejek bez kolizji.
 - Wyspy są prostokątne (sztuczne nabrzeża), łodzie to prosty model zręcznościowy (bez fal i fizyki wody); łodzie NPC pływają po losowych celach, nie po trasach.
 - Uproszczony model lotu (bez wiatru i klap); samoloty NPC lecą po wyliczonej trasie (nie fizyką) i nie kołują po drogach kołowania — zawracają na końcu pasa. Samolot gracza zderza się z budynkami, terenem i samolotami NPC, nie z autami.
 - Postać ma ręce z jednego segmentu — przy karabinie lewa dłoń tylko sięga w stronę łoża.

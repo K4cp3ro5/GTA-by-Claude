@@ -130,7 +130,7 @@ function navPin(g, x, y, s){
 const bigEl = document.getElementById('bigmap'), bigCv = document.getElementById('bigmapCv'), bigG = bigCv.getContext('2d');
 const BIG = { cx: 0, cz: 0, s: 1, drag: null };
 const MAP_LABELS = [['PORT', () => [PORTS.main.x + 60, PORTS.main.z + 30]], ['LOTNISKO', () => [0, AIRPORT.runway.z - 30]], ['LOTNISKO', () => [AIRPORT_W.apron.x0, AIRPORT_W.runway.z0 - 14]], ['PRZYSTAŃ', () => [PORTS.airport.x, PORTS.airport.z + 26]],
-                    ['SZPITAL', () => [HOSPITAL_SPAWN.x, HOSPITAL.main.z1 + 14]], ['WĘZEŁ A1/A2', () => [0, 30]]];
+                    ['SZPITAL', () => [HOSPITAL_SPAWN.x, HOSPITAL.main.z1 + 14]], ['WĘZEŁ A1/A2', () => [0, 30]], ['PARK ROZRYWKI', () => [PARK.boulX, 30]]];
 function openMap(){
   if (mapOpen) return;
   mapOpen = true;

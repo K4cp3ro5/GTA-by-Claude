@@ -10,6 +10,7 @@ airport.js
 hospital.js
 islands.js
 landmarks.js
+park.js
 city-generation.js
 highways.js
 traffic-lights.js

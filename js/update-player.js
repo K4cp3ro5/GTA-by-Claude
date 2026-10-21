@@ -118,6 +118,7 @@ function damagePlayer(amount, cause){
 }
 
 function respawnPlayer(){
+  if (mode === 'ride') rideEnd(curRide, true);
   if (mode === 'plane') exitPlane(true);
   if (mode === 'boat') exitBoat(true);
   if (mode === 'car'){

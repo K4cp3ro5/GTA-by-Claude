@@ -153,7 +153,7 @@ document.addEventListener('mousemove', e => {
     wheelVY += e.movementY;
     return;
   }
-  if (mode === 'plane' || mode === 'boat'){                                  // samolot / łódź: mysz tylko obraca kamerę
+  if (mode === 'plane' || mode === 'boat' || mode === 'ride'){               // samolot / łódź / kolejka: mysz tylko obraca kamerę
     planeCamYaw = clamp(planeCamYaw - e.movementX * 0.003, -2.6, 2.6);
     if (Math.abs(e.movementX) > 1.5) lastMouseMove = clock;
     return;
@@ -310,7 +310,7 @@ function refreshDebugInfo(){
   dbgEl('dbgCars').textContent = (npcs.length - nb) + ' / ' + nb;
   dbgEl('dbgPeds').textContent = String(Pedestrians.list.length);
   dbgEl('dbgSeaAir').textContent = boats.filter(b => b.npc).length + ' / ' + airPlanes.length;
-  dbgEl('dbgMode').textContent = mode === 'car' ? CAR_TYPES[carType].name + (driving.owner === 'stolen' ? ' (kradzione)' : '') : mode === 'plane' && curPlane ? curPlane.T.name : mode === 'boat' ? BOAT_T.name : 'pieszo';
+  dbgEl('dbgMode').textContent = mode === 'car' ? CAR_TYPES[carType].name + (driving.owner === 'stolen' ? ' (kradzione)' : '') : mode === 'plane' && curPlane ? curPlane.T.name : mode === 'boat' ? BOAT_T.name : mode === 'ride' && curRide ? curRide.name : 'pieszo';
   dbgEl('dbgPirCount').textContent = String(npcs.filter(n => n.profile === 'pirat').length);
 }
 debugEl.addEventListener('click', ev => { if (ev.target === debugEl) toggleDebugMenu(); });
@@ -318,12 +318,14 @@ dbgEl('closeDebug').addEventListener('click', ev => { ev.stopPropagation(); togg
 
 /* --- akcje --- */
 function dbgOnFoot(){                                    // samolot / łódź: wysiadka; auto: trzeba wysiąść samemu (F)
+  if (mode === 'ride') rideEnd(curRide, true);
   if (mode === 'plane') exitPlane(true);
   if (mode === 'boat') exitBoat(true);
   if (mode === 'car'){ hudToast('Najpierw wysiądź z auta (F)'); return false; }
   return true;
 }
 function dbgTeleport(x, z, heading, yTop){
+  if (mode === 'ride') rideEnd(curRide, true);
   if (mode === 'plane') exitPlane(true);
   if (mode === 'boat') exitBoat(true);
   const g = groundAt(x, z, yTop === undefined ? 30 : yTop); const y = g === null ? 0 : g;
@@ -394,6 +396,7 @@ debugEl.querySelectorAll('[data-tp]').forEach(b => b.addEventListener('click', e
   else if (k === 'port') dbgTeleport(L(5) - 2, -330, Math.PI);
   else if (k === 'airportW') dbgTeleport(AIRPORT_W.front.x + 2, 30, Math.PI);
   else if (k === 'ring') dbgTeleport(L(12) + 3.5, 60, Math.PI);           // wschodnia obwodnica, pas na północ
+  else if (k === 'park') dbgTeleport(PARK.gateX - 12, 0, Math.PI / 2);
   else if (k === 'clover') dbgTeleport(L(6) + 30, L(6) + 9, -Math.PI / 2, 3);   // ulica pod węzłem
   else if (k === 'exit'){ const q = wayAt(HWY_TERM[0].exit, HWY_TERM[0].exit.len - 160); dbgTeleport(q.x, q.z, Math.atan2(q.hx, q.hz), q.y + 3); }
   else {                                                 // pomost A1 przed węzłem (punkt trasy NPC na jezdni)
