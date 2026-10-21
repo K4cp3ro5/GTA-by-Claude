@@ -238,22 +238,37 @@ function offsetLoop(P, off){
     return Object.assign({}, b, { x: b.x + mx * k, z: b.z + mz * k });
   });
 }
+/* menu debug: istniejące auto staje się piratem (profil jak przy spawnie, nowy lakier i kierunkowskazy na nowym modelu) */
+function npcMakePirate(n){
+  if (n.type === 'bike' || n.profile === 'pirat') return false;
+  n.profile = 'pirat'; n.obey = rand(1.35, 1.6); n.target = Math.max(n.target * 1.25, 13); n.hwyF = 1.25;
+  n.accel = CAR_TYPES[n.type].npc.accel * 2.0; n.gapX = -0.5; n.react = 0; n.color = PIRATE_COLOR;
+  npcHazardOff(n);
+  const old = n.mesh; n.mesh = buildNpcModel(PIRATE_COLOR, n.type);
+  n.mesh.position.copy(old.position); n.mesh.quaternion.copy(old.quaternion); scene.remove(old);
+  n.indMeshes = addIndicators(n.mesh, n.type);
+  return true;
+}
 const _bikeLoops = new Map();
 function bikeLoopOf(P){ if (!_bikeLoops.has(P)) _bikeLoops.set(P, offsetLoop(P, 2.3)); return _bikeLoops.get(P); }
 function spawnNpcBikes(){
   const noRb = P => !P.hwyRoute && !P.some(p => p.rb !== undefined);
   const city = LOOPS.filter(noRb), pirLoops = npcs.filter(n => n.profile === 'pirat' && noRb(n.path)).map(n => n.path);
   for (let k = 0; k < NPC_BIKE_COUNT; k++){
-    const P = bikeLoopOf(k < pirLoops.length && k < 3 ? pirLoops[k] : city[(k * 5 + 2) % city.length]);
-    for (let t = 0; t < 30; t++){
-      const sp = pathSpot(P, rnd()), a = P[sp.idx], b = P[(sp.idx + 1) % P.length];
-      const x = lerp(a.x, b.x, sp.frac), z = lerp(a.z, b.z, sp.frac);
-      if (npcs.some(m => Math.hypot(m.pos.x - x, m.pos.y - z) < 12)) continue;
-      const n = spawnNpcCar(P, [0xc0392b, 0x2a6cb8, 0xe8b923, 0x2f8a4c, 0xd35fa0, 0xeeeeea][k % 6], sp.idx, sp.frac, 'bike');
-      n.target = rand(4.4, 5.6); n.obey = 1; n.profile = 'rowerzysta';
-      break;
-    }
+    spawnNpcBike(bikeLoopOf(k < pirLoops.length && k < 3 ? pirLoops[k] : city[(k * 5 + 2) % city.length]), k);
   }
+}
+const BIKE_COLORS = [0xc0392b, 0x2a6cb8, 0xe8b923, 0x2f8a4c, 0xd35fa0, 0xeeeeea];
+function spawnNpcBike(P, k){
+  for (let t = 0; t < 30; t++){
+    const sp = pathSpot(P, rnd()), a = P[sp.idx], b = P[(sp.idx + 1) % P.length];
+    const x = lerp(a.x, b.x, sp.frac), z = lerp(a.z, b.z, sp.frac);
+    if (npcs.some(m => Math.hypot(m.pos.x - x, m.pos.y - z) < 12)) continue;
+    const n = spawnNpcCar(P, BIKE_COLORS[k % 6], sp.idx, sp.frac, 'bike');
+    n.target = rand(4.4, 5.6); n.obey = 1; n.profile = 'rowerzysta';
+    return n;
+  }
+  return null;
 }
 function removeNpcCar(n){
   npcHazardOff(n);

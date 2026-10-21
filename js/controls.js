@@ -212,6 +212,13 @@ const dbg = {
   counts:   document.getElementById('dbgCounts'),
   fps:      document.getElementById('dbgFps'),
   close:    document.getElementById('closeDebug'),
+  pirCount: document.getElementById('dbgPirCount'),
+  bikeCount: document.getElementById('dbgBikeCount'),
+  ram:      document.getElementById('dbgRam'),
+  ramVal:   document.getElementById('dbgRamVal'),
+  lod:      document.getElementById('dbgLod'),
+  modeInfo: document.getElementById('dbgMode'),
+  npcInd:   document.getElementById('dbgNpcInd'),
   clearStolen: document.getElementById('dbgClearStolen')
 };
 
@@ -238,6 +245,12 @@ function refreshDebugInfo(){
   dbg.bodies.textContent = String(world.bodies.length);
   dbg.counts.textContent = npcs.length + ' / ' + Pedestrians.list.length;
   dbg.fps.textContent = el.fps.textContent;
+  dbg.pirCount.textContent = String(npcs.filter(n => n.profile === 'pirat').length);
+  dbg.bikeCount.textContent = String(npcs.filter(n => n.type === 'bike').length);
+  dbg.ram.value = String(PIRATE_RAM_CHANCE); dbg.ramVal.textContent = Math.round(PIRATE_RAM_CHANCE * 100) + '%';
+  dbg.lod.checked = NPC_LOD_DIST < 1e6;
+  dbg.modeInfo.textContent = mode + (mode === 'car' ? ' · ' + CAR_TYPES[carType].name + ' (' + driving.owner + ')' : mode === 'plane' && curPlane ? ' · ' + curPlane.T.name : '');
+  dbg.npcInd.textContent = npcs.filter(n => n.ind).length + ' / ' + npcs.reduce((a, n) => a + (n.rams || 0) + (n.pedHits || 0), 0);
 }
 function timeLabel(v){
   const h = Math.floor(v / 60), m = v % 60;
@@ -294,6 +307,79 @@ dbg.speed.addEventListener('input', () => {
 dbg.heal.addEventListener('click', ev => { ev.stopPropagation(); player.health = 100; player.stamina = 100; });
 dbg.clearStolen.addEventListener('click', ev => { ev.stopPropagation(); parkedCars.filter(q => q.owner === 'stolen').forEach(removeParked); refreshDebugInfo(); });
 dbg.ammo.addEventListener('click', ev => { ev.stopPropagation(); Weapons.reserve += 200; });
+/* --- pojazdy, samoloty, teleporty, piraci, rowerzyści (debug) --- */
+function dbgOnFoot(){                                    // samolot: wysiadka; auto: trzeba wysiąść samemu (F)
+  if (mode === 'plane') exitPlane(true);
+  if (mode === 'car'){ hudToast('Najpierw wysiądź z auta (F)'); return false; }
+  return true;
+}
+function dbgTeleport(x, z, heading, yTop){
+  if (mode === 'plane') exitPlane(true);
+  const g = groundAt(x, z, yTop === undefined ? 30 : yTop); const y = g === null ? 0 : g;
+  if (mode === 'car') takeOver(carType, driving.color, driving.owner, x, y, z, heading);
+  else { player.body.position.set(x, y + 1.2, z); player.body.velocity.set(0, 0, 0); }
+  refreshDebugInfo();
+}
+debugEl.querySelectorAll('[data-car]').forEach(b => b.addEventListener('click', ev => {
+  ev.stopPropagation();
+  const type = b.dataset.car;
+  if (mode === 'plane') exitPlane(true);
+  if (mode === 'car'){                                   // w aucie: zmiana typu w miejscu
+    const T = CAR_TYPES[carType], p = chassisBody.position;
+    takeOver(type, driving.color, driving.owner, p.x, p.y - T.restY - 0.13, p.z, carYaw());
+  } else { lastCarSpawn = -99; spawnOwnCar(type); }
+  refreshDebugInfo();
+}));
+debugEl.querySelectorAll('[data-ind]').forEach(b => b.addEventListener('click', ev => {
+  ev.stopPropagation();
+  if (mode !== 'car'){ hudToast('Kierunkowskazy działają w aucie'); return; }
+  playerInd = b.dataset.ind || null;
+}));
+debugEl.querySelectorAll('[data-plane]').forEach(b => b.addEventListener('click', ev => {
+  ev.stopPropagation();
+  if (!dbgOnFoot()) return;
+  const p = planes.find(q => q.kind === b.dataset.plane); if (!p) return;
+  resetPlane(p);
+  if (b.dataset.air){                                    // od razu w locie: 150 m nad lotniskiem, kurs na wschód, ponad prędkością przeciągnięcia
+    p.pos.set(-120, 150, AIRPORT.runway.z); p.quat.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
+    p.onGround = false; p.v = p.T.vStall * 1.35; p.thr = 0.75; syncPlane(p);
+  } else { const d = planeDoorPoint(p, { x: 0, y: 0, z: 0 }); player.body.position.set(d.x, d.y + 1.2, d.z); }
+  enterPlane(p);
+  camCur.set(p.pos.x - 30, p.pos.y + 10, p.pos.z);
+  refreshDebugInfo();
+}));
+debugEl.querySelectorAll('[data-tp]').forEach(b => b.addEventListener('click', ev => {
+  ev.stopPropagation();
+  const k = b.dataset.tp;
+  if (k === 'airport') dbgTeleport(AIRPORT.access.x - 2, -285, 0);
+  else if (k === 'ring') dbgTeleport(L(12) + 3.5, 60, Math.PI);           // wschodnia obwodnica, pas na północ
+  else if (k === 'exit'){ const q = wayAt(HWY_TERM[0].exit, HWY_TERM[0].exit.len - 160); dbgTeleport(q.x, q.z, Math.atan2(q.hx, q.hz), q.y + 3); }
+  else {                                                 // pomost A1 przed węzłem (punkt trasy NPC na jezdni)
+    const P = HWY_LOOPS[0][0], i = P.findIndex((q, j) => q.hwy && (q.y || 0) > 6 && Math.hypot(q.x, q.z) > 90 && Math.hypot(q.x, q.z) < 140);
+    const a = P[Math.max(0, i)], c = P[(Math.max(0, i) + 1) % P.length];
+    dbgTeleport(a.x, a.z, Math.atan2(c.x - a.x, c.z - a.z), (a.y || 0) + 3);
+  }
+}));
+document.getElementById('dbgAddPirate').addEventListener('click', ev => {
+  ev.stopPropagation();
+  for (let t = 0; t < 12; t++){ const n = spawnRandomNpcCar(); if (n.type !== 'bike' && !n.path.hwyRoute){ npcMakePirate(n); break; } removeNpcCar(n); }
+  refreshDebugInfo();
+});
+document.getElementById('dbgNearPirate').addEventListener('click', ev => {
+  ev.stopPropagation();
+  const p = mode === 'car' ? chassisBody.position : player.body.position;
+  const c = npcs.filter(n => n.type !== 'bike' && n.profile !== 'pirat').sort((a, b) => Math.hypot(a.pos.x - p.x, a.pos.y - p.z) - Math.hypot(b.pos.x - p.x, b.pos.y - p.z))[0];
+  if (c){ npcMakePirate(c); hudToast('Pirat: auto ' + Math.round(Math.hypot(c.pos.x - p.x, c.pos.y - p.z)) + ' m od ciebie'); }
+  refreshDebugInfo();
+});
+document.getElementById('dbgAddBikes').addEventListener('click', ev => {
+  ev.stopPropagation();
+  const city = LOOPS.filter(P => !P.hwyRoute && !P.some(q => q.rb !== undefined));
+  for (let k = 0; k < 2; k++) spawnNpcBike(bikeLoopOf(city[randInt(0, city.length - 1)]), randInt(0, 5));
+  refreshDebugInfo();
+});
+dbg.ram.addEventListener('input', () => { PIRATE_RAM_CHANCE = parseFloat(dbg.ram.value); dbg.ramVal.textContent = Math.round(PIRATE_RAM_CHANCE * 100) + '%'; });
+dbg.lod.addEventListener('change', () => { NPC_LOD_DIST = dbg.lod.checked ? 220 : Infinity; });
 dbg.teleport.addEventListener('click', ev => {
   ev.stopPropagation();
   if (mode === 'car'){

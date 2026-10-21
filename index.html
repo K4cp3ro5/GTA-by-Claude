@@ -424,9 +424,39 @@ var LOADER = (function(){
       <div class="drow"><span>Mnożnik prędkości auta: <b class="dval" id="dbgSpeedVal">1.0×</b></span><input type="range" id="dbgSpeed" min="0.2" max="3" step="0.1" value="1"></div>
     </div>
 
+    <div class="dsec">
+      <h3>Pojazdy</h3>
+      <div class="drow"><span>Twój pojazd</span>
+        <span class="dbtnrow"><button class="dbtn" data-car="sedan">Zwykły</button><button class="dbtn" data-car="pickup">Pickup</button><button class="dbtn" data-car="sport">Sportowy</button><button class="dbtn" data-car="bike">Rower</button></span></div>
+      <div class="drow"><span>Kierunkowskazy (Q / E)</span>
+        <span class="dbtnrow"><button class="dbtn" data-ind="L">◀ Lewy</button><button class="dbtn" data-ind="R">Prawy ▶</button><button class="dbtn" data-ind="">Wył.</button></span></div>
+      <div class="drow"><span>Samolot na lotnisku</span>
+        <span class="dbtnrow"><button class="dbtn" data-plane="jet">Odrzutowiec</button><button class="dbtn" data-plane="prop">Awionetka</button></span></div>
+      <div class="drow"><span>Samolot w powietrzu (150 m)</span>
+        <span class="dbtnrow"><button class="dbtn" data-plane="jet" data-air="1">Odrzutowiec</button><button class="dbtn" data-plane="prop" data-air="1">Awionetka</button></span></div>
+    </div>
+
+    <div class="dsec">
+      <h3>Teleport</h3>
+      <div class="drow"><span>Dokąd</span>
+        <span class="dbtnrow"><button class="dbtn" data-tp="airport">Lotnisko</button><button class="dbtn" data-tp="hwy">Autostrada</button><button class="dbtn" data-tp="exit">Zjazd SE</button><button class="dbtn" data-tp="ring">Obwodnica</button></span></div>
+    </div>
+
+    <div class="dsec">
+      <h3>Piraci drogowi i rowerzyści</h3>
+      <div class="drow"><span>Piraci: <b class="dval" id="dbgPirCount">0</b></span>
+        <span class="dbtnrow"><button class="dbtn" id="dbgAddPirate">+1 pirat</button><button class="dbtn" id="dbgNearPirate">Najbliższe auto → pirat</button></span></div>
+      <div class="drow"><span>Rowerzyści: <b class="dval" id="dbgBikeCount">0</b></span>
+        <span class="dbtnrow"><button class="dbtn" id="dbgAddBikes">+2</button></span></div>
+      <div class="drow"><span>Szansa, że pirat wjedzie w rowerzystę: <b class="dval" id="dbgRamVal">15%</b></span><input type="range" id="dbgRam" min="0" max="1" step="0.05" value="0.15"></div>
+      <div class="drow"><span>LOD AI (dalekie auta co drugą klatkę)</span><input type="checkbox" id="dbgLod" checked></div>
+    </div>
+
     <div id="debugInfo">
       <div>Ciała fizyczne: <span id="dbgBodies">—</span></div>
       <div>NPC / piesi / pociski: <span id="dbgCounts">—</span></div>
+      <div>Tryb / pojazd: <span id="dbgMode">—</span></div>
+      <div>NPC z kierunkowskazem / pirackie potrącenia: <span id="dbgNpcInd">—</span></div>
       <div>FPS: <span id="dbgFps">—</span></div>
     </div>
 
