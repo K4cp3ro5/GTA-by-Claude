@@ -84,12 +84,27 @@ function buildBindList(){
     r.appendChild(s); r.appendChild(b);
     bindListEl.appendChild(r);
   });
+  buildGateKeys();
+}
+/* ściągawka sterowania na ekranie startowym / pauzy (z aktualnych klawiszy) */
+function buildGateKeys(){
+  const box = document.getElementById('gateKeys'); if (!box) return;
+  const K = a => '<kbd>' + keyLabel(BIND[a]) + '</kbd>', T = t => '<kbd>' + t + '</kbd>';
+  const rows = [
+    [K('forward') + K('left') + K('back') + K('right'), 'Ruch / jazda'], [K('sprint') + K('jump'), 'Bieg · skok / ręczny'],
+    [K('enter'), 'Wsiądź / wysiądź / ukradnij'], [K('vehicleWheel'), 'Menu pojazdów (przytrzymaj)'], null,
+    [T('LPM') + T('PPM'), 'Strzał · przycelowanie'], [K('wheel') + T('1–4'), 'Koło broni · wybór broni'], [K('reload'), 'Przeładuj / postaw auto'], null,
+    [K('map') + K('daytime'), 'Mapa · przyspiesz dobę'], [K('mute') + T('Esc') + T('`'), 'Dźwięk · pauza · menu dev']
+  ];
+  box.innerHTML = rows.map(r => r ? '<span class="k">' + r[0] + '</span><span>' + r[1] + '</span>' : '<i class="sep"></i>').join('');
 }
 buildBindList();
 
 function openSettings(){ settingsEl.classList.add('on'); }
 function closeSettings(){ settingsEl.classList.remove('on'); rebindTarget = null; }
 settingsBtn.addEventListener('click', ev => { ev.stopPropagation(); openSettings(); });
+document.getElementById('gMap').addEventListener('click', ev => { ev.stopPropagation(); openMap(); });
+document.getElementById('gDev').addEventListener('click', ev => { ev.stopPropagation(); toggleDebugMenu(); });
 document.getElementById('closeSettings').addEventListener('click', ev => { ev.stopPropagation(); closeSettings(); });
 document.getElementById('resetBinds').addEventListener('click', ev => {
   ev.stopPropagation();
@@ -106,10 +121,14 @@ document.addEventListener('pointerlockchange', () => {
   pointerLocked = (document.pointerLockElement === renderer.domElement);
   if (pointerLocked) gameStarted = true;
   gate.classList.toggle('hidden', pointerLocked || mapOpen);
+  gate.classList.toggle('paused', gameStarted);
   Sound.setPaused(!pointerLocked && !debugOpen);                // pauza (menu): dźwięk wyciszony
   if (!pointerLocked){
     goBtn.textContent = 'WRÓĆ DO GRY';
-    if (gameStarted) document.getElementById('gatetxt').textContent = 'Pauza — miasto czeka, dźwięk wyciszony.';
+    if (gameStarted){                                                       // pauza: stan gry w jednym wierszu
+      const md = mode === 'car' ? 'w aucie' : mode === 'plane' ? 'w samolocie' : mode === 'boat' ? 'na łodzi' : 'pieszo';
+      document.getElementById('gatetxt').textContent = document.getElementById('clock').textContent + ' · ' + document.getElementById('phase').textContent + ' · ' + md + ' · zdrowie ' + Math.round(player.health) + ' — miasto czeka, dźwięk wyciszony.';
+    }
     for (const k in keys) keys[k] = false;
     mouseDown = false; mouseDownR = false;
   } else {
@@ -123,7 +142,7 @@ goBtn.addEventListener('click', () => {
 });
 renderer.domElement.addEventListener('click', () => { if (!pointerLocked && !goBtn.disabled){ Sound.init(); lockPointer(); } });
 gate.addEventListener('click', e => {
-  if (e.target === goBtn || e.target === settingsBtn || goBtn.disabled || settingsEl.classList.contains('on')) return;
+  if (e.target === goBtn || e.target === settingsBtn || e.target.closest('.gbtn') || goBtn.disabled || settingsEl.classList.contains('on')) return;
   Sound.init(); lockPointer();
 });
 

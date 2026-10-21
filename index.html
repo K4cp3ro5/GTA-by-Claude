@@ -25,7 +25,7 @@
     cursor:default;
   }
   canvas{display:block}
-  button,input{font-family:inherit}
+  button,input,kbd{font-family:inherit}
 
   #hud{position:fixed;inset:0;pointer-events:none;z-index:10}
 
@@ -150,54 +150,86 @@
   #bigmap.on{display:block}
   #bigmap canvas{display:block;width:100%;height:100%}
 
-  /* ---- ekran ładowania (przed menu startowym) ---- */
+  /* ---- ekran ładowania (przed menu startowym): niebo o zmierzchu, sylwetka miasta z oknami, pasek z procentem,
+     etapy wczytywania i zmieniające się wskazówki ---- */
   #loader{
-    position:fixed;inset:0;z-index:60;display:flex;flex-direction:column;
-    align-items:center;justify-content:center;gap:22px;text-align:center;
-    background:
-      radial-gradient(1100px 620px at 50% 30%,rgba(255,176,58,.10),transparent 68%),
-      linear-gradient(#0a0c11,#05060a);
-    transition:opacity .5s ease;
+    position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;overflow:hidden;
+    background:linear-gradient(180deg,#07080d 0%,#0d1018 46%,#2a1a14 78%,#4a2a14 100%);
+    transition:opacity .6s ease;
   }
   #loader.done{opacity:0;pointer-events:none}
-  #loader .ltitle{font-size:clamp(30px,5vw,54px);font-weight:200;letter-spacing:-.03em}
-  #loader .ltitle em{font-style:normal;font-weight:600;color:var(--sodium)}
-  #loader .lbar{width:min(360px,70vw);height:4px;border-radius:2px;background:#1d2027;overflow:hidden}
-  #lfill{display:block;height:100%;width:2%;background:var(--sodium);box-shadow:0 0 12px rgba(255,176,58,.6);transition:width .25s ease}
-  #lstat{font-size:12px;letter-spacing:.08em;color:#8d8b86;min-height:1.4em}
+  #loader .lsun{position:absolute;left:50%;bottom:16%;width:520px;height:520px;margin-left:-260px;border-radius:50%;
+    background:radial-gradient(circle,rgba(255,176,58,.38),rgba(255,120,40,.12) 45%,transparent 70%);filter:blur(4px)}
+  #lcity{position:absolute;left:0;right:0;bottom:0;width:100%;height:42%;display:block}
+  #lcity .w{fill:#ffcf7a;opacity:.8;animation:lwin 4s ease-in-out infinite}
+  @keyframes lwin{0%,100%{opacity:.85}50%{opacity:.25}}
+  #loader .lbox{position:relative;z-index:1;width:min(520px,88vw);display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center;margin-bottom:12vh}
+  .lkicker,.gkicker{font-size:11px;font-weight:600;letter-spacing:.32em;color:#a08c74}
+  #loader .ltitle{font-size:clamp(40px,7vw,78px);font-weight:200;letter-spacing:-.035em;line-height:.95;text-shadow:0 6px 40px rgba(0,0,0,.6)}
+  #loader .ltitle em,#gate h1 em{font-style:normal;font-weight:700;color:var(--sodium);text-shadow:0 0 44px rgba(255,176,58,.42)}
+  .lprog{display:flex;align-items:center;gap:12px;width:100%;margin-top:10px}
+  #loader .lbar{flex:1;height:6px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden}
+  #lfill{display:block;height:100%;width:2%;border-radius:3px;background:linear-gradient(90deg,#ff8a2a,var(--sodium));box-shadow:0 0 14px rgba(255,176,58,.6);transition:width .25s ease}
+  #lpct{width:42px;text-align:right;font-size:13px;font-weight:600;color:var(--paint);font-variant-numeric:tabular-nums}
+  #lstat{font-size:12px;letter-spacing:.06em;color:#9b9890;min-height:1.4em}
   #lstat.err{color:var(--brake)}
-  #loader .lspin{width:26px;height:26px;border-radius:50%;border:2px solid #2a2d34;border-top-color:var(--sodium);animation:lspin .9s linear infinite}
-  @keyframes lspin{to{transform:rotate(360deg)}}
+  #lsteps{list-style:none;display:flex;flex-wrap:wrap;justify-content:center;gap:6px}
+  #lsteps li{font-size:11px;color:#77746d;border:1px solid rgba(255,255,255,.08);border-radius:20px;padding:4px 10px 4px 9px;display:flex;align-items:center;gap:6px;background:rgba(10,12,16,.45)}
+  #lsteps li::before{content:"";width:7px;height:7px;border-radius:50%;border:1px solid #55524c}
+  #lsteps li.cur{color:#e6e3dc;border-color:rgba(255,176,58,.4)}
+  #lsteps li.cur::before{border-color:var(--sodium);animation:pulse 1s infinite}
+  #lsteps li.ok{color:#c9c6bf}
+  #lsteps li.ok::before{background:var(--sodium);border-color:var(--sodium)}
+  #ltip{margin-top:6px;font-size:12.5px;color:#b7b2a8;line-height:1.55;max-width:460px;min-height:3.1em;transition:opacity .3s}
+  #ltip b{color:var(--sodium);font-weight:600}
 
-  /* ---- ekran startowy ---- */
+  /* ---- ekran startowy i pauza: karta z tytułem i przyciskami + ściągawka sterowania;
+     w pauzie półprzezroczyste tło z rozmyciem (widać zatrzymane miasto) ---- */
   #gate{
-    position:fixed;inset:0;z-index:40;display:flex;flex-direction:column;
-    align-items:center;justify-content:center;gap:26px;text-align:center;
+    position:fixed;inset:0;z-index:40;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:24px;overflow-y:auto;
     background:
-      radial-gradient(1100px 620px at 50% 30%,rgba(255,176,58,.10),transparent 68%),
+      radial-gradient(1100px 620px at 30% 30%,rgba(255,176,58,.10),transparent 68%),
       linear-gradient(#0a0c11,#05060a);
-    transition:opacity .45s ease;
+    transition:opacity .35s ease;
   }
+  #gate.paused{background:radial-gradient(900px 520px at 28% 40%,rgba(255,176,58,.08),transparent 70%),rgba(5,6,10,.64);backdrop-filter:blur(7px) saturate(.85);-webkit-backdrop-filter:blur(7px) saturate(.85)}
   #gate.hidden{opacity:0;pointer-events:none}
-  #gate h1{
-    font-size:clamp(44px,9vw,104px);font-weight:200;letter-spacing:-.035em;line-height:.88;
+  .gcard{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(280px,1fr);gap:40px;width:min(1000px,100%);align-items:center}
+  .gmain{display:flex;flex-direction:column;align-items:flex-start;gap:16px}
+  .gbadge{display:none;font-size:11px;font-weight:700;letter-spacing:.24em;color:#14161b;background:var(--sodium);border-radius:4px;padding:6px 10px}
+  #gate.paused .gbadge{display:inline-block}
+  #gate.paused .gkicker{display:none}
+  #gate h1{font-size:clamp(48px,8vw,104px);font-weight:200;letter-spacing:-.035em;line-height:.9}
+  #gate h1 em{display:block}
+  #gate.paused h1{font-size:clamp(36px,5vw,60px)}
+  #gate p{max-width:470px;color:#9a978f;font-size:14px;line-height:1.65}
+  #gate.paused p{color:#d8d5ce;font-size:15px;font-variant-numeric:tabular-nums}
+  .gbtns{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}
+  #go,#settingsBtn,.gbtn{
+    pointer-events:auto;cursor:pointer;border-radius:6px;padding:15px 30px;font-weight:700;font-size:12.5px;line-height:1;letter-spacing:.14em;
+    transition:transform .14s ease,box-shadow .14s ease,background .14s,color .14s,border-color .14s;
   }
-  #gate h1 em{
-    display:block;font-style:normal;font-weight:600;
-    color:var(--sodium);text-shadow:0 0 44px rgba(255,176,58,.42);
-  }
-  #gate p{max-width:430px;color:#8d8b86;font-size:14px;line-height:1.65;padding:0 24px}
-  #go{
-    pointer-events:auto;cursor:pointer;
-    background:var(--sodium);color:#14161b;border:0;border-radius:3px;
-    padding:14px 34px;font-weight:600;font-size:13px;line-height:1;letter-spacing:.12em;
-    transition:transform .14s ease,box-shadow .14s ease;
-  }
-  #go:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(255,176,58,.28)}
+  #go{background:var(--sodium);color:#14161b;border:0;min-width:220px}
+  #go:hover{transform:translateY(-2px);box-shadow:0 12px 34px rgba(255,176,58,.32)}
   #go:focus-visible{outline:2px solid var(--paint);outline-offset:3px}
-  #go[disabled]{background:#3a3d45;color:#8d8b86;cursor:progress;transform:none;box-shadow:none}
-  #gatefoot{font-size:11px;color:#56544f;letter-spacing:.08em}
-  #err{color:var(--brake);font-size:13px;max-width:520px;line-height:1.6;padding:0 24px}
+  #go[disabled]{background:#30333b;color:#8d8b86;cursor:progress;transform:none;box-shadow:none}
+  #settingsBtn,.gbtn{background:rgba(255,255,255,.04);color:#d8d5ce;border:1px solid #3a3e48}
+  #settingsBtn:hover,.gbtn:hover{border-color:var(--sodium);color:#fff}
+  .gpause{display:none;gap:8px;flex-wrap:wrap}
+  #gate.paused .gpause{display:flex}
+  .gbtn{padding:11px 16px;font-size:11px;letter-spacing:.1em;font-weight:600}
+  .gside{background:rgba(18,20,26,.82);border:1px solid #2a2e37;border-radius:12px;padding:16px 18px 12px;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+  .gside h3{font-size:11px;font-weight:600;letter-spacing:.2em;color:var(--sodium);margin-bottom:10px;text-transform:uppercase}
+  #gateKeys{display:grid;grid-template-columns:auto 1fr;gap:7px 14px;align-items:center;font-size:12.5px;color:#b9b6ae}
+  #gateKeys .k{display:flex;gap:4px;justify-content:flex-end}
+  #gateKeys .sep{grid-column:1 / -1;height:1px;background:var(--line);margin:3px 0}
+  #gatefoot{font-size:11px;color:#615e58;letter-spacing:.06em;text-align:center}
+  #err{color:var(--brake);font-size:13px;max-width:520px;line-height:1.6}
+  @media (max-width:780px){
+    .gcard{grid-template-columns:1fr;gap:22px}
+    .gmain{align-items:center;text-align:center}
+    .gbtns,.gpause{justify-content:center}
+  }
 
   /* ---- zdrowie / stamina ---- */
   .vtrack i{display:block;height:100%;border-radius:2px;transition:width .15s ease}
@@ -236,12 +268,6 @@
   #wheelCanvas{filter:drop-shadow(0 8px 28px rgba(0,0,0,.5))}
 
   /* ---- ekran ustawień ---- */
-  #settingsBtn{
-    pointer-events:auto;cursor:pointer;background:transparent;color:#8d8b86;
-    border:1px solid var(--line);border-radius:3px;padding:9px 20px;
-    font-weight:500;font-size:11px;line-height:1;letter-spacing:.1em;margin-top:14px;transition:color .14s,border-color .14s;
-  }
-  #settingsBtn:hover{color:var(--paint);border-color:#565b64}
   #settings{
     position:fixed;inset:0;z-index:45;display:none;align-items:center;justify-content:center;
     background:rgba(5,6,10,.72);backdrop-filter:blur(4px);
@@ -329,7 +355,7 @@
   }
   @media (prefers-reduced-motion:reduce){
     #go,#speedo,#prompt,#gate,#loader{transition:none}
-    #loader .lspin{animation:none}
+    #lcity .w,#lsteps li.cur::before{animation:none}
   }
 </style>
 </head>
@@ -338,33 +364,83 @@
 <!-- ekran ładowania: pasek liczy wczytane skrypty (data-scripts = 2 biblioteki + pliki z loadorder.txt, sprawdza harness);
      main-loop.js woła LOADER.finish(), błąd podczas ładowania odsłania menu z komunikatem (#err) -->
 <div id="loader" data-scripts="39">
-  <div class="ltitle">GTA by <em>Claude</em></div>
-  <div class="lbar"><i id="lfill"></i></div>
-  <div id="lstat">Wczytywanie bibliotek…</div>
-  <div class="lspin"></div>
+  <div class="lsun"></div>
+  <svg id="lcity" viewBox="0 0 1600 400" preserveAspectRatio="xMidYMax slice" aria-hidden="true"></svg>
+  <div class="lbox">
+    <div class="lkicker">PRZEGLĄDARKOWE MINI-GTA · 3D</div>
+    <div class="ltitle">GTA by <em>Claude</em></div>
+    <div class="lprog"><div class="lbar"><i id="lfill"></i></div><span id="lpct">0%</span></div>
+    <div id="lstat">Wczytywanie bibliotek…</div>
+    <ul id="lsteps">
+      <li data-s="three.min.js">Grafika 3D</li><li data-s="cannon.min.js">Fizyka</li><li data-s="districts.js">Dzielnice</li>
+      <li data-s="highways.js">Autostrady</li><li data-s="traffic-npc.js">Ruch uliczny</li><li data-s="air-traffic.js">Lotniska i port</li><li data-s="main-loop.js">Shadery</li>
+    </ul>
+    <div id="ltip"></div>
+  </div>
 </div>
 <script>
 var LOADER = (function(){
-  var el = document.getElementById('loader'), fill = document.getElementById('lfill'), stat = document.getElementById('lstat');
+  var el = document.getElementById('loader'), fill = document.getElementById('lfill'), stat = document.getElementById('lstat'), pct = document.getElementById('lpct'), tip = document.getElementById('ltip');
   var total = +el.getAttribute('data-scripts') || 1, done = 0, over = false;
   var WHAT = { 'three.min.js': 'grafika 3D', 'cannon.min.js': 'fizyka', 'textures.js': 'tekstury', 'districts.js': 'dzielnice',
-    'airport.js': 'lotnisko', 'city-generation.js': 'ulice i kwartały', 'highways.js': 'autostrady', 'city-props.js': 'latarnie i drzewa',
-    'traffic-npc.js': 'ruch uliczny', 'pedestrians.js': 'piesi', 'planes.js': 'samoloty', 'main-loop.js': 'shadery' };
-  function set(p, txt){ fill.style.width = Math.round(2 + 96 * Math.min(1, p)) + '%'; if (txt) stat.textContent = txt; }
+    'airport.js': 'lotniska', 'city-generation.js': 'ulice i kwartały', 'highways.js': 'autostrady', 'city-props.js': 'latarnie i drzewa',
+    'traffic-npc.js': 'ruch uliczny', 'pedestrians.js': 'piesi', 'planes.js': 'samoloty', 'air-traffic.js': 'ruch lotniczy', 'boats.js': 'łodzie', 'main-loop.js': 'shadery' };
+  var steps = [].slice.call(document.querySelectorAll('#lsteps li'));
+  /* sylwetka miasta: losowe bryły z oknami (część okien mruga) */
+  (function(){
+    var svg = document.getElementById('lcity'), ns = 'http://www.w3.org/2000/svg', x = -10, s = 7;
+    function r(){ s = (s * 16807) % 2147483647; return s / 2147483647; }
+    function add(tag, a){ var e = document.createElementNS(ns, tag); for (var k in a) e.setAttribute(k, a[k]); svg.appendChild(e); return e; }
+    for (var layer = 0; layer < 2; layer++){
+      x = -10 - layer * 23;
+      while (x < 1610){
+        var w = 34 + r() * 70, h = (layer ? 90 : 60) + r() * (layer ? 240 : 150) * (Math.abs(x - 800) < 330 ? 1.25 : 0.8), y = 400 - h;
+        add('rect', { x: x, y: y, width: w, height: h + 2, fill: layer ? '#07080c' : '#141019' });
+        if (layer) for (var wy = y + 10; wy < 392; wy += 13) for (var wx = x + 6; wx < x + w - 8; wx += 11) if (r() < 0.22){
+          var q = add('rect', { x: wx, y: wy, width: 5, height: 6, 'class': r() < 0.25 ? 'w' : '' });
+          if (q.getAttribute('class') !== 'w') q.setAttribute('fill', r() < 0.5 ? '#ffcf7a' : '#ffe2a8'), q.setAttribute('opacity', (0.35 + r() * 0.5).toFixed(2));
+          else q.style.animationDelay = (r() * 4).toFixed(2) + 's';
+        }
+        if (layer && r() < 0.2) add('rect', { x: x + w / 2 - 1, y: y - 22, width: 2, height: 22, fill: '#07080c' });
+        x += w + (layer ? 3 : 8) + r() * 10;
+      }
+    }
+  })();
+  var TIPS = ['<b>PPM</b> z bronią palną — przycelowanie: bliżej, ciaśniejszy rozrzut.',
+    '<b>Q</b> (przytrzymaj) — koło broni; <b>1–4</b> — szybki wybór. Karabin strzela seriami.',
+    '<b>M</b> — mapa świata; <b>PPM</b> na mapie wyznacza trasę z nawigacją.',
+    'Na lotniskach czekają odrzutowiec i awionetka. W powietrzu <b>F</b> — skok ze spadochronem.',
+    'Przy pomostach w porcie stoją motorówki — <b>F</b>, żeby wsiąść.',
+    '<b>`</b> — menu deweloperskie: liczba aut i pieszych, pora dnia, tempo gry, teleporty.',
+    'Piraci drogowi mają jaskrawy, kwasowo-zielony lakier — uważaj na skrzyżowaniach.',
+    '<b>Esc</b> pauzuje grę. <b>N</b> wycisza dźwięk, <b>T</b> przyspiesza dobę.'];
+  var ti = Math.floor(Math.random() * TIPS.length);
+  function nextTip(){ tip.style.opacity = 0; setTimeout(function(){ tip.innerHTML = TIPS[ti++ % TIPS.length]; tip.style.opacity = 1; }, 300); }
+  tip.innerHTML = TIPS[ti++ % TIPS.length];
+  var tipTimer = setInterval(nextTip, 3200);
+  function set(p, txt){ var v = Math.round(2 + 96 * Math.min(1, p)); fill.style.width = v + '%'; pct.textContent = Math.round(Math.min(1, p) * 100) + '%'; if (txt) stat.textContent = txt; }
+  function stepsUpdate(f){
+    var hit = -1; steps.forEach(function(li, i){ if (li.getAttribute('data-s') === f) hit = i; });
+    if (hit < 0) return;
+    for (var i = 0; i <= hit; i++){ steps[i].className = 'ok'; }
+    if (steps[hit + 1]) steps[hit + 1].className = 'cur';
+  }
+  if (steps[0]) steps[0].className = 'cur';
   document.addEventListener('load', function(e){
     var t = e.target; if (over || !t || t.tagName !== 'SCRIPT' || !t.src) return;
     var f = t.src.split('/').pop(); done++;
     set(done / total, 'Wczytano ' + done + ' / ' + total + (WHAT[f] ? ' · ' + WHAT[f] : ''));
+    stepsUpdate(f);
   }, true);
   function fail(){
-    if (over) return; over = true;
+    if (over) return; over = true; clearInterval(tipTimer);
     stat.className = 'err'; stat.textContent = 'Błąd podczas ładowania — szczegóły w menu';
     setTimeout(function(){ el.classList.add('done'); }, 900);
   }
   document.addEventListener('error', function(e){ if (e.target && e.target.tagName === 'SCRIPT') fail(); }, true);
   window.addEventListener('error', fail);
   return {
-    finish: function(){ if (over) return; over = true; set(1, 'Gotowe'); setTimeout(function(){ el.classList.add('done'); }, 280); }
+    finish: function(){ if (over) return; over = true; clearInterval(tipTimer); set(1, 'Gotowe — miasto czeka'); steps.forEach(function(li){ li.className = 'ok'; }); setTimeout(function(){ el.classList.add('done'); }, 380); }
   };
 })();
 </script>
@@ -411,12 +487,19 @@ var LOADER = (function(){
 <div id="wheelWrap"><canvas id="wheelCanvas" width="360" height="360"></canvas></div>
 
 <div id="gate">
-  <h1>GTA by <em>Claude</em></h1>
-  <p id="gatetxt">Dwanaście na dwanaście kwartałów, ekwipunek, mieszkańcy na chodnikach i pełna doba do dyspozycji. Wszystko — asfalt, okna, silnik — generowane w locie.</p>
-  <button id="go" disabled>BUDUJĘ MIASTO…</button>
-  <button id="settingsBtn">STEROWANIE</button>
-  <div id="gatefoot">Kliknięcie przejmuje kursor myszy. Esc pauzuje grę (świat stoi, dźwięk cichnie) i otwiera to menu. M — mapa.</div>
-  <div id="err"></div>
+  <div class="gcard">
+    <div class="gmain">
+      <span class="gbadge">PAUZA</span>
+      <div class="gkicker">PRZEGLĄDARKOWE MINI-GTA · 3D</div>
+      <h1>GTA by <em>Claude</em></h1>
+      <p id="gatetxt">Dwie wyspy, dwanaście na dwanaście kwartałów, autostrady z koniczyną, lotniska, port, łodzie, mieszkańcy na chodnikach i pełna doba. Wszystko — asfalt, okna, silnik — generowane w locie.</p>
+      <div class="gbtns"><button id="go" disabled>BUDUJĘ MIASTO…</button><button id="settingsBtn">STEROWANIE</button></div>
+      <div class="gpause"><button class="gbtn" id="gMap">MAPA (M)</button><button class="gbtn" id="gDev">MENU DEWELOPERSKIE (`)</button></div>
+      <div id="err"></div>
+    </div>
+    <div class="gside"><h3>Sterowanie</h3><div id="gateKeys"></div></div>
+  </div>
+  <div id="gatefoot">Kliknięcie przejmuje kursor myszy · Esc — pauza (świat stoi, dźwięk cichnie)</div>
 </div>
 
 <div id="settings">
