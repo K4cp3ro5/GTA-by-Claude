@@ -34,8 +34,8 @@ function hudToast(text, secs){ el.toast.textContent = text; el.toast.classList.a
 
 /* statyczna mapa CAŁEGO świata (miasto + pas podmiejski + autostrady) rysowana raz */
 const MAP_SCALE = 1.35;
-const MAP_X0 = -470, MAP_Z0 = -840;                                  // obie wyspy z morzem dookoła
-const MAP_W = 940, MAP_H = 1290;
+const MAP_X0 = -490, MAP_Z0 = -890;                                  // obie wyspy (z nasypem i drugim pasem) z morzem dookoła
+const MAP_W = 980, MAP_H = 1340;
 const mapStatic = mkCanvas(Math.ceil(MAP_W * MAP_SCALE), Math.ceil(MAP_H * MAP_SCALE));
 (function drawStaticMap(){
   const g = mapStatic.getContext('2d');
@@ -131,6 +131,8 @@ function drawMinimap(){
     mg.fillStyle = '#f2f0ea'; mg.beginPath(); mg.moveTo(0, -7); mg.lineTo(3.5, -1); mg.lineTo(3.5, 6); mg.lineTo(-3.5, 6); mg.lineTo(-3.5, -1); mg.closePath(); mg.fill();
     mg.restore();
   }
+  /* samoloty NPC (ruch lotniczy) — małe sylwetki */
+  for (const a of airPlanes){ const q = toMap(a.pos.x, a.pos.z); if (q[0] < -8 || q[0] > MM + 8 || q[1] < -8 || q[1] > MM + 8) continue; mg.save(); mg.translate(q[0], q[1]); mg.rotate(-a.heading + Math.PI); mg.fillStyle = '#cfe3ee'; mg.fillRect(-0.9, -4.5, 1.8, 9); mg.fillRect(-4.5, -1, 9, 2); mg.fillRect(-2, 3, 4, 1.4); mg.restore(); }
   /* samolot gracza */
   if (mode === 'plane' && curPlane){
     _cpF.set(0, 0, 1).applyQuaternion(curPlane.quat);

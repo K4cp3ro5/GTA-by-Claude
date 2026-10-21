@@ -28,18 +28,18 @@ function buildBoatModel(color){
   return { group: g, wake: wake };
 }
 const boats = [], _boatAxis = new CANNON.Vec3(0, 1, 0);
-(function spawnBoats(){
-  BOAT_SPOTS.forEach((s, i) => {
-    const m = buildBoatModel(BOAT_COLORS[i % BOAT_COLORS.length]);
-    const b = new CANNON.Body({ mass: 0, type: CANNON.Body.KINEMATIC, material: matCar });
-    b.addShape(new CANNON.Box(new CANNON.Vec3(BOAT_T.beam / 2, 0.5, BOAT_T.len / 2)));
-    b.collisionFilterGroup = G_CAR; b.collisionFilterMask = ~G_WORLD; b.isBoat = true;
-    addBody(b);
-    const bt = { spec: s, group: m.group, wake: m.wake, body: b, pos: new THREE.Vector3(s.x, WATER_Y, s.z), heading: s.heading, v: 0, thr: 0, phase: i * 1.7, roll: 0 };
-    boats.push(bt);
-    syncBoat(bt, 0);
-  });
-})();
+function makeBoat(s, color, i){
+  const m = buildBoatModel(color);
+  const b = new CANNON.Body({ mass: 0, type: CANNON.Body.KINEMATIC, material: matCar });
+  b.addShape(new CANNON.Box(new CANNON.Vec3(BOAT_T.beam / 2, 0.5, BOAT_T.len / 2)));
+  b.collisionFilterGroup = G_CAR; b.collisionFilterMask = ~G_WORLD; b.isBoat = true;
+  addBody(b);
+  const bt = { spec: s, group: m.group, wake: m.wake, body: b, pos: new THREE.Vector3(s.x, WATER_Y, s.z), heading: s.heading, v: 0, thr: 0, phase: i * 1.7, roll: 0, npc: null };
+  boats.push(bt);
+  syncBoat(bt, 0);
+  return bt;
+}
+BOAT_SPOTS.forEach((s, i) => makeBoat(s, BOAT_COLORS[i % BOAT_COLORS.length], i));
 function syncBoat(b, t){
   const y = WATER_Y + 0.12 + Math.sin(t * 1.6 + b.phase) * 0.07, pitch = -clamp(b.v / BOAT_T.vMax, 0, 1) * 0.07 + Math.sin(t * 1.3 + b.phase) * 0.02;
   b.group.position.set(b.pos.x, y, b.pos.z);
@@ -67,6 +67,7 @@ function boatBlocked(b, x, z, h){
 let curBoat = null;
 const boatKeysHelp = 'W / S — gaz / wsteczny · A / D — ster · Spacja — hamowanie · F — wysiadka przy brzegu';
 function enterBoat(b){
+  if (b.npc){ b.group.remove(b.npc.driver); b.npc = null; }                     // łódź NPC przejęta: sternik „wyskakuje”
   curBoat = b; mode = 'boat';
   player.mesh.visible = false; delBody(player.body);
   hudToast(BOAT_T.name + ': ' + boatKeysHelp, 5);
@@ -108,6 +109,7 @@ function updateBoat(dt){
 function updateBoatsIdle(dt){
   for (const b of boats){
     if (b === curBoat) continue;
+    if (b.npc){ npcBoatStep(b, dt); continue; }
     if (Math.abs(b.v) > 0.05){
       b.v = approach(b.v, 0, 3 * dt);
       const nx = b.pos.x + Math.sin(b.heading) * b.v * dt, nz = b.pos.z + Math.cos(b.heading) * b.v * dt;
@@ -117,6 +119,81 @@ function updateBoatsIdle(dt){
     syncBoat(b, clock);
   }
 }
+
+/* --- łodzie NPC: pływają między losowymi punktami na morzu wokół wysp (cel z wolną linią wody, zapas od brzegu),
+   omijają ląd, statek i inne łodzie (patrzą przed dziób), zwalniają w zakręcie; sternik przy konsoli --- */
+const NPC_BOAT_AREA = { x0: -680, x1: 680, z0: -1060, z1: 640 };              // pas morza w zasięgu wzroku z wysp
+let NPC_BOAT_COUNT = 6;
+const npcBoatClear = (x, z, m) => !isLand(x, z) && !BOAT_OBSTACLES.some(o => inRect(o, x, z, m)) && [0, 1, 2, 3, 4, 5, 6, 7].every(k => !isLand(x + Math.cos(k * 0.785) * m, z + Math.sin(k * 0.785) * m));
+function npcBoatLineFree(x0, z0, x1, z1){
+  const l = Math.hypot(x1 - x0, z1 - z0), n = Math.ceil(l / 10);
+  for (let k = 1; k <= n; k++){ const t = k / n; if (!npcBoatClear(lerp(x0, x1, t), lerp(z0, z1, t), 14)) return false; }
+  return true;
+}
+function npcBoatPickTarget(b){
+  const A = NPC_BOAT_AREA;
+  for (let t = 0; t < 40; t++){
+    const r = rand(120, 380), a = rnd() * TAU, x = clamp(b.pos.x + Math.cos(a) * r, A.x0, A.x1), z = clamp(b.pos.z + Math.sin(a) * r, A.z0, A.z1);
+    if (npcBoatClear(x, z, 30) && npcBoatLineFree(b.pos.x, b.pos.z, x, z)){ b.npc.tx = x; b.npc.tz = z; return true; }
+  }
+  b.npc.tx = b.pos.x - Math.sin(b.heading) * 60; b.npc.tz = b.pos.z - Math.cos(b.heading) * 60;   // nic wolnego: zawróć
+  return false;
+}
+const NPC_BOAT_PALS = [{ skin: 0xd9a882, shirt: 0xf2f0ea, pants: 0x2c3e66, hair: 0x2a1f19 }, { skin: 0x8d5a3b, shirt: 0xe0a52c, pants: 0x2c2f36, hair: 0x15110e },
+  { skin: 0xe8c4a0, shirt: 0x2f8a4c, pants: 0x50463a, hair: 0x9a6a3a }, { skin: 0xc68a62, shirt: 0xb3272b, pants: 0x23262c, hair: 0x2a1f19 }];
+function spawnNpcBoat(){
+  const A = NPC_BOAT_AREA;
+  for (let t = 0; t < 60; t++){
+    const x = rand(A.x0 + 40, A.x1 - 40), z = rand(A.z0 + 40, A.z1 - 40);
+    if (!npcBoatClear(x, z, 40) || boats.some(o => Math.hypot(o.pos.x - x, o.pos.z - z) < 40)) continue;
+    const b = makeBoat({ x: x, z: z, heading: rnd() * TAU, npcSpot: true }, BOAT_COLORS[randInt(0, BOAT_COLORS.length - 1)], boats.length);
+    const h = buildHumanoid(NPC_BOAT_PALS[randInt(0, NPC_BOAT_PALS.length - 1)]);
+    h.group.position.set(0, 0.47, -0.45); h.armL.rotation.x = h.armR.rotation.x = -0.9;   // ręce na kierownicy
+    b.group.add(h.group);
+    b.npc = { driver: h.group, tx: x, tz: z, vT: rand(7, 12), stuck: 0 };
+    npcBoatPickTarget(b);
+    return b;
+  }
+  return null;
+}
+function removeNpcBoat(b){
+  delBody(b.body); scene.remove(b.group);
+  const i = boats.indexOf(b); if (i >= 0) boats.splice(i, 1);
+}
+function setNpcBoatCount(n){
+  NPC_BOAT_COUNT = n;
+  let list = boats.filter(b => b.npc);
+  while (list.length > n){ removeNpcBoat(list.pop()); }
+  while (list.length < n && spawnNpcBoat()) list = boats.filter(b => b.npc);
+}
+function npcBoatStep(b, dt){
+  const N = b.npc;
+  if (Math.hypot(N.tx - b.pos.x, N.tz - b.pos.z) < 25) npcBoatPickTarget(b);
+  let want = Math.atan2(N.tx - b.pos.x, N.tz - b.pos.z);
+  /* inne łodzie przed dziobem (w tym gracza): odbij w bok */
+  const fx = Math.sin(b.heading), fz = Math.cos(b.heading);
+  for (const o of boats){
+    if (o === b) continue;
+    const dx = o.pos.x - b.pos.x, dz = o.pos.z - b.pos.z, d = Math.hypot(dx, dz), ahead = (dx * fx + dz * fz) / (d || 1);
+    if (d < 32 && ahead > 0.3) want = b.heading + ((dx * fz - dz * fx) > 0 ? -1 : 1) * 0.9;     // inna łódź z prawej -> w lewo
+  }
+  const err = wrapAngle(want - b.heading);
+  const turn = clamp(err, -1, 1) * 0.55 * clamp(Math.abs(b.v) / 5, 0.3, 1);
+  b.heading += turn * dt;
+  /* przed dziobem ląd albo przeszkoda: hamuj i szukaj nowego celu */
+  const look = 8 + Math.abs(b.v) * 1.6;
+  const blockedAhead = !npcBoatClear(b.pos.x + fx * look, b.pos.z + fz * look, 6);
+  if (blockedAhead && N.stuck <= 0){ npcBoatPickTarget(b); N.stuck = 2; }
+  N.stuck -= dt;
+  const vT = blockedAhead ? 2 : N.vT * (1 - clamp(Math.abs(err) - 0.3, 0, 0.6));
+  b.v = approach(b.v, vT, (b.v < vT ? 2.5 : 4) * dt);
+  b.roll = damp(b.roll, -Math.sign(turn) * clamp(Math.abs(turn) * 0.4, 0, 0.12), 3, dt);
+  const nx = b.pos.x + fx * b.v * dt, nz = b.pos.z + fz * b.v * dt;
+  if (boatBlocked(b, nx, nz, b.heading)){ b.v = 0; b.heading += 0.8 * dt; npcBoatPickTarget(b); }
+  else { b.pos.x = nx; b.pos.z = nz; }
+  syncBoat(b, clock);
+}
+setNpcBoatCount(NPC_BOAT_COUNT);
 
 /* pozycja „gracza” w świecie niezależnie od trybu (HUD, mapa, nawigacja) */
 function playerWorldPos(){

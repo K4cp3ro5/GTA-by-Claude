@@ -50,6 +50,7 @@ function frame(now){
   const carState = updateCar(dt);
   const planeKmh = mode === 'plane' ? updatePlane(dt) : 0;
   updatePlanesIdle(dt);
+  updateAirTraffic(dt);
   const boatKmh = mode === 'boat' ? updateBoat(dt) : 0;
   updateBoatsIdle(dt);
   updateBirds(dt);
