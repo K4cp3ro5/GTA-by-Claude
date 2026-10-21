@@ -80,7 +80,7 @@ Jak wystartować: ustaw samolot na pasie, trzymaj `W`, a gdy prędkościomierz p
 - Miasto leży na wyspie otoczonej morzem, z nabrzeżem i balustradą dookoła.
 - Na północnym brzegu jest **port towarowy**: plac kontenerowy z suwnicą, dwa dźwigi nabrzeżowe, statek kontenerowy i holownik, zbiorniki paliw, magazyn, biuro portu, przystań z motorówkami i falochron z biało-czerwoną latarnią.
 - Na wysepce jest **przystań pasażerska**: drewniany deptak, kasa biletowa z czerwonym dachem, ławki, prom, jachty i latarnie wejścia (zielona i czerwona).
-- Nad miastem, portem i przy graczu latają **mewy**. Co jakiś czas któraś „zrzuca balast”: na ziemi albo dachu zostaje biała plama, która po kilku sekundach znika. Trafienie w ciebie albo w szybę auta kończy się komunikatem i plamą na ekranie.
+- Nad miastem i portem latają **mewy**. Co jakiś czas któraś „zrzuca balast”: na ziemi albo dachu zostaje biała plama, która po kilku sekundach znika. Trafienie w ciebie albo w szybę auta kończy się komunikatem i plamą na ekranie.
 - Za cieśniną, ok. 250 m na północ, leży **wysepka z drugim lotniskiem** i własną przystanią. Dopłyniesz tam łodzią z portu albo dolecisz samolotem z lotniska miejskiego.
 - Kto wpadnie do wody (pieszo albo autem), zostaje wyciągnięty na brzeg; auto ląduje obok. Samolot, który dotknie wody, rozbija się i tonie.
 
