@@ -63,7 +63,8 @@ function updateNpc(n, i, dt, honk){
         if (along > sl - 8 && ((n.pos.x - tgt.x) * ux2 + (n.pos.y - tgt.z) * uz2) / l2 > 0.5){ n.wp = (n.wp + 1) % n.path.length; return; } }   // już na następnym odcinku (zakręt po zewnętrznej)
       const latAct = ((n.pos.x - prv.x) * sz - (n.pos.y - prv.z) * sx) / sl;          // faktyczne przesunięcie w lewo od toru
       /* objazd: punkt celowania tuż przed tyłem przeszkody (ostry skręt z bliska), pełzanie, dopóki auto się nie odsunie */
-      const La = n.byp ? clamp(n.byp.rear - n.byp.s - 0.3, 1.2, 8) : Math.max(8, n.speed * 1.2);
+      /* pirat w mieście: cel najwyżej 10 m przed autem — dalszy punkt (przy 50 m/s ~60 m) leżał za narożnikiem i auto ścinało kwartał przez budynki */
+      const La = n.byp ? clamp(n.byp.rear - n.byp.s - 0.3, 1.2, 8) : Math.min(Math.max(8, n.speed * 1.2), n.profile === 'pirat' && !tgt.hwy ? 10 : Infinity);
       n.bypCreep = !!n.byp && latAct < (n.latT || 0) - 0.4;
       const aim = npcAim(n, prv, tgt, along, La);
       dx = aim.x - n.pos.x; dz = aim.z - n.pos.y; d = Math.hypot(dx, dz) || 1;
@@ -407,7 +408,8 @@ function npcPirate(n, dx, dz, tgt, dt){
   const nearX = _nearAxis(n.pos.x) < ROAD_H + 3 && _nearAxis(n.pos.y) < ROAD_H + 3;
   n.weaveT = Math.max(0, (n.weaveT || 0) - dt);
   n.weave = (n.weave || n.id * 1.7) + dt * (1.6 + (n.id % 3) * 0.35);
-  if (!nearX && !n.weaveT && n.speed > 6) { n.latT = 0.5 + 1.1 * Math.sin(n.weave); n.latRate = 1.8; }
+  const turnNear = Math.hypot(tgt.x - n.pos.x, tgt.z - n.pos.y) < 25 + n.speed * 0.6;      // przed narożnikiem trasy: bez slalomu (wraca na tor)
+  if (!nearX && !turnNear && !n.weaveT && n.speed > 6) { n.latT = 0.5 + 1.1 * Math.sin(n.weave); n.latRate = 1.8; }
   else if (Math.abs(n.latT || 0) < 1.7) n.latT = 0;
   for (const m of npcs){
     if (m === n || Math.abs((m.y || 0) - n.y) > 2.5) continue;

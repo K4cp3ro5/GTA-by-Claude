@@ -18,7 +18,7 @@ const DEFAULT_BINDS = {
   sprint:'ShiftLeft', jump:'Space',
   enter:'KeyF', horn:'KeyH', reload:'KeyR', wheel:'KeyQ', vehicleWheel:'KeyV', indLeft:'KeyQ', indRight:'KeyE',
   slot1:'Digit1', slot2:'Digit2', slot3:'Digit3',
-  daytime:'KeyT', mute:'KeyM'
+  daytime:'KeyT', mute:'KeyN', map:'KeyM'
 };
 const BIND_ROWS = [
   ['forward','Przód'], ['back','Tył'], ['left','Lewo'], ['right','Prawo'],
@@ -29,12 +29,16 @@ const BIND_ROWS = [
   ['vehicleWheel','Menu pojazdów (przytrzymaj)'],
   ['indLeft','Kierunkowskaz lewy (w aucie)'], ['indRight','Kierunkowskaz prawy (w aucie)'],
   ['slot1','Broń — slot 1'], ['slot2','Broń — slot 2'], ['slot3','Broń — slot 3'],
-  ['horn','Klakson'], ['daytime','Przyspiesz dobę'], ['mute','Wycisz dźwięk']
+  ['horn','Klakson'], ['daytime','Przyspiesz dobę'], ['map','Mapa (PPM — cel trasy)'], ['mute','Wycisz dźwięk']
 ];
 function loadBinds(){
   try {
     const raw = localStorage.getItem('nc_binds_v1');
-    if (raw) return Object.assign({}, DEFAULT_BINDS, JSON.parse(raw));
+    if (raw){
+      const saved = JSON.parse(raw);
+      if (saved.mute === 'KeyM' && !saved.map) saved.mute = 'KeyN';           // M to teraz mapa (stare zapisane sterowanie)
+      return Object.assign({}, DEFAULT_BINDS, saved);
+    }
   } catch(e){}
   return Object.assign({}, DEFAULT_BINDS);
 }
@@ -101,7 +105,7 @@ function lockPointer(){
 document.addEventListener('pointerlockchange', () => {
   pointerLocked = (document.pointerLockElement === renderer.domElement);
   if (pointerLocked) gameStarted = true;
-  gate.classList.toggle('hidden', pointerLocked);
+  gate.classList.toggle('hidden', pointerLocked || mapOpen);
   Sound.setPaused(!pointerLocked && !debugOpen);                // pauza (menu): dźwięk wyciszony
   if (!pointerLocked){
     goBtn.textContent = 'WRÓĆ DO GRY';
@@ -130,9 +134,9 @@ document.addEventListener('mousemove', e => {
     wheelVY += e.movementY;
     return;
   }
-  if (mode === 'plane'){                                                     // mysz = drążek (wychylenie, wraca powoli do środka)
-    planeStick.x = clamp(planeStick.x + e.movementX * 0.0035, -1, 1);
-    planeStick.y = clamp(planeStick.y + e.movementY * 0.0035, -1, 1);
+  if (mode === 'plane' || mode === 'boat'){                                  // samolot / łódź: mysz tylko obraca kamerę
+    planeCamYaw = clamp(planeCamYaw - e.movementX * 0.003, -2.6, 2.6);
+    if (Math.abs(e.movementX) > 1.5) lastMouseMove = clock;
     return;
   }
   const s = 0.0022;
@@ -166,7 +170,9 @@ document.addEventListener('keydown', e => {
     return;
   }
   if (k === 'Backquote'){ e.preventDefault(); toggleDebugMenu(); return; }
+  if (mapOpen){ if (k === BIND.map || k === 'Escape'){ e.preventDefault(); closeMap(k === BIND.map); } return; }   // mapa: tylko zamknięcie
   if (!pointerLocked) return;   // menu/gate widoczne — klawisze nie sterują grą
+  if (k === BIND.map){ openMap(); return; }
 
   if (keys[k]) return;
   keys[k] = true;
@@ -249,7 +255,7 @@ function refreshDebugInfo(){
   dbg.bikeCount.textContent = String(npcs.filter(n => n.type === 'bike').length);
   dbg.ram.value = String(PIRATE_RAM_CHANCE); dbg.ramVal.textContent = Math.round(PIRATE_RAM_CHANCE * 100) + '%';
   dbg.lod.checked = NPC_LOD_DIST < 1e6;
-  dbg.modeInfo.textContent = mode + (mode === 'car' ? ' · ' + CAR_TYPES[carType].name + ' (' + driving.owner + ')' : mode === 'plane' && curPlane ? ' · ' + curPlane.T.name : '');
+  dbg.modeInfo.textContent = mode + (mode === 'boat' ? ' · ' + BOAT_T.name : '') + (mode === 'car' ? ' · ' + CAR_TYPES[carType].name + ' (' + driving.owner + ')' : mode === 'plane' && curPlane ? ' · ' + curPlane.T.name : '');
   dbg.npcInd.textContent = npcs.filter(n => n.ind).length + ' / ' + npcs.reduce((a, n) => a + (n.rams || 0) + (n.pedHits || 0), 0);
 }
 function timeLabel(v){
@@ -310,11 +316,13 @@ dbg.ammo.addEventListener('click', ev => { ev.stopPropagation(); Weapons.reserve
 /* --- pojazdy, samoloty, teleporty, piraci, rowerzyści (debug) --- */
 function dbgOnFoot(){                                    // samolot: wysiadka; auto: trzeba wysiąść samemu (F)
   if (mode === 'plane') exitPlane(true);
+  if (mode === 'boat') exitBoat(true);
   if (mode === 'car'){ hudToast('Najpierw wysiądź z auta (F)'); return false; }
   return true;
 }
 function dbgTeleport(x, z, heading, yTop){
   if (mode === 'plane') exitPlane(true);
+  if (mode === 'boat') exitBoat(true);
   const g = groundAt(x, z, yTop === undefined ? 30 : yTop); const y = g === null ? 0 : g;
   if (mode === 'car') takeOver(carType, driving.color, driving.owner, x, y, z, heading);
   else { player.body.position.set(x, y + 1.2, z); player.body.velocity.set(0, 0, 0); }
@@ -324,6 +332,7 @@ debugEl.querySelectorAll('[data-car]').forEach(b => b.addEventListener('click', 
   ev.stopPropagation();
   const type = b.dataset.car;
   if (mode === 'plane') exitPlane(true);
+  if (mode === 'boat') exitBoat(true);
   if (mode === 'car'){                                   // w aucie: zmiana typu w miejscu
     const T = CAR_TYPES[carType], p = chassisBody.position;
     takeOver(type, driving.color, driving.owner, p.x, p.y - T.restY - 0.13, p.z, carYaw());
@@ -351,7 +360,9 @@ debugEl.querySelectorAll('[data-plane]').forEach(b => b.addEventListener('click'
 debugEl.querySelectorAll('[data-tp]').forEach(b => b.addEventListener('click', ev => {
   ev.stopPropagation();
   const k = b.dataset.tp;
-  if (k === 'airport') dbgTeleport(AIRPORT.access.x - 2, -285, 0);
+  if (k === 'airport') dbgTeleport(AIRPORT.access.x - 2, -690, 0);
+  else if (k === 'port') dbgTeleport(L(5) - 2, -330, Math.PI);
+  else if (k === 'airportW') dbgTeleport(AIRPORT_W.front.x + 2, 30, Math.PI);
   else if (k === 'ring') dbgTeleport(L(12) + 3.5, 60, Math.PI);           // wschodnia obwodnica, pas na północ
   else if (k === 'exit'){ const q = wayAt(HWY_TERM[0].exit, HWY_TERM[0].exit.len - 160); dbgTeleport(q.x, q.z, Math.atan2(q.hx, q.hz), q.y + 3); }
   else {                                                 // pomost A1 przed węzłem (punkt trasy NPC na jezdni)

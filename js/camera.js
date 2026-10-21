@@ -7,20 +7,39 @@ const camCur    = new THREE.Vector3(0, 6, 20);
 const lookAt    = new THREE.Vector3();
 const rayCaster = new THREE.Raycaster();
 let camFov = 66, camKmh = 0, camDist = 7.6;
+let camShake = 0, planeCamYaw = 0;                     // wstrząs (wybuch) / obrót kamery samolotu myszą (wraca za ogon)
 const _camEuler = new THREE.Euler();
 
 const _cpF = new THREE.Vector3(), _cpW = new THREE.Vector3(), _cpL = new THREE.Vector3();
 function updateCamera(dt, kmh){
   let dist, height, tx, ty, tz;
+  if (mode === 'boat' && curBoat){
+    /* łódź: kamera pościgowa za rufą (mysz obraca jak w samolocie) */
+    const b = curBoat;
+    if (clock - lastMouseMove > 1.2) planeCamYaw = angleDamp(planeCamYaw, 0, 1.5, dt);
+    const h = b.heading + planeCamYaw;
+    _cpW.set(b.pos.x - Math.sin(h) * BOAT_T.camDist, WATER_Y + BOAT_T.camH, b.pos.z - Math.cos(h) * BOAT_T.camDist);
+    camCur.x = damp(camCur.x, _cpW.x, 6, dt); camCur.y = damp(camCur.y, _cpW.y, 6, dt); camCur.z = damp(camCur.z, _cpW.z, 6, dt);
+    camera.position.copy(camCur);
+    camera.lookAt(b.pos.x + Math.sin(b.heading) * 6, WATER_Y + 1.2, b.pos.z + Math.cos(b.heading) * 6);
+    camFov = damp(camFov, 66 + clamp(kmh / 60, 0, 1) * 8, 2, dt);
+    if (Math.abs(camera.fov - camFov) > 0.01){ camera.fov = camFov; camera.updateProjectionMatrix(); }
+    sun.target.position.set(b.pos.x, 0, b.pos.z);
+    sun.position.set(b.pos.x + lightDir.x * 95, lightDir.y * 95 + 2, b.pos.z + lightDir.z * 95);
+    camYaw = h + Math.PI;
+    return;
+  }
   if (mode === 'plane' && curPlane){
     /* kamera pościgowa: za ogonem i nad samolotem, patrzy przed nos; płynnie, bez wysięgnika kolizyjnego */
     const p = curPlane, T = p.T;
     _cpF.set(0, 0, 1).applyQuaternion(p.quat);
-    _cpW.copy(p.pos).addScaledVector(_cpF, -T.camDist); _cpW.y += T.camH;
+    if (clock - lastMouseMove > 1.2) planeCamYaw = angleDamp(planeCamYaw, 0, 1.5, dt);
+    _cpL.copy(_cpF).applyAxisAngle(_pY, planeCamYaw);
+    _cpW.copy(p.pos).addScaledVector(_cpL, -T.camDist); _cpW.y += T.camH;
     const gy = planeGroundY(_cpW.x, _cpW.z, _cpW.y + 5) + 1.5; if (_cpW.y < gy) _cpW.y = gy;
     camCur.x = damp(camCur.x, _cpW.x, 5, dt); camCur.y = damp(camCur.y, _cpW.y, 5, dt); camCur.z = damp(camCur.z, _cpW.z, 5, dt);
     camera.position.copy(camCur);
-    _cpL.copy(p.pos).addScaledVector(_cpF, 25); camera.lookAt(_cpL);
+    _cpL.copy(p.pos).addScaledVector(_cpF, planeCamYaw ? 0 : 25); camera.lookAt(_cpL);
     camFov = damp(camFov, 70 + clamp(kmh / 400, 0, 1) * 10, 2, dt);
     if (Math.abs(camera.fov - camFov) > 0.01){ camera.fov = camFov; camera.updateProjectionMatrix(); }
     sun.target.position.set(p.pos.x, 0, p.pos.z);
@@ -95,4 +114,11 @@ function updateCamera(dt, kmh){
   /* cień podąża za akcją */
   sun.target.position.set(camTarget.x, 0, camTarget.z);
   sun.position.set(camTarget.x + lightDir.x * 95, lightDir.y * 95 + 2, camTarget.z + lightDir.z * 95);
+}
+
+/* wstrząs kamery po wybuchu (main-loop po updateCamera) */
+function applyCamShake(dt){
+  if (camShake <= 0) return;
+  camera.position.x += (Math.random() - 0.5) * camShake; camera.position.y += (Math.random() - 0.5) * camShake * 0.6; camera.position.z += (Math.random() - 0.5) * camShake;
+  camShake = Math.max(0, camShake - dt * 1.4);
 }

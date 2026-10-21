@@ -97,9 +97,6 @@
   #toast{position:fixed;left:50%;top:18%;transform:translateX(-50%);padding:8px 16px;border-radius:8px;background:rgba(20,22,27,.82);
     color:#f2f0ea;font:600 15px Inter,system-ui,sans-serif;opacity:0;transition:opacity .25s;pointer-events:none;z-index:30}
   #toast.on{opacity:1}
-  #stick{position:absolute;left:50%;top:50%;width:64px;height:64px;margin:-32px 0 0 -32px;border:1px solid rgba(242,240,234,.35);border-radius:50%;opacity:0;transition:opacity .2s}
-  #stick.on{opacity:1}
-  #stick i{position:absolute;left:28px;top:28px;width:8px;height:8px;border-radius:50%;background:#ffb03a}
   #kmh{
     font-size:58px;font-weight:200;line-height:.92;letter-spacing:-.02em;
     font-variant-numeric:tabular-nums;
@@ -138,6 +135,11 @@
   }
   #deadScreen.on{opacity:1;background:rgba(10,4,4,.72)}
   #deadScreen span{font-size:34px;font-weight:200;letter-spacing:.1em;color:var(--brake)}
+
+  /* ---- pełna mapa (M) ---- */
+  #bigmap{position:fixed;inset:0;z-index:45;display:none;background:#16384b;cursor:grab}
+  #bigmap.on{display:block}
+  #bigmap canvas{display:block;width:100%;height:100%}
 
   /* ---- ekran ładowania (przed menu startowym) ---- */
   #loader{
@@ -302,7 +304,7 @@
 
 <!-- ekran ładowania: pasek liczy wczytane skrypty (data-scripts = 2 biblioteki + pliki z loadorder.txt, sprawdza harness);
      main-loop.js woła LOADER.finish(), błąd podczas ładowania odsłania menu z komunikatem (#err) -->
-<div id="loader" data-scripts="32">
+<div id="loader" data-scripts="36">
   <div class="ltitle">GTA by <em>Claude</em></div>
   <div class="lbar"><i id="lfill"></i></div>
   <div id="lstat">Wczytywanie bibliotek…</div>
@@ -362,13 +364,13 @@ var LOADER = (function(){
   </section>
 
   <div id="toast"></div>
-  <div id="stick"><i id="stickDot"></i></div>
   <div id="prompt">Naciśnij <kbd>F</kbd> lub <kbd>E</kbd>, aby wsiąść</div>
   <section class="panel" id="weaponhud"><span class="wname" id="wname">Pięści</span><span class="wammo" id="wammo"></span></section>
   <div id="crosshair"></div>
   <div id="fps">— fps</div>
 </div>
 
+<div id="bigmap"><canvas id="bigmapCv"></canvas></div>
 <div id="hurtFlash"></div>
 <div id="deadScreen"><span>ROZBITY</span></div>
 
@@ -379,7 +381,7 @@ var LOADER = (function(){
   <p id="gatetxt">Dwanaście na dwanaście kwartałów, ekwipunek, mieszkańcy na chodnikach i pełna doba do dyspozycji. Wszystko — asfalt, okna, silnik — generowane w locie.</p>
   <button id="go" disabled>BUDUJĘ MIASTO…</button>
   <button id="settingsBtn">STEROWANIE</button>
-  <div id="gatefoot">Kliknięcie przejmuje kursor myszy. Esc pauzuje grę (świat stoi, dźwięk cichnie) i otwiera to menu.</div>
+  <div id="gatefoot">Kliknięcie przejmuje kursor myszy. Esc pauzuje grę (świat stoi, dźwięk cichnie) i otwiera to menu. M — mapa.</div>
   <div id="err"></div>
 </div>
 
@@ -439,7 +441,7 @@ var LOADER = (function(){
     <div class="dsec">
       <h3>Teleport</h3>
       <div class="drow"><span>Dokąd</span>
-        <span class="dbtnrow"><button class="dbtn" data-tp="airport">Lotnisko</button><button class="dbtn" data-tp="hwy">Autostrada</button><button class="dbtn" data-tp="exit">Zjazd SE</button><button class="dbtn" data-tp="ring">Obwodnica</button></span></div>
+        <span class="dbtnrow"><button class="dbtn" data-tp="port">Port</button><button class="dbtn" data-tp="airportW">Lotnisko</button><button class="dbtn" data-tp="airport">Wysepka</button><button class="dbtn" data-tp="hwy">Autostrada</button><button class="dbtn" data-tp="exit">Zjazd SE</button><button class="dbtn" data-tp="ring">Obwodnica</button></span></div>
     </div>
 
     <div class="dsec">
@@ -478,6 +480,8 @@ var LOADER = (function(){
 <script src="js/signs.js"></script>
 <script src="js/districts.js"></script>
 <script src="js/airport.js"></script>
+<script src="js/hospital.js"></script>
+<script src="js/islands.js"></script>
 <script src="js/city-generation.js"></script>
 <script src="js/highways.js"></script>
 <script src="js/traffic-lights.js"></script>
@@ -492,12 +496,14 @@ var LOADER = (function(){
 <script src="js/sound.js"></script>
 <script src="js/vehicle-entry.js"></script>
 <script src="js/planes.js"></script>
+<script src="js/boats.js"></script>
 <script src="js/daynight.js"></script>
 <script src="js/update-player.js"></script>
 <script src="js/update-vehicle.js"></script>
 <script src="js/update-npc.js"></script>
 <script src="js/camera.js"></script>
 <script src="js/hud.js"></script>
+<script src="js/navigation.js"></script>
 <script src="js/main-loop.js"></script>
 </body>
 </html>

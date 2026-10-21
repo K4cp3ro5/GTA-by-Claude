@@ -95,11 +95,11 @@ function addHouse(cx, cz, w, d, h, roof){
 (function ground(){
   const t = texs.asphalt.clone();
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.repeat.set(240, 240);
+  t.repeat.set(200, 200);
   t.anisotropy = MAXA;
   t.needsUpdate = true;
   const m = new THREE.Mesh(
-    new THREE.PlaneGeometry(960, 960),
+    new THREE.PlaneGeometry(WALL_X * 2, WALL_X * 2),          // tylko wyspa główna (dookoła morze — islands.js)
     new THREE.MeshLambertMaterial({ map: t, color: 0x9d9d9d })
   );
   m.rotation.x = -Math.PI/2;
@@ -586,21 +586,13 @@ for (let bi = 0; bi < GRID; bi++){
   }
 })();
 
+buildIslands();
 buildGasStation();
 buildAirport();
+buildAirportWest();
+buildHospital();
 
-/* --- bariera betonowa: JEDEN obwód dookoła świata (miasto + pas podmiejski), x, z = ±WALL_X --- */
-(function barrier(){
-  const H = 3.2, T = 1.2, Lx = WALL_X * 2 + T, Lz = WALL_X * 2 + T;
-  const b = new GeoBuf();
-  [[0, WALL_X, Lx, T], [0, -WALL_X, Lx, T], [-WALL_X, 0, T, Lz], [WALL_X, 0, T, Lz]].forEach(w => {
-    b.box(w[0], H/2, w[1], w[2], H, w[3], 3, true);
-    staticBox(w[0], H/2, w[1], w[2], H, w[3]);
-  });
-  const mesh = new THREE.Mesh(b.geometry(), new THREE.MeshLambertMaterial({ map: texs.curb, color: 0xb9b6ad }));
-  mesh.castShadow = mesh.receiveShadow = true;
-  scene.add(mesh);
-})();
+/* (dawny mur dookoła świata zastąpiony nabrzeżem z balustradą — islands.js) */
 
 /* --- RONDA (skrzyżowania ROUNDABOUT_PTS) ---
    Jednolite parametry wszystkich rond (metry, od środka skrzyżowania):

@@ -111,6 +111,11 @@ function nearestVehicle(){
     const d = Math.hypot(p.x - d0.x, p.z - d0.z) * 0.8;                       // drzwi samolotu: trochę większy zasięg
     if (d < best.dist) best = { kind: 'plane', dist: d, plane: q };
   }
+  if (typeof boats !== 'undefined') for (const b of boats){            // łódź: z pomostu / nabrzeża (gracz nisko, nie na estakadzie)
+    if (b === curBoat || p.y > 3) continue;
+    const d = Math.max(0, Math.hypot(p.x - b.pos.x, p.z - b.pos.z) - 2.6);          // z dowolnej burty (pomost po lewej albo prawej)
+    if (d < best.dist) best = { kind: 'boat', dist: d, boat: b };
+  }
   for (const n of npcs){
     if (Math.abs((n.y || 0) - (p.y - 0.9)) > 2) continue;           // auto na estakadzie nad / pod graczem
     npcDoorPoint(n, _npcDoor);
@@ -163,7 +168,7 @@ const _ray = new CANNON.Ray(), _rayRes = new CANNON.RaycastResult();
 function rayHit(x0, y0, z0, x1, y1, z1, mask){
   _rayRes.reset();
   _ray.from.set(x0, y0, z0); _ray.to.set(x1, y1, z1);
-  _ray.intersectWorld(world, { mode: CANNON.Ray.CLOSEST, result: _rayRes, skipBackfaces: true, collisionFilterGroup: G_WORLD, collisionFilterMask: mask || (G_WORLD | G_CAR) });
+  _ray.intersectWorld(world, { mode: CANNON.Ray.CLOSEST, result: _rayRes, skipBackfaces: true, collisionFilterGroup: -1, collisionFilterMask: mask || (G_WORLD | G_CAR) });   // grupa −1: ciała kinematyczne (maska ~G_WORLD) też trafiane
   return _rayRes.hasHit ? _rayRes : null;
 }
 function groundAt(x, z, yTop){
@@ -225,10 +230,12 @@ function vehicleMenuPick(i){
 function toggleVehicle(){
   if (!pointerLocked) return;
   if (mode === 'plane'){ exitPlane(false); return; }
+  if (mode === 'boat'){ exitBoat(false); return; }
   if (mode === 'foot'){
     const nv = nearestVehicle();
     if (nv.dist > 3.5) return;
     if (nv.kind === 'plane'){ enterPlane(nv.plane); return; }
+    if (nv.kind === 'boat'){ enterBoat(nv.boat); return; }
     if (nv.kind === 'npc') jackCar(nv.npc);
     else if (nv.kind === 'parked') enterParked(nv.parked);
     mode = 'car';

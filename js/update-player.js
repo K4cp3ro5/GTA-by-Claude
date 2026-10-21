@@ -119,6 +119,7 @@ function damagePlayer(amount, cause){
 
 function respawnPlayer(){
   if (mode === 'plane') exitPlane(true);
+  if (mode === 'boat') exitBoat(true);
   if (mode === 'car'){
     mode = 'foot';
     player.mesh.visible = true;
@@ -127,11 +128,16 @@ function respawnPlayer(){
     for (let i = 0; i < 4; i++){ vehicle.applyEngineForce(0, i); vehicle.setBrake(160, i); }
     Sound.engine(false, 0, 0);
   }
-  player.body.position.set(SPAWN.x, SPAWN.y, SPAWN.z);
+  endParachute();
+  player.mesh.visible = true;
+  /* odrodzenie przed szpitalem (plac przed wejściem), twarzą do miasta */
+  player.body.position.set(HOSPITAL_SPAWN.x, 1.2, HOSPITAL_SPAWN.z);
+  player.facing = HOSPITAL_SPAWN.facing; camYaw = HOSPITAL_SPAWN.facing + Math.PI; camPitch = -0.12;
   player.body.velocity.set(0, 0, 0);
   player.body.wakeUp();
   player.fallSpeed = 0;
   player.health = 100;
   player.stamina = 100;
   player.dead = false;
+  hudToast('Szpital — wypisano cię po leczeniu', 3);
 }

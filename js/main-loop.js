@@ -50,18 +50,24 @@ function frame(now){
   const carState = updateCar(dt);
   const planeKmh = mode === 'plane' ? updatePlane(dt) : 0;
   updatePlanesIdle(dt);
-  const vehKmh = mode === 'plane' ? planeKmh : carState.kmh;
+  const boatKmh = mode === 'boat' ? updateBoat(dt) : 0;
+  updateBoatsIdle(dt);
+  const vehKmh = mode === 'plane' ? planeKmh : mode === 'boat' ? boatKmh : carState.kmh;
   if (mode === 'foot' && pointerLocked) updatePlayer(dt);
   else if (mode === 'foot') {
     /* pauza sterowania przy zwolnionym kursorze — postać wciąż stoi na fizyce */
     player.body.velocity.x = damp(player.body.velocity.x, 0, 10, dt);
     player.body.velocity.z = damp(player.body.velocity.z, 0, 10, dt);
   }
+  updateParachute(dt);                         // po updatePlayer: nadpisuje prędkość i obrót postaci pod czaszą
   Weapons.updatePose(dt);
   updateWheel();
   pruneParked();
 
   const alpha = physicsStep(dt);
+  updateWaterHazards(dt);
+  navUpdate(dt);
+  updateSea(dt);
 
   if (mode === 'foot'){
     const b = player.body;
@@ -73,6 +79,7 @@ function frame(now){
   }
   syncCar(alpha);
   updateCamera(dt, vehKmh);
+  applyCamShake(dt);
   updateLampLights();
   updateHud(dt, vehKmh);
 
