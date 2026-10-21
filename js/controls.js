@@ -153,8 +153,9 @@ document.addEventListener('mousemove', e => {
     wheelVY += e.movementY;
     return;
   }
-  if (mode === 'plane' || mode === 'boat' || mode === 'ride'){               // samolot / łódź / kolejka: mysz tylko obraca kamerę
+  if (mode === 'plane' || mode === 'boat' || mode === 'ride'){               // samolot / łódź / przejażdżka: mysz obraca kamerę
     planeCamYaw = clamp(planeCamYaw - e.movementX * 0.003, -2.6, 2.6);
+    if (mode === 'ride') rideLookPitch = clamp(rideLookPitch - e.movementY * 0.003, -1.2, 1.0);
     if (Math.abs(e.movementX) > 1.5) lastMouseMove = clock;
     return;
   }

@@ -116,10 +116,10 @@ function nearestVehicle(){
     const d = Math.max(0, Math.hypot(p.x - b.pos.x, p.z - b.pos.z) - 2.6);          // z dowolnej burty (pomost po lewej albo prawej)
     if (d < best.dist) best = { kind: 'boat', dist: d, boat: b };
   }
-  if (typeof COASTERS !== 'undefined') for (const c of COASTERS){      // peron kolejki górskiej (park rozrywki)
-    if (!c.board || p.y > 4) continue;
-    const d = Math.max(0, Math.hypot(p.x - c.board.x, p.z - c.board.z) - 2.5);
-    if (d < best.dist) best = { kind: 'coaster', dist: d, coaster: c };
+  if (typeof RIDES !== 'undefined') for (const r of RIDES){             // wejście na atrakcję w parku rozrywki (peron, gondola, autodrom…)
+    if (!r.board || p.y > 4) continue;
+    const d = Math.max(0, Math.hypot(p.x - r.board.x, p.z - r.board.z) - 2.5);
+    if (d < best.dist) best = { kind: 'ride', dist: d, ride: r };
   }
   for (const n of npcs){
     if (Math.abs((n.y || 0) - (p.y - 0.9)) > 2) continue;           // auto na estakadzie nad / pod graczem
@@ -236,11 +236,11 @@ function toggleVehicle(){
   if (!pointerLocked) return;
   if (mode === 'plane'){ exitPlane(false); return; }
   if (mode === 'boat'){ exitBoat(false); return; }
-  if (mode === 'ride'){ hudToast('Nie wysiadaj w trakcie jazdy — kolejka zatrzyma się na stacji'); return; }
+  if (mode === 'ride'){ if (curRide && curRide.canExit) rideEnd(curRide); else hudToast('Nie wysiadaj w trakcie jazdy — poczekaj do końca przejażdżki'); return; }
   if (mode === 'foot'){
     const nv = nearestVehicle();
     if (nv.dist > 3.5) return;
-    if (nv.kind === 'coaster'){ rideStart(nv.coaster); return; }
+    if (nv.kind === 'ride'){ rideStart(nv.ride); return; }
     if (nv.kind === 'plane'){ enterPlane(nv.plane); return; }
     if (nv.kind === 'boat'){ enterBoat(nv.boat); return; }
     if (nv.kind === 'npc') jackCar(nv.npc);

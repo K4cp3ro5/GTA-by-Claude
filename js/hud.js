@@ -266,7 +266,7 @@ function updateHud(dt, kmh){
   } else if (mode === 'ride' && curRide){
     const lbl = 'Przejażdżka · ' + curRide.name.replace('Kolejka ', '');
     if (el.carlblTxt.textContent !== lbl){ el.carlblTxt.textContent = lbl; el.carlbl.classList.remove('stolen'); }
-    drawSpeedo(curRide.v * 3.6, 140, 0);
+    drawSpeedo(rideSpeed() * 3.6, 140, 0);
     el.gval.textContent = 'WYS ' + Math.round(ridePos().y) + ' m'; el.ghand.textContent = 'KOLEJKA'; el.ghand.className = '';
   } else if (el.ghand.textContent !== 'RĘCZNY') el.ghand.textContent = 'RĘCZNY';
   if (_toastT > 0){ _toastT -= dt; if (_toastT <= 0) el.toast.classList.remove('on'); }
@@ -310,17 +310,17 @@ function updateHud(dt, kmh){
   let nv = null;
   if (mode === 'foot') nv = nearestVehicle();
   const near = !!nv && nv.dist < 3.5;
-  promptEl.classList.toggle('on', near || mode === 'car' || mode === 'boat' || (mode === 'plane' && curPlane && ((curPlane.onGround && curPlane.v < 3) || (!curPlane.onGround && curPlane.agl > 15))));
-  const want = mode === 'car' ? 'out' : mode === 'boat' ? 'outBoat' : mode === 'plane' ? (curPlane && !curPlane.onGround ? 'bail' : 'outPlane') : (near ? (nv.kind === 'npc' ? 'jack' : nv.kind === 'plane' ? 'plane' : nv.kind === 'boat' ? 'boat' : nv.kind === 'coaster' ? (nv.coaster.state === 'wait' ? 'coaster' : 'coasterWait') : 'in') : lastPrompt);
+  promptEl.classList.toggle('on', near || mode === 'car' || mode === 'boat' || (mode === 'ride' && curRide && curRide.canExit) || (mode === 'plane' && curPlane && ((curPlane.onGround && curPlane.v < 3) || (!curPlane.onGround && curPlane.agl > 15))));
+  const want = mode === 'ride' ? 'outRide' : mode === 'car' ? 'out' : mode === 'boat' ? 'outBoat' : mode === 'plane' ? (curPlane && !curPlane.onGround ? 'bail' : 'outPlane') : (near ? (nv.kind === 'npc' ? 'jack' : nv.kind === 'plane' ? 'plane' : nv.kind === 'boat' ? 'boat' : nv.kind === 'ride' ? (nv.ride.ready() ? 'ride:' : 'rideWait:') + nv.ride.name : 'in') : lastPrompt);
   if (want !== lastPrompt){
     lastPrompt = want;
-    promptEl.innerHTML = want === 'out' ? 'Naciśnij <kbd>F</kbd>, aby wysiąść'
+    promptEl.innerHTML = want === 'out' || want === 'outRide' ? 'Naciśnij <kbd>F</kbd>, aby wysiąść'
                         : want === 'outPlane' ? 'Naciśnij <kbd>F</kbd>, aby wysiąść z samolotu'
                         : want === 'bail' ? 'Naciśnij <kbd>F</kbd>, aby wyskoczyć ze spadochronem'
                         : want === 'outBoat' ? 'Naciśnij <kbd>F</kbd> przy brzegu, aby wysiąść'
                         : want === 'boat' ? 'Naciśnij <kbd>F</kbd>, aby wsiąść do łodzi'
-                        : want === 'coaster' ? 'Naciśnij <kbd>F</kbd> — przejażdżka kolejką'
-                        : want === 'coasterWait' ? 'Kolejka w trasie — poczekaj na peronie'
+                        : want.indexOf('ride:') === 0 ? 'Naciśnij <kbd>F</kbd> — przejażdżka: ' + want.slice(5)
+                        : want.indexOf('rideWait:') === 0 ? (nv && nv.ride ? nv.ride.wait : '')
                         : want === 'jack' ? 'Naciśnij <kbd>F</kbd> lub <kbd>E</kbd>, aby ukraść auto'
                         : want === 'plane' ? 'Naciśnij <kbd>F</kbd> lub <kbd>E</kbd>, aby wsiąść do samolotu'
                         : 'Naciśnij <kbd>F</kbd> lub <kbd>E</kbd>, aby wsiąść';
