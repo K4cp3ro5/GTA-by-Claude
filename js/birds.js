@@ -4,11 +4,13 @@
    z grawitacją, w miejscu trafienia (ziemia, dach, auto) zostaje biała plama, która blednie i znika po kilku
    sekundach; trafienie w gracza / szybę auta — komunikat i plama na ekranie.
    --------------------------------------------------------------- */
-const BIRD_FLOCKS = [
-  { n: 8, alt: 55, r: 140, cx: -60, cz: 40,   w: 0.05, ph: 0 },          // nad miastem
-  { n: 7, alt: 48, r: 110, cx: 120, cz: -120, w: -0.06, ph: 2 },
-  { n: 9, alt: 32, r: 60,  cx: 0,   cz: -360, w: 0.08, ph: 4 },          // nad portem
-  { n: 7, alt: 30, r: 45,  follow: true, w: 0.09, ph: 1 }                // w pobliżu gracza
+const BIRD_FLOCKS = [                                                   // tylko nad miastem i portem (stałe trasy, niezależne od gracza)
+  { n: 8, alt: 55, r: 140, cx: -60,  cz: 40,   w: 0.05,  ph: 0 },
+  { n: 7, alt: 48, r: 110, cx: 120,  cz: -120, w: -0.06, ph: 2 },
+  { n: 7, alt: 42, r: 95,  cx: -150, cz: -150, w: 0.07,  ph: 3 },
+  { n: 6, alt: 50, r: 100, cx: 150,  cz: 160,  w: -0.05, ph: 5 },
+  { n: 9, alt: 32, r: 60,  cx: 0,    cz: -360, w: 0.08,  ph: 4 },          // nad portem
+  { n: 6, alt: 26, r: 45,  cx: 110,  cz: -410, w: -0.09, ph: 1 }           // nad przystanią i falochronem
 ];
 const birds = [];
 BIRD_FLOCKS.forEach((f, fi) => { for (let k = 0; k < f.n; k++) birds.push({ f: f, off: new THREE.Vector3(rand(-9, 9), rand(-3, 3), rand(-9, 9)), flap: rand(0, TAU), fr: rand(7, 10), pos: new THREE.Vector3(), prev: new THREE.Vector3(), head: 0, span: rand(0.7, 0.9) }); });
@@ -56,11 +58,10 @@ function updateBirds(dt){
   const pos = _birdGeo.attributes.position.array;
   birds.forEach((b, i) => {
     const f = b.f, a = t * f.w + f.ph;
-    const cx = f.follow ? pp.x : f.cx, cz = f.follow ? pp.z : f.cz;
+    const cx = f.cx, cz = f.cz;
     const r = f.r * (0.85 + 0.15 * Math.sin(t * 0.13 + f.ph));
     b.prev.copy(b.pos);
     b.pos.set(cx + Math.cos(a) * r + b.off.x + Math.sin(t * 0.7 + i) * 2, f.alt + b.off.y + Math.sin(t * 0.5 + i * 1.3) * 2, cz + Math.sin(a) * r + b.off.z + Math.cos(t * 0.6 + i) * 2);
-    if (f.follow) b.pos.y = Math.max(b.pos.y, (pp.y || 0) + 22);
     const dx = b.pos.x - b.prev.x, dz = b.pos.z - b.prev.z;
     if (dx * dx + dz * dz > 1e-6) b.head = Math.atan2(dx, dz);
     b.flap += dt * b.fr;
@@ -77,7 +78,7 @@ function updateBirds(dt){
   _dropT -= dt;
   if (_dropT <= 0){
     _dropT = rand(5, 12);
-    const near = birds.filter(b => Math.hypot(b.pos.x - pp.x, b.pos.z - pp.z) < 90);
+    const near = birds.filter(b => Math.hypot(b.pos.x - pp.x, b.pos.z - pp.z) < 110);
     if (near.length) birdDrop(near[randInt(0, near.length - 1)]);
   }
   for (let i = drops.length - 1; i >= 0; i--){

@@ -66,9 +66,10 @@ function updateCamera(dt, kmh){
     camFov = damp(camFov, 66 + clamp(camKmh / 190, 0, 1) * 15, 2, dt);
   } else {
     const p = player.mesh.position;
-    tx = p.x; ty = p.y + 0.85 + 0.72; tz = p.z;
-    dist = 5.3;
-    height = 0.35;
+    const para = typeof parachute !== 'undefined' && parachute.on && parachute.t > 0.7;
+    tx = p.x; ty = p.y + 0.85 + 0.72 + (para ? 1.6 : 0); tz = p.z;
+    dist = para ? 10.5 : 5.3;
+    height = para ? 1.2 : 0.35;
     camFov = damp(camFov, 68, 4, dt);
   }
 

@@ -73,6 +73,7 @@ function frame(now){
   if (mode === 'foot'){
     const b = player.body;
     player.mesh.position.set(lerp(b._p0.x, b.position.x, alpha), lerp(b._p0.y, b.position.y, alpha) - 0.85, lerp(b._p0.z, b.position.z, alpha));
+    syncParachute();
   }
   for (const n of npcs){                       // auta NPC: model między dwoma ostatnimi krokami fizyki
     const b = n.body;

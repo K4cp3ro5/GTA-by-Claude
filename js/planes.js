@@ -257,24 +257,34 @@ function updateParachute(dt){
   parachute.bank = -parachute.yawRate / PARA.turn * 0.38;
   parachute.speed = damp(parachute.speed, fast ? PARA.fast : slow ? PARA.slow : PARA.glide, 1.5, dt);
   const sink = (fast ? PARA.sinkFast : slow ? PARA.sinkSlow : PARA.sink) + Math.abs(turn) * 1.2;
-  const fx = Math.sin(parachute.heading), fz = Math.cos(parachute.heading);
-  /* lot zawsze w kierunku czaszy (bez bocznego znoszenia) */
-  b.velocity.x = damp(b.velocity.x, fx * parachute.speed * s, 8, dt);
-  b.velocity.z = damp(b.velocity.z, fz * parachute.speed * s, 8, dt);
-  /* opadanie: hamowanie czaszy do -sink, potem stała prędkość; krok fizyki doda grawitację świata — kompensacja */
-  const g = -world.gravity.y; let vy = b.velocity.y;
-  vy = vy < -sink ? approach(vy, -sink, 14 * dt) : Math.max(vy - g * dt, -sink);
-  b.velocity.y = vy + g * dt;
+  parachute.sink = sink; parachute.open = s; parachute.pitch = fast ? -0.16 : slow ? 0.04 : -0.08;
   player.fallSpeed = Math.min(player.fallSpeed, 6);                                 // pod czaszą bez obrażeń od upadku
-  player.facing = parachute.heading; player.mesh.rotation.y = parachute.heading;
-  if (clock - lastMouseMove > 0.8) camYaw = angleDamp(camYaw, parachute.heading + Math.PI, 3.2, dt);   // kamera za plecami
-  /* czasza: rozwija się 0.6 s, nad graczem, w kierunku lotu, przechyla się w zakręcie */
+  player.facing = parachute.heading; player.mesh.rotation.set(0, parachute.heading, 0);
+  if (clock - lastMouseMove > 0.5) camYaw = angleDamp(camYaw, parachute.heading + Math.PI, 4, dt);     // kamera za plecami
+  if (clock - lastMouseMove > 0.5) camPitch = damp(camPitch, -0.18, 2, dt);
+  if (parachute.t > 1.3 && checkGrounded()){ endParachute(); hudToast('Wylądowano'); }
+}
+/* co krok fizyki (1/60 s): lot w kierunku czaszy, opadanie ze stałą prędkością (kompensacja grawitacji świata) */
+world.addEventListener('preStep', () => {
+  if (!parachute.on || parachute.t < 0.7 || mode !== 'foot' || player.dead) return;
+  const b = player.body, h = 1 / 60, g = -world.gravity.y, sp = parachute.speed * (parachute.open || 0);
+  const k = 1 - Math.exp(-8 * h);
+  b.velocity.x += (Math.sin(parachute.heading) * sp - b.velocity.x) * k;
+  b.velocity.z += (Math.cos(parachute.heading) * sp - b.velocity.z) * k;
+  let vy = b.velocity.y; const sink = parachute.sink || PARA.sink;
+  vy = vy < -sink ? approach(vy, -sink, 14 * h) : Math.max(vy - g * h, -sink);
+  b.velocity.y = vy + g * h;                                                        // ten krok doda −g·h
+});
+/* czasza nad interpolowanym modelem postaci (main-loop, po ustawieniu player.mesh) */
+function syncParachute(){
+  const m = parachute.mesh;
+  if (!parachute.on || parachute.t < 0.7 || !m){ if (m) m.visible = false; return; }
+  const s = parachute.open || 0;
   m.visible = true;
   m.scale.set(0.25 + 0.75 * s, 0.6 + 0.4 * s, 0.25 + 0.75 * s);
-  m.position.set(b.position.x, b.position.y - 0.85, b.position.z);
+  m.position.copy(player.mesh.position);
   m.rotation.set(0, parachute.heading, 0);
-  m.userData.canopy.rotation.set(-0.08 + (fast ? -0.08 : slow ? 0.12 : 0), 0, parachute.bank);
-  if (parachute.t > 1.3 && checkGrounded()){ endParachute(); hudToast('Wylądowano'); }
+  m.userData.canopy.rotation.set(parachute.pitch || 0, 0, parachute.bank);
 }
 
 /* --- katastrofa: kula ognia, błysk, odłamki, dym, płonący wrak, wstrząs kamery, huk --- */
