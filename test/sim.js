@@ -317,6 +317,12 @@ function __sim(seconds){
       for (const n of npcs){ if (n.profile === 'pirat') continue; const d = Math.hypot(n.pos.x - p.pos.x, n.pos.y - p.pos.y); if (d < cnt.pedMinD) cnt.pedMinD = d; if (d < 2.2) cnt.pedHit++; }   // piraci potrącają celowo (osobno)
     }
     for (const n of npcs){ n.body.position.x += n.body.velocity.x*dt; n.body.position.z += n.body.velocity.z*dt; }
+    /* auto w obrysie budynku (środek nadwozia głębiej niż 0.3 m) — co 3 kroki, siatka 44 m */
+    if (s % 3 === 0){
+      if (!globalThis.__bGrid){ const G = new Map(); buildings.forEach(b => { for (let gx = Math.floor((b.x - b.w/2) / 44); gx <= Math.floor((b.x + b.w/2) / 44); gx++) for (let gz = Math.floor((b.z - b.d/2) / 44); gz <= Math.floor((b.z + b.d/2) / 44); gz++){ const k = gx + ',' + gz; if (!G.has(k)) G.set(k, []); G.get(k).push(b); } }); globalThis.__bGrid = G; }
+      for (const n of npcs){ if ((n.y || 0) > 1) continue; const L0 = globalThis.__bGrid.get(Math.floor(n.pos.x / 44) + ',' + Math.floor(n.pos.y / 44)); if (!L0) continue;
+        for (const b of L0) if (Math.abs(n.pos.x - b.x) < b.w/2 - 0.3 && Math.abs(n.pos.y - b.z) < b.d/2 - 0.3){ cnt.inBld = (cnt.inBld || 0) + 1; if ((cnt.inBldEx || (cnt.inBldEx = [])).length < 6) cnt.inBldEx.push([n.id, n.profile, +n.pos.x.toFixed(0), +n.pos.y.toFixed(0), +n.speed.toFixed(0), +(n.lat||0).toFixed(1), n.wp]); break; } }
+    }
     for (let i = 0; i < npcs.length; i++){
       const n = npcs[i];
       const sp = Math.hypot(n.body.velocity.x, n.body.velocity.z);
@@ -372,6 +378,7 @@ function __sim(seconds){
                  nakladaniaZPiratem: cnt.pirOverlap || 0,
                  profile: npcs.reduce((a, n) => (a[n.profile] = (a[n.profile] || 0) + 1, a), {}), typy: npcs.reduce((a, n) => (a[n.type] = (a[n.type] || 0) + 1, a), {}) };
   report.cnt = cnt;
+  report.inBld = { klatkiAutWBudynku: cnt.inBld || 0, przyklady: cnt.inBldEx || [] };
   report.hwyRun = { nakładaniaNaAutostradzie: cnt.hwyOverlap || 0, przejazdyPętli: cnt.loopPass || 0, przejazdyŁącznic: cnt.connPass || 0, wjazdyZPrzekątnych: cnt.hwyEnter || 0, maksKmh: +(cnt.hwyMax*3.6).toFixed(0), poniżejPomostu: cnt.underDeck || 0 };
   report.npcCount = npcs.length;
   report.whyStuck = report.stuckMax > 30 ? npcs.filter(m => m.speed < 0.3).map(m => m.id + ':' + m.why).slice(0, 12) : [];
@@ -399,7 +406,7 @@ console.log('Detale w budynkach:', JSON.stringify(st.propsInBuildings));
 const r = base.__sim(secs);
 console.log('Symulacja', secs, 's gry,', r.npcCount, 'aut NPC (miasto + trasy przez autostrady)');
 console.log('Najdłuższy postój jednego auta (v<0.3):', r.stuckMax.toFixed(1), 's', r.stuckAt ? '(auto #'+r.stuckId+' przy '+r.stuckAt+')' : '');
-console.log('Klatki z nakładaniem się nadwozi aut miejskich (test SAT):', r.overlaps, r.overlapPairs.slice(0,8)); if (r.ovInfo) console.log('Pierwsze nakładanie:', JSON.stringify(r.ovInfo));
+console.log('Auta w budynkach:', JSON.stringify(r.inBld)); console.log('Klatki z nakładaniem się nadwozi aut miejskich (test SAT):', r.overlaps, r.overlapPairs.slice(0,8)); if (r.ovInfo) console.log('Pierwsze nakładanie:', JSON.stringify(r.ovInfo));
 if (r.dump) console.log('ZAKLESZCZENIE — auta w pobliżu:', JSON.stringify(r.dump), '| przyczyny postoju (id:why):', r.whyStuck.join(' '));
 if (r.locs) console.log('miejsca nakładania (x,z,h1,h2):', JSON.stringify(r.locs.slice(0,14)));
 console.log('Aktywacje reguł (klatki z hamowaniem): światła', r.cnt.red, '| STOP', r.cnt.stop, '| ustępowanie na rondach', r.cnt.yield, '| w 2. połowie: światła', r.cnt.red2, 'STOP', r.cnt.stop2);

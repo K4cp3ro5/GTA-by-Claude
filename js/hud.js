@@ -96,12 +96,12 @@ function drawMinimap(){
 
   const toMap = (wx, wz) => [ MM/2 + (wx - px) * MAP_SCALE, MM/2 + (wz - pz) * MAP_SCALE ];
 
-  /* NPC */
-  mg.fillStyle = '#7f8794';
+  /* NPC (piraci drogowi większym kwasowo zielonym punktem, jak lakier) */
   for (let i = 0; i < npcs.length; i++){
-    const p = toMap(npcs[i].pos.x, npcs[i].pos.y);
+    const p = toMap(npcs[i].pos.x, npcs[i].pos.y), pir = npcs[i].profile === 'pirat';
     if (p[0] < -6 || p[0] > MM+6 || p[1] < -6 || p[1] > MM+6) continue;
-    mg.fillRect(p[0]-2, p[1]-2, 4, 4);
+    mg.fillStyle = pir ? '#7cff2e' : '#7f8794';
+    if (pir) mg.fillRect(p[0]-2.5, p[1]-2.5, 5, 5); else mg.fillRect(p[0]-2, p[1]-2, 4, 4);
   }
 
   /* zaparkowane skradzione (i porzucone prowadzalne skradzione) — małe fioletowe kwadraty */
