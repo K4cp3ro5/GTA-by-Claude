@@ -107,7 +107,7 @@ function mergeColored(parts){
   const P = [], N = [], C = [];
   for (const pt of parts){
     const g = (pt.geo.index ? pt.geo.toNonIndexed() : pt.geo.clone());
-    _mcE.set(pt.rx || 0, 0, 0);
+    _mcE.set(pt.rx || 0, pt.ry || 0, pt.rz || 0);
     _mcM.makeRotationFromEuler(_mcE).setPosition(pt.x || 0, pt.y || 0, pt.z || 0);
     g.applyMatrix4(_mcM);
     _mcC.setHex(pt.color);

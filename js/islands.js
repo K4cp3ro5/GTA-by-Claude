@@ -163,7 +163,7 @@ function buildMainPort(){
   const sx0 = -150, sx1 = -46, sz0 = -E - 21, sz1 = -E - 5, scz = (sz0 + sz1) / 2;
   CB(0x1f3550).box((sx0 + sx1) / 2, 2.6, scz, sx1 - sx0, 7, sz1 - sz0, 3, true);
   CB(0x8a2a22).box((sx0 + sx1) / 2, -0.6, scz, sx1 - sx0 + 0.1, 0.8, sz1 - sz0 + 0.1, 2, true);
-  CB(0x1f3550).box(sx1 + 4, 2.6, scz, 8, 7, (sz1 - sz0) * 0.7, 1, true);                                  // dziób
+  /* (dziób w kształcie klina: landmarks.js) */
   CB(0xe9eaec).box(sx0 + 9, 10, scz, 12, 9, sz1 - sz0 - 2, 2, true); CB(0x2a2c30).box(sx0 + 9, 13.2, scz, 12.2, 0.8, sz1 - sz0 - 1.8, 1, true);
   CB(0xd35f1a).box(sx0 + 6, 17, scz, 2.4, 6, 2.4, 1, true);                                              // komin
   for (let x = sx0 + 20; x < sx1 - 6; x += 7) for (let k = 0; k < 2; k++) for (const dz of [-4.5, -1.5, 1.5, 4.5]) CB(CC[randInt(0, CC.length - 1)]).box(x, 7.4 + k * 2.6, scz + dz, 6.1, 2.55, 2.44, 1, true);
@@ -192,13 +192,14 @@ function buildMainPort(){
 /* --- przystań na wysepce lotniska (południowy brzeg, naprzeciw portu) --- */
 function buildAirportHarbor(){
   const r = ISLANDS[1], z1 = r.z1;
-  CB(0x86837c).plane(-40, 0.02, z1 - 7, 140, 14, 1, 1);
+  CB(0x9b7a55).plane(-40, 0.02, z1 - 7, 140, 14, 1, 1);                                             // drewniany deptak
+  for (let x = -109.5; x < 30; x += 1.2) CB(0x7d6045).quad([x, 0.028, z1 - 14], [x, 0.028, z1], [x + 0.08, 0.028, z1], [x + 0.08, 0.028, z1 - 14], [0,0],[1,0],[1,1],[0,1]);
   quayPaint(-110, z1 - 1.2, 30, z1 - 1.2, 0.25, 0xe0b020);
   for (let x = -106; x <= 26; x += 10) CB(0x2a2c30).box(x, 0.3, z1 - 0.7, 0.4, 0.6, 0.4, 1, true);
   pier(-92, -88, z1 - 0.2, z1 + 32); pier(-12, -8, z1 - 0.2, z1 + 32);
   BOAT_SPOTS.push({ x: -95.5, z: z1 + 18, heading: 0 }, { x: -4.5, z: z1 + 22, heading: 0 });
   /* budynek przystani */
-  CB(0xe3e5e2).box(60, 3, z1 - 18, 16, 6, 10, 2, true); CB(0x2f5674).box(60, 6.2, z1 - 18, 16.4, 0.4, 10.4, 1, true);
+  CB(0xb98b5e).box(60, 3, z1 - 18, 16, 6, 10, 2, true);                                             // kasa biletowa (drewno; dach: landmarks.js)
   staticBox(60, 3, z1 - 18, 16, 6, 10); buildings.push({ x: 60, z: z1 - 18, w: 16, d: 10 });
   wordSignQuad('PRZYSTAŃ', '#1f3550', '#ffffff', [53, 4.2, z1 - 12.9], [67, 4.2, z1 - 12.9], [67, 5.6, z1 - 12.9], [53, 5.6, z1 - 12.9]);
   for (let x = -100; x <= 20; x += 30) lampSpots.push({ x: x, z: z1 - 13.5, rot: Math.PI, y: 0 });

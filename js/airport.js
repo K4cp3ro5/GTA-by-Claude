@@ -87,12 +87,7 @@ function buildAirport(){
 
   /* --- wieża kontroli lotów --- */
   const wx = 60, wz = -712;
-  CB(0xd3cfc6).box(wx, 11, wz, 4, 22, 4, 2, false);
-  glassWallBuf.box(wx, 24, wz, 7.5, 4, 7.5, 2, false);
-  CB(0x3b4046).box(wx, 26.3, wz, 8.5, 0.6, 8.5, 2, true);
-  CB(0x8a8f96).box(wx, 28.5, wz, 0.2, 4, 0.2, 1, true);
-  staticBox(wx, 11, wz, 4, 22, 4);
-  buildings.push({ x: wx, z: wz, w: 4, d: 4 });
+  /* (bryła wieży: landmarks.js — okrągły trzon, szklana kabina, radar) */
 
   /* --- hangar (blacha, dach dwuspadowy, wrota od strony płyty) --- */
   const hx = 118, hz = -734, hw2 = 34, hd = 26, hh = 12;
@@ -228,20 +223,19 @@ function buildAirportWest(){
   buildPlane(-330, 30, Math.PI, 1, 0xc0392b, true);           // awionetka
   /* terminal (szkło, dach, napis od strony miasta), wieża, hangar */
   const tm = A.term, tcx = (tm.x0 + tm.x1) / 2, tcz = (tm.z0 + tm.z1) / 2, tw = tm.x1 - tm.x0, td = tm.z1 - tm.z0, th = 9;
-  glassWallBuf.box(tcx, th / 2, tcz, tw, th, td, 4, false);
-  roofBuf.plane(tcx, th, tcz, tw, td, tw / 6, td / 6);
-  CB(0x4a4f55).box(tcx, th + 0.3, tcz, tw + 0.6, 0.6, td + 0.6, 2, false);
+  /* (bryła terminalu: landmarks.js — cegła, dach dwuspadowy) */
   staticBox(tcx, th / 2, tcz, tw, th, td); buildings.push({ x: tcx, z: tcz, w: tw, d: td });
   wordSignQuad('LOTNISKO', '#1a4fa0', '#ffffff', [tm.x1 + 0.06, th - 3.2, tcz + 11], [tm.x1 + 0.06, th - 3.2, tcz - 11], [tm.x1 + 0.06, th - 0.8, tcz - 11], [tm.x1 + 0.06, th - 0.8, tcz + 11]);
   CB(0xd8d4cc).box(tm.x1 + 1.0, 4.0, tcz, 2.0, 0.3, 20, 1, true);
   const wx = -305, wz = 30;
-  CB(0xd3cfc6).box(wx, 9, wz, 4, 18, 4, 2, false); glassWallBuf.box(wx, 20, wz, 7, 4, 7, 2, false); CB(0x3b4046).box(wx, 22.3, wz, 8, 0.6, 8, 2, true);
+  /* (wieża: landmarks.js — ceglany trzon, ośmiokątna kabina) */
   staticBox(wx, 9, wz, 4, 18, 4); buildings.push({ x: wx, z: wz, w: 4, d: 4 });
   const hx = -333, hz = 92, hw2 = 26, hd = 30, hh = 11;
-  corrBuf.box(hx, hh / 2, hz, hw2, hh, hd, 6, false); CB(0x6d7174).box(hx, hh + 0.2, hz, hw2 + 0.6, 0.4, hd + 0.6, 2, true);
-  CB(0x3f4449).plane(hx, hh * 0.45, hz - hd / 2 - 0.02, hw2 * 0.8, hh * 0.85, 1, 1);
+  /* (hangary łukowe: landmarks.js) */
   staticBox(hx, hh / 2, hz, hw2, hh, hd); buildings.push({ x: hx, z: hz, w: hw2, d: hd });
   flat(crossBuf, hx - hw2 / 2, hx + hw2 / 2, ap.z1, hz - hd / 2, y + 0.003);
+  flat(crossBuf, hx + hw2 / 2, hx + hw2 / 2 + 8, hz - hd / 2, hz + 34 + hd / 2, y + 0.003);                 // dojazd do drugiego hangaru
+  staticBox(hx, hh / 2, hz + 34, hw2, hh, hd); buildings.push({ x: hx, z: hz + 34, w: hw2, d: hd });
   /* dojazd z alei j=6, droga przed terminalem, parking; znaki (wyjazd na jednokierunkową obwodnicę: A-7 + nakaz w lewo) */
   const ac = A.access, fr = A.front, pk = A.park;
   flat(crossBuf, ac.x1, ac.x0, ac.z - ac.hw, ac.z + ac.hw, y);
