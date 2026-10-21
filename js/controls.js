@@ -6,7 +6,7 @@ let pointerLocked = false;
 let camYaw = Math.PI, camPitch = -0.16;
 let lastMouseMove = -99;
 let mode = 'foot';                    // 'foot' | 'car'
-let muted = false;
+let muted = false, gameStarted = false;   // gameStarted: pierwsze przejęcie kursora (potem Esc = pauza)
 
 const gate     = document.getElementById('gate');
 const goBtn    = document.getElementById('go');
@@ -100,9 +100,12 @@ function lockPointer(){
 }
 document.addEventListener('pointerlockchange', () => {
   pointerLocked = (document.pointerLockElement === renderer.domElement);
+  if (pointerLocked) gameStarted = true;
   gate.classList.toggle('hidden', pointerLocked);
+  Sound.setPaused(!pointerLocked && !debugOpen);                // pauza (menu): dźwięk wyciszony
   if (!pointerLocked){
     goBtn.textContent = 'WRÓĆ DO GRY';
+    if (gameStarted) document.getElementById('gatetxt').textContent = 'Pauza — miasto czeka, dźwięk wyciszony.';
     for (const k in keys) keys[k] = false;
     mouseDown = false;
   } else {
@@ -227,7 +230,7 @@ function toggleDebugMenu(){
     refreshDebugInfo();
   } else if (wasLockedBeforeDebug){
     lockPointer();
-  }
+  } else Sound.setPaused(gameStarted && !pointerLocked);       // zamknięte nad menu pauzy: z powrotem cisza
 }
 function refreshDebugInfo(){
   dbg.carCount.textContent = String(npcs.length);

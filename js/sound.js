@@ -51,9 +51,14 @@ const Sound = {
     this.ready = true;
   },
 
+  paused: false,
   setMuted(m){
     if (!this.ready) return;
-    this.master.gain.setTargetAtTime(m ? 0 : 0.55, this.ctx.currentTime, 0.05);
+    this.master.gain.setTargetAtTime(m || this.paused ? 0 : 0.55, this.ctx.currentTime, 0.05);
+  },
+  setPaused(p){                               // pauza (menu Esc): cisza, po powrocie głośność zgodna z wyciszeniem (M)
+    this.paused = p;
+    this.setMuted(muted);
   },
 
   /* rpm01: 0..1, load: 0..1 */

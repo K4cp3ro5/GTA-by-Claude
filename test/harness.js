@@ -89,6 +89,10 @@ if (!same) {
   process.exit(1);
 }
 console.log('index.html zgodny z loadorder.txt (' + order.length + ' plików) — OK');
+{
+  const m = htmlContent.match(/id="loader" data-scripts="(\d+)"/);
+  if (!m || +m[1] !== order.length + 2){ console.error('BŁĄD: #loader data-scripts (' + (m && m[1]) + ') != ' + (order.length + 2) + ' (2 biblioteki + loadorder.txt)'); process.exit(1); }
+}
 
 let code = '';
 for (const f of order){
