@@ -55,7 +55,10 @@ GeoBuf.prototype.ring = function(cx, y, cz, rInner, rOuter, seg){
     this.quad(pI0, pI1, pO1, pO0, [0,0],[1,0],[1,1],[0,1]);
   }
 };
-/* pudełko bez spodu; uS = jednostek świata na kafel */
+/* pudełko bez spodu (stojące na ziemi albo dachu); bryła zawieszona (spód wyżej niż 0.3 m) albo tuż nad wodą
+   (pomost: spód −0.3…−0.05) dostaje spód — inaczej z dołu (z łodzi, spod dźwigu, rękawa, oczepu) widać przez nią niebo;
+   uS = jednostek świata na kafel */
+const boxNeedsBottom = y0 => y0 > 0.3 || (y0 > -0.85 && y0 < -0.05);
 GeoBuf.prototype.box = function(cx, cy, cz, w, h, d, uS, withTop){
   const hx = w/2, hy = h/2, hz = d/2;
   const x0 = cx-hx, x1 = cx+hx, y0 = cy-hy, y1 = cy+hy, z0 = cz-hz, z1 = cz+hz;
@@ -66,6 +69,8 @@ GeoBuf.prototype.box = function(cx, cy, cz, w, h, d, uS, withTop){
   this.quad([x0,y0,z0],[x0,y0,z1],[x0,y1,z1],[x0,y1,z0], [0,0],[ud,0],[ud,uh],[0,uh]); // -X
   if (withTop)
     this.quad([x0,y1,z1],[x1,y1,z1],[x1,y1,z0],[x0,y1,z0], [0,0],[uw,0],[uw,ud],[0,ud]);
+  if (boxNeedsBottom(y0))
+    this.quad([x0,y0,z0],[x1,y0,z0],[x1,y0,z1],[x0,y0,z1], [0,0],[uw,0],[uw,ud],[0,ud]);
 };
 GeoBuf.prototype.geometry = function(){
   const g = new THREE.BufferGeometry();
@@ -91,6 +96,8 @@ GeoBuf.prototype.boxRot = function(cx, cy, cz, w, h, d, rotY, uS, withTop){
   this.quad([p00[0],y0,p00[1]],[p01[0],y0,p01[1]],[p01[0],y1,p01[1]],[p00[0],y1,p00[1]], [0,0],[ud,0],[ud,uh],[0,uh]);
   if (withTop)
     this.quad([p01[0],y1,p01[1]],[p11[0],y1,p11[1]],[p10[0],y1,p10[1]],[p00[0],y1,p00[1]], [0,0],[uw,0],[uw,ud],[0,ud]);
+  if (boxNeedsBottom(y0))
+    this.quad([p00[0],y0,p00[1]],[p10[0],y0,p10[1]],[p11[0],y0,p11[1]],[p01[0],y0,p01[1]], [0,0],[uw,0],[uw,ud],[0,ud]);
 };
 /* czworokąt z automatycznie poprawnym zwrotem normalnej (w stronę "out") */
 function quadOut(buf, a, b, c, d, out){
