@@ -362,6 +362,7 @@ debugEl.querySelectorAll('[data-tp]').forEach(b => b.addEventListener('click', e
   const k = b.dataset.tp;
   if (k === 'airport') dbgTeleport(AIRPORT.access.x - 2, -690, 0);
   else if (k === 'port') dbgTeleport(L(5) - 2, -330, Math.PI);
+  else if (k === 'airportW') dbgTeleport(AIRPORT_W.front.x + 2, 30, Math.PI);
   else if (k === 'ring') dbgTeleport(L(12) + 3.5, 60, Math.PI);           // wschodnia obwodnica, pas na północ
   else if (k === 'exit'){ const q = wayAt(HWY_TERM[0].exit, HWY_TERM[0].exit.len - 160); dbgTeleport(q.x, q.z, Math.atan2(q.hx, q.hz), q.y + 3); }
   else {                                                 // pomost A1 przed węzłem (punkt trasy NPC na jezdni)

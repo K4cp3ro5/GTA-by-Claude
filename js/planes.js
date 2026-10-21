@@ -507,27 +507,35 @@ function updatePlanesIdle(dt){
   updateRunwayMarker(dt);
 }
 
-/* --- znacznik lotniska w locie: duża strzałka nad środkiem pasa (bez mgły — widoczna z daleka) i strzałki
-   kierunku podejścia nad progami; pokazywane tylko w samolocie --- */
-const runwayMarker = (function(){
-  const g = new THREE.Group(), rw = AIRPORT.runway;
+/* --- znaczniki lotnisk w locie: duża strzałka nad środkiem każdego pasa (bez mgły — widoczna z daleka) i strzałki
+   kierunku podejścia nad progami; pokazywane tylko w samolocie. Pasy: wysepka (wzdłuż x) i lotnisko miejskie (wzdłuż z) --- */
+const RUNWAYS = [
+  { cx: (AIRPORT.runway.x0 + AIRPORT.runway.x1) / 2, cz: AIRPORT.runway.z, alongX: true, half: (AIRPORT.runway.x1 - AIRPORT.runway.x0) / 2 },
+  { cx: AIRPORT_W.runway.x, cz: (AIRPORT_W.runway.z0 + AIRPORT_W.runway.z1) / 2, alongX: false, half: (AIRPORT_W.runway.z1 - AIRPORT_W.runway.z0) / 2 }
+];
+const runwayMarkers = RUNWAYS.map(r => {
+  const g = new THREE.Group();
   const mat = new THREE.MeshBasicMaterial({ color: 0xffc83a, fog: false, transparent: true, opacity: 0.92 });
   const tip = new THREE.Mesh(new THREE.ConeGeometry(9, 16, 4), mat); tip.rotation.x = Math.PI; tip.position.y = 8;      // grot w dół
   const shaft = new THREE.Mesh(new THREE.BoxGeometry(5, 18, 5), mat); shaft.position.y = 25;
-  const big = new THREE.Group(); big.add(tip); big.add(shaft); big.position.set((rw.x0 + rw.x1) / 2, 70, rw.z); g.add(big);
+  const big = new THREE.Group(); big.add(tip); big.add(shaft); big.position.set(r.cx, 70, r.cz); g.add(big);
   const appr = new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false, transparent: true, opacity: 0.75 });
-  for (const e of [-1, 1]){                                                       // nad progami: strzałki wzdłuż pasa
-    const c = new THREE.Mesh(new THREE.ConeGeometry(4, 10, 3), appr);
-    c.rotation.z = e < 0 ? -Math.PI / 2 : Math.PI / 2; c.position.set(e < 0 ? rw.x0 - 30 : rw.x1 + 30, 35, rw.z); g.add(c);
+  for (const e of [-1, 1]){                                                       // nad progami: strzałki wzdłuż pasa, w stronę pasa
+    const c = new THREE.Mesh(new THREE.ConeGeometry(4, 10, 3), appr), d = r.half + 30;
+    if (r.alongX){ c.rotation.z = e < 0 ? -Math.PI / 2 : Math.PI / 2; c.position.set(r.cx + e * d, 35, r.cz); }
+    else { c.rotation.x = e < 0 ? Math.PI / 2 : -Math.PI / 2; c.position.set(r.cx, 35, r.cz + e * d); }
+    g.add(c);
   }
   g.userData.big = big; g.visible = false; scene.add(g);
   return g;
-})();
+});
 function updateRunwayMarker(dt){
   const on = mode === 'plane' && !!curPlane;
-  runwayMarker.visible = on;
-  if (!on) return;
-  const b = runwayMarker.userData.big, d = Math.hypot(curPlane.pos.x - b.position.x, curPlane.pos.z - b.position.z);
-  b.position.y = 70 + Math.sin(clock * 2) * 3; b.rotation.y += dt * 0.8;
-  const s = clamp(d / 280, 0.7, 4); b.scale.setScalar(s);                         // z daleka większa
+  for (const g of runwayMarkers){
+    g.visible = on;
+    if (!on) continue;
+    const b = g.userData.big, d = Math.hypot(curPlane.pos.x - b.position.x, curPlane.pos.z - b.position.z);
+    b.position.y = 70 + Math.sin(clock * 2) * 3; b.rotation.y += dt * 0.8;
+    b.scale.setScalar(clamp(d / 280, 0.7, 4));                                     // z daleka większa
+  }
 }

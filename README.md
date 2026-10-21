@@ -1,6 +1,6 @@
 # GTA by Claude
 
-**Mini-GTA w przeglądarce.** Miasto na wyspie: 12 × 12 kwartałów z ruchem ulicznym, pieszymi, rowerzystami i piratami drogowymi, dwie autostrady na estakadach z węzłem koniczynowym, port z łodziami, a za cieśniną wysepka z lotniskiem i samolotami, którymi można latać (i z których można wyskoczyć ze spadochronem). Do tego pełna mapa z wyznaczaniem trasy, cykl dnia i nocy, broń i kradzież aut.
+**Mini-GTA w przeglądarce.** Miasto na wyspie: 12 × 12 kwartałów z ruchem ulicznym, pieszymi, rowerzystami i piratami drogowymi, dwie autostrady na estakadach z węzłem koniczynowym, lotnisko miejskie i port z łodziami, a za cieśniną wysepka z drugim lotniskiem — samolotami z obu można latać (i z których można wyskoczyć ze spadochronem). Do tego pełna mapa z wyznaczaniem trasy, cykl dnia i nocy, broń i kradzież aut.
 
 Wszystko — asfalt, okna, modele aut i samolotów, znaki, dźwięk silnika i wybuchów — jest generowane w kodzie. Nie ma ani jednego pliku graficznego czy dźwiękowego, nie ma bundlera ani serwera: wystarczy otworzyć `index.html`.
 
@@ -75,7 +75,7 @@ Jak wystartować: ustaw samolot na pasie, trzymaj `W`, a gdy prędkościomierz p
 
 - Miasto leży na wyspie otoczonej morzem, z nabrzeżem i balustradą dookoła.
 - Na północnym brzegu jest **port**: plac kontenerowy z suwnicą, dwa dźwigi nabrzeżowe, statek kontenerowy, magazyn, biuro portu i przystań z motorówkami.
-- Za cieśniną, ok. 250 m na północ, leży **wysepka z lotniskiem** i własną przystanią. Dopłyniesz tam łodzią z portu, a wrócisz łodzią albo samolotem.
+- Za cieśniną, ok. 250 m na północ, leży **wysepka z drugim lotniskiem** i własną przystanią. Dopłyniesz tam łodzią z portu albo dolecisz samolotem z lotniska miejskiego.
 - Kto wpadnie do wody (pieszo albo autem), zostaje wyciągnięty na brzeg; auto ląduje obok. Samolot, który dotknie wody, rozbija się i tonie.
 
 ### Mapa i nawigacja
@@ -86,7 +86,7 @@ Jak wystartować: ustaw samolot na pasie, trzymaj `W`, a gdy prędkościomierz p
 
 - `M` otwiera mapę całego świata (gra stoi): kółko przybliża, przeciąganie przesuwa, **prawy klik ustawia fioletowy znacznik celu** (drugi klik na znaczniku go usuwa).
 - Trasa prowadzi pieszo i autem **po drogach** (autem z poszanowaniem jednokierunkowej obwodnicy), na drugą wyspę — przez przystanie, a samolotem i łodzią — w linii prostej. Widać ją na minimapie i mapie, a w świecie stoi fioletowy słup celu.
-- W samolocie nad pasem startowym unosi się żółta strzałka widoczna z daleka, a nad progami — strzałki kierunku podejścia.
+- W samolocie nad oboma pasami startowymi unoszą się żółte strzałki widoczne z daleka, a nad progami — strzałki kierunku podejścia.
 
 ### Miasto
 
@@ -122,22 +122,22 @@ Jak wystartować: ustaw samolot na pasie, trzymaj `W`, a gdy prędkościomierz p
 
 ### Lotnisko i samoloty
 
-| Lotnisko | Odrzutowiec w locie | Awionetka |
+| Lotnisko miejskie | Lotnisko na wysepce | Odrzutowiec w locie |
 |---|---|---|
-| ![Lotnisko](screenshots/lotnisko.jpg) | ![Lot](screenshots/lot.jpg) | ![Awionetka](screenshots/awionetka.jpg) |
+| ![Lotnisko miejskie](screenshots/lotnisko-miejskie.jpg) | ![Lotnisko na wysepce](screenshots/lotnisko.jpg) | ![Lot](screenshots/lot.jpg) |
 
 | Skok ze spadochronem | Katastrofa | Odrzutowiec |
 |---|---|---|
 | ![Spadochron](screenshots/spadochron.jpg) | ![Katastrofa](screenshots/katastrofa.jpg) | ![Odrzutowiec](screenshots/odrzutowiec.jpg) |
 
-- Lotnisko na osobnej wysepce na północ od miasta: pas startowy 336 × 30 m, droga kołowania, płyta z rękawami, terminal, wieża, hangar, parking, przystań.
+- **Dwa lotniska**: miejskie w zachodnim pasie zieleni wyspy głównej (pas 18/36, 326 × 26 m, terminal, wieża, hangar, parking, dojazd z alei) i na wysepce na północ od miasta (pas 09/27, 336 × 30 m, płyta z rękawami, terminal, wieża, hangar, parking, przystań). Na każdym stoi odrzutowiec i awionetka — można przelecieć z jednego na drugie.
 - Dwa samoloty: szybki odrzutowiec i zwrotna awionetka. Sterowanie strzałkami z autopoziomowaniem, ochroną przed przeciągnięciem i asystentem lądowania.
 - `F` w locie — wyskakujesz, otwiera się prostokątna czasza (skręty `A`/`D`, `W` szybciej, `S` hamowanie), a samolot bez pilota nurkuje i rozbija się.
 - Zderzenie z budynkiem albo twarde lądowanie to katastrofa: kula ognia przechodząca w dym, błysk, odłamki, płonący wrak, wstrząs kamery i huk. Pilot nie przeżywa (z nieśmiertelnością z menu debug ląduje obok wraku). Po kilkunastu sekundach samolot wraca na lotnisko — gdy jego stanowisko jest wolne.
 
 ### Menu debug (`` ` ``)
 
-Liczba aut i pieszych, pora dnia, nieśmiertelność, amunicja, teleporty (start, port, lotnisko, autostrada, zjazd, obwodnica), zmiana typu auta w trakcie jazdy i rower, kierunkowskazy, samolot na lotnisku albo od razu w powietrzu, dodawanie piratów i rowerzystów, szansa potrącenia rowerzysty, przełącznik LOD.
+Liczba aut i pieszych, pora dnia, nieśmiertelność, amunicja, teleporty (start, port, lotnisko miejskie, wysepka, autostrada, zjazd, obwodnica), zmiana typu auta w trakcie jazdy i rower, kierunkowskazy, samolot na lotnisku albo od razu w powietrzu, dodawanie piratów i rowerzystów, szansa potrącenia rowerzysty, przełącznik LOD.
 
 ![Ekran ładowania](screenshots/ladowanie.jpg)
 

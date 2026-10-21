@@ -23,7 +23,7 @@ Brak bundlera: `index.html` ładuje zwykłe `<script>` w kolejności z `loadorde
 | physics-world.js | świat cannon, materiały, statyczne kolizje w komórkach, poprawka `computeAABB` |
 | signs.js | znaki drogowe: tarcze, słupki, `placeSign`, `signSpotFree` |
 | car-types.js | typy aut (CAR_TYPES: sedan, pickup, sport, bike) — napęd, zawieszenie, bryła, części modelu (carParts; spojler tylko sport), kierunkowskazy (`addIndicators`, `indBlinkOn`) |
-| airport.js | lotnisko na wysepce (`AIRPORT`, z ≈ −650…−810): pas, kołowanie, płyta, terminal, parking, dojazd z przystani; miejsca samolotów w `AIRPORT_PLANES` |
+| airport.js | dwa lotniska: na wysepce (`AIRPORT`, pas wzdłuż x, z ≈ −650…−810, dojazd z przystani) i miejskie w zachodnim pasie wyspy głównej (`AIRPORT_W`, `buildAirportWest`, pas 18/36 wzdłuż z, dojazd z alei j=6); miejsca samolotów w `AIRPORT_PLANES` (po odrzutowcu i awionetce na każdym); strzałki nad pasami: `RUNWAYS` / `runwayMarkers` w planes.js |
 | hospital.js | szpital w południowym pasie podmiejskim (`HOSPITAL`): dojazd z i=4, budynek, lądowisko, karetki, parking; odrodzenie gracza `HOSPITAL_SPAWN` (`respawnPlayer`) |
 | islands.js | wyspy i morze: `WATER_Y`, `SEA_FLOOR`, `ISLANDS`, `isLand`/`islandAt`, `PIERS`, `BOAT_OBSTACLES`, `BOAT_SPOTS`, `PORTS`; bryły wysp w fizyce (dno = `groundBody` na `SEA_FLOOR`), nabrzeża z balustradą (przerwy `HARBOR_GAPS`), woda (`updateSea`), port (`buildMainPort`), przystań wysepki, `updateWaterHazards` (wyciąganie z wody) |
 | districts.js | zabudowa dzielnic (wieżowce, bloki, domki z działkami, parki, plac, galeria, stacja, przemysł); CB(kolor) = bufory scalane w jedną siatkę z kolorami wierzchołków |

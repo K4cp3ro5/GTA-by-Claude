@@ -30,6 +30,8 @@ function navBuild(){
   const H = add(HOSPITAL.access.x, HOSPITAL.front.z, 'main'); edge(id(4, GRID), H);
   const H2 = add(HOSPITAL_SPAWN.x, HOSPITAL.front.z, 'main'); edge(H, H2);
   const P = add(PORTS.main.x, PORTS.main.z, 'main'); edge(id(5, 0), P);
+  const AW = add(AIRPORT_W.front.x, AIRPORT_W.access.z, 'main'); edge(id(0, 6), AW);                        // lotnisko miejskie
+  const AW2 = add(AIRPORT_W.front.x, AIRPORT_W.term.z0, 'main'); edge(AW, AW2);
   const A0 = add(PORTS.airport.x, PORTS.airport.z, 'airport'), A1 = add(AIRPORT.access.x, AIRPORT.front.z, 'airport'), A2 = add(AIRPORT.front.x1, AIRPORT.front.z, 'airport');
   edge(A0, A1); edge(A1, A2);
   NAV.port = { main: P, airport: A0 };
@@ -127,7 +129,7 @@ function navPin(g, x, y, s){
 /* --- pełna mapa (M) --- */
 const bigEl = document.getElementById('bigmap'), bigCv = document.getElementById('bigmapCv'), bigG = bigCv.getContext('2d');
 const BIG = { cx: 0, cz: 0, s: 1, drag: null };
-const MAP_LABELS = [['PORT', () => [PORTS.main.x + 60, PORTS.main.z + 30]], ['LOTNISKO', () => [0, AIRPORT.runway.z - 30]], ['PRZYSTAŃ', () => [PORTS.airport.x, PORTS.airport.z + 26]],
+const MAP_LABELS = [['PORT', () => [PORTS.main.x + 60, PORTS.main.z + 30]], ['LOTNISKO', () => [0, AIRPORT.runway.z - 30]], ['LOTNISKO', () => [AIRPORT_W.apron.x0, AIRPORT_W.runway.z0 - 14]], ['PRZYSTAŃ', () => [PORTS.airport.x, PORTS.airport.z + 26]],
                     ['SZPITAL', () => [HOSPITAL_SPAWN.x, HOSPITAL.main.z1 + 14]], ['WĘZEŁ A1/A2', () => [0, 30]]];
 function openMap(){
   if (mapOpen) return;

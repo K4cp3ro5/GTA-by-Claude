@@ -589,6 +589,7 @@ for (let bi = 0; bi < GRID; bi++){
 buildIslands();
 buildGasStation();
 buildAirport();
+buildAirportWest();
 buildHospital();
 
 /* (dawny mur dookoła świata zastąpiony nabrzeżem z balustradą — islands.js) */
