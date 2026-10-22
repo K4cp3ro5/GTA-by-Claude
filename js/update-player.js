@@ -139,6 +139,6 @@ function respawnPlayer(){
   player.fallSpeed = 0;
   player.health = 100;
   player.stamina = 100;
-  player.dead = false;
+  player.dead = false; player.deathMsg = null;
   hudToast('Szpital — wypisano cię po leczeniu', 3);
 }

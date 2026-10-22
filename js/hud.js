@@ -113,6 +113,7 @@ function drawMinimap(){
   if (mode === 'foot' && driving.owner !== 'player') sq(chassisBody.position.x, chassisBody.position.z);
   /* auto gracza — strzałka jak u pieszego, ten sam poprawny wzór obrotu (prowadzone albo zaparkowane twoje) */
   const ownP = driving.owner === 'player' || mode === 'car' ? null : parkedCars.find(q => q.owner === 'player');
+  if (!ownP && activeCarGone){ /* auto zniszczone */ } else {
   const cp = ownP ? toMap(ownP.x, ownP.z) : toMap(chassisBody.position.x, chassisBody.position.z);
   const cy = ownP ? ownP.heading : carYaw();
   mg.save();
@@ -123,6 +124,7 @@ function drawMinimap(){
   mg.moveTo(0, -6.5); mg.lineTo(3.6, 4.5); mg.lineTo(0, 2.2); mg.lineTo(-3.6, 4.5);
   mg.closePath(); mg.fill();
   mg.restore();
+  }
 
   /* łodzie (niebieskie kreski) i łódź gracza */
   for (const b of boats){ const q = toMap(b.pos.x, b.pos.z); if (b === curBoat || q[0] < -6 || q[0] > MM + 6 || q[1] < -6 || q[1] > MM + 6) continue; mg.save(); mg.translate(q[0], q[1]); mg.rotate(-b.heading + Math.PI); mg.fillStyle = '#7fc4e8'; mg.fillRect(-1.5, -3.5, 3, 7); mg.restore(); }
@@ -288,6 +290,7 @@ function updateHud(dt, kmh){
   Weapons.updateHud();
   el.hurtFlash.style.opacity = (player.hurtFlash * 0.7).toFixed(2);
   el.deadScreen.classList.toggle('on', player.dead);
+  if (player.dead){ const t = player.deathMsg || 'ROZBITY'; if (el.deadScreen.firstChild.textContent !== t) el.deadScreen.firstChild.textContent = t; }
 
   if (hudAcc > 0.12){
     hudAcc = 0;

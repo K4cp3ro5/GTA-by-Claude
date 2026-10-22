@@ -17,7 +17,7 @@ const DEFAULT_BINDS = {
   forward:'KeyW', back:'KeyS', left:'KeyA', right:'KeyD',
   sprint:'ShiftLeft', jump:'Space',
   enter:'KeyF', horn:'KeyH', reload:'KeyR', wheel:'KeyQ', vehicleWheel:'KeyV', indLeft:'KeyQ', indRight:'KeyE',
-  slot1:'Digit1', slot2:'Digit2', slot3:'Digit3', slot4:'Digit4',
+  slot1:'Digit1', slot2:'Digit2', slot3:'Digit3', slot4:'Digit4', slot5:'Digit5',
   daytime:'KeyT', mute:'KeyN', map:'KeyM'
 };
 const BIND_ROWS = [
@@ -28,7 +28,7 @@ const BIND_ROWS = [
   ['wheel','Koło broni (przytrzymaj)'],
   ['vehicleWheel','Menu pojazdów (przytrzymaj)'],
   ['indLeft','Kierunkowskaz lewy (w aucie)'], ['indRight','Kierunkowskaz prawy (w aucie)'],
-  ['slot1','Broń — slot 1'], ['slot2','Broń — slot 2'], ['slot3','Broń — slot 3'], ['slot4','Broń — slot 4'],
+  ['slot1','Broń — slot 1'], ['slot2','Broń — slot 2'], ['slot3','Broń — slot 3'], ['slot4','Broń — slot 4'], ['slot5','Broń — slot 5'],
   ['horn','Klakson'], ['daytime','Przyspiesz dobę'], ['map','Mapa (PPM — cel trasy)'], ['mute','Wycisz dźwięk']
 ];
 function loadBinds(){
@@ -93,7 +93,7 @@ function buildGateKeys(){
   const rows = [
     [K('forward') + K('left') + K('back') + K('right'), 'Ruch / jazda'], [K('sprint') + K('jump'), 'Bieg · skok / ręczny'],
     [K('enter'), 'Wsiądź / wysiądź / ukradnij'], [K('vehicleWheel'), 'Menu pojazdów (przytrzymaj)'], null,
-    [T('LPM') + T('PPM'), 'Strzał · przycelowanie'], [K('wheel') + T('1–4'), 'Koło broni · wybór broni'], [K('reload'), 'Przeładuj / postaw auto'], null,
+    [T('LPM') + T('PPM'), 'Strzał · przycelowanie'], [K('wheel') + T('1–5'), 'Koło broni · wybór broni'], [K('reload'), 'Przeładuj / postaw auto'], null,
     [K('map') + K('daytime'), 'Mapa · przyspiesz dobę'], [K('mute') + T('Esc') + T('`'), 'Dźwięk · pauza · menu dev']
   ];
   box.innerHTML = rows.map(r => r ? '<span class="k">' + r[0] + '</span><span>' + r[1] + '</span>' : '<i class="sep"></i>').join('');
@@ -208,6 +208,7 @@ document.addEventListener('keydown', e => {
     if (k === BIND.slot2) Weapons.select(1);
     if (k === BIND.slot3) Weapons.select(2);
     if (k === BIND.slot4) Weapons.select(3);
+    if (k === BIND.slot5) Weapons.select(4);
   }
 });
 document.addEventListener('keyup', e => {
@@ -348,7 +349,7 @@ const DBG_ACT = {
     if (c){ npcMakePirate(c); hudToast('Pirat: auto ' + Math.round(Math.hypot(c.pos.x - p.x, c.pos.y - p.z)) + ' m od ciebie'); }
   },
   heal:        () => { player.health = 100; player.stamina = 100; },
-  ammo:        () => Weapons.fillAmmo(200),
+  ammo:        () => Weapons.fillAmmo(),
   fixCar:      () => { if (mode === 'car') resetCar(); else hudToast('Działa w aucie'); },
   clearStolen: () => parkedCars.filter(q => q.owner === 'stolen').forEach(removeParked),
   boat:        () => {

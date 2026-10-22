@@ -252,7 +252,7 @@ const Sound = {
   }
 };
 
-let _crashT = -9, _crashD = 0;
+let _crashT = -9, _crashD = 0, _carCrashT = -9, _carCrashV = 9;
 /* dźwięk uderzenia karoserii + obrażenia od kraksy + potrącenie pieszego */
 chassisBody.addEventListener('collide', e => {
   const v = e.contact ? Math.abs(e.contact.getImpactVelocityAlongNormal()) : 0;
@@ -260,5 +260,7 @@ chassisBody.addEventListener('collide', e => {
   /* obrażenia raz na kraksę (kilka kształtów naraz = kilka zdarzeń): najmocniejsze uderzenie w oknie 0.4 s */
   if (mode === 'car' && v > 11){ const d = (v - 11) * 3.6; if (clock - _crashT > 0.4){ _crashT = clock; _crashD = 0; } if (d > _crashD){ damagePlayer(d - _crashD, 'kraksa'); _crashD = d; } }
   if (e.body && e.body.isPed && v > 2.2) Pedestrians.hit(e.body.pedRef, v);   // body.pedRef = obiekt pieszego (samo ciało nie ma group/state)
-  if (e.body && e.body.npcRef && v > 5.6) npcHitByPlayer(e.body.npcRef, v);    // > 20 km/h: NPC staje ze światłami awaryjnymi
+  if (e.body && e.body.npcRef && v > 5.6){ const n = e.body.npcRef; npcHitByPlayer(n, v); n.hp = (n.hp === undefined ? 100 : n.hp) - (v - 5) * 7; if (n.hp <= 0) _boomQueue.push(() => destroyNpcCar(n)); }   // > 20 km/h: NPC staje; duża kraksa — wybuch
+  /* stan auta gracza: najmocniejsze uderzenie w oknie 0.4 s */
+  if (v > 9){ if (clock - _carCrashT > 0.4){ _carCrashT = clock; _carCrashV = 9; } if (v > _carCrashV){ const dv = v, prev = _carCrashV; _carCrashV = v; _boomQueue.push(() => { carHp -= (dv - prev) * 5.5; if (carHp <= 0) destroyActiveCar('kraksa'); }); } }
 });

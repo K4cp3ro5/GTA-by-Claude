@@ -26,6 +26,7 @@ sound.js
 vehicle-entry.js
 planes.js
 air-traffic.js
+destruction.js
 boats.js
 birds.js
 daynight.js

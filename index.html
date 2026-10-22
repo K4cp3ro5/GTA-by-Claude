@@ -364,7 +364,7 @@
 
 <!-- ekran ładowania: pasek liczy wczytane skrypty (data-scripts = 2 biblioteki + pliki z loadorder.txt, sprawdza harness);
      main-loop.js woła LOADER.finish(), błąd podczas ładowania odsłania menu z komunikatem (#err) -->
-<div id="loader" data-scripts="40">
+<div id="loader" data-scripts="41">
   <div class="lsun"></div>
   <svg id="lcity" viewBox="0 0 1600 400" preserveAspectRatio="xMidYMax slice" aria-hidden="true"></svg>
   <div class="lbox">
@@ -572,7 +572,7 @@ var LOADER = (function(){
         <label class="dtog"><span>Nieśmiertelność</span><input type="checkbox" data-dbg="god"><i></i></label>
         <label class="dtog"><span>Nieskończona amunicja</span><input type="checkbox" data-dbg="infAmmo"><i></i></label>
         <div class="dctl"><span>Moc auta</span><input type="range" data-dbg="carSpeed" min="0.2" max="3" step="0.1"><output></output></div>
-        <div class="dbtngrid"><button class="dbtn" data-act="heal">Ulecz</button><button class="dbtn" data-act="ammo">+200 amunicji</button><button class="dbtn" data-act="fixCar">Postaw auto</button><button class="dbtn warn" data-act="clearStolen">Usuń skradzione</button></div>
+        <div class="dbtngrid"><button class="dbtn" data-act="heal">Ulecz</button><button class="dbtn" data-act="ammo">Pełne magazynki</button><button class="dbtn" data-act="fixCar">Postaw auto</button><button class="dbtn warn" data-act="clearStolen">Usuń skradzione</button></div>
       </section>
 
       <section class="dsec">
@@ -637,6 +637,7 @@ var LOADER = (function(){
 <script src="js/vehicle-entry.js"></script>
 <script src="js/planes.js"></script>
 <script src="js/air-traffic.js"></script>
+<script src="js/destruction.js"></script>
 <script src="js/boats.js"></script>
 <script src="js/birds.js"></script>
 <script src="js/daynight.js"></script>
