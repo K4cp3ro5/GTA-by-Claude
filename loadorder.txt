@@ -28,6 +28,7 @@ planes.js
 air-traffic.js
 destruction.js
 cats.js
+inventory.js
 boats.js
 birds.js
 daynight.js

@@ -243,9 +243,11 @@ function vehicleMenuPick(i){
 
 function toggleVehicle(){
   if (!pointerLocked) return;
+  fishCancel();
   if (mode === 'plane'){ exitPlane(false); return; }
   if (mode === 'boat'){ exitBoat(false); return; }
   if (mode === 'ride'){ if (curRide && curRide.canExit) rideEnd(curRide); else hudToast('Nie wysiadaj w trakcie jazdy — poczekaj do końca przejażdżki'); return; }
+  if (mode === 'foot' && invTryFeed()) return;                                    // ryba w ręce przy kocie
   if (mode === 'foot'){
     const nv = nearestVehicle();
     if (nv.dist > 3.5) return;

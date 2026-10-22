@@ -28,6 +28,9 @@ const el = {
   indRh:       document.getElementById('indRh'),
   toast:       document.getElementById('toast')
 };
+/* przyczyny śmierci (damagePlayer(…, cause), killPlayer) — podtytuł ekranu śmierci */
+const DEATH_CAUSES = { upadek: 'Upadek z wysokości.', kraksa: 'Wypadek samochodowy.', wybuch: 'Wybuch — za blisko ognia.', rakieta: 'Trafienie rakietą.', katastrofa: 'Katastrofa lotnicza.',
+  'wyskok': 'Wyskok z pędzącego auta.', strzał: 'Postrzał.', kot: 'Skrzywdziłeś kota. Karma wraca natychmiast.' };
 /* krótki komunikat na środku ekranu */
 let _toastT = 0;
 function hudToast(text, secs){ el.toast.textContent = text; el.toast.classList.add('on'); _toastT = secs || 2.2; }
@@ -133,6 +136,8 @@ function drawMinimap(){
     mg.fillStyle = '#f2f0ea'; mg.beginPath(); mg.moveTo(0, -7); mg.lineTo(3.5, -1); mg.lineTo(3.5, 6); mg.lineTo(-3.5, 6); mg.lineTo(-3.5, -1); mg.closePath(); mg.fill();
     mg.restore();
   }
+  /* koty — pomarańczowe kropki (nakarmione: różowe) */
+  for (const c of CATS){ if (c.dead) continue; const q = toMap(c.x, c.z); if (q[0] < -4 || q[0] > MM + 4 || q[1] < -4 || q[1] > MM + 4) continue; mg.fillStyle = c.fedT > clock ? '#ff7aa2' : '#ff9d2e'; mg.beginPath(); mg.arc(q[0], q[1], 2.2, 0, TAU); mg.fill(); }
   /* samoloty NPC (ruch lotniczy) — małe sylwetki */
   for (const a of airPlanes){ const q = toMap(a.pos.x, a.pos.z); if (q[0] < -8 || q[0] > MM + 8 || q[1] < -8 || q[1] > MM + 8) continue; mg.save(); mg.translate(q[0], q[1]); mg.rotate(-a.heading + Math.PI); mg.fillStyle = '#cfe3ee'; mg.fillRect(-0.9, -4.5, 1.8, 9); mg.fillRect(-4.5, -1, 9, 2); mg.fillRect(-2, 3, 4, 1.4); mg.restore(); }
   /* samolot gracza */
@@ -290,7 +295,16 @@ function updateHud(dt, kmh){
   Weapons.updateHud();
   el.hurtFlash.style.opacity = (player.hurtFlash * 0.7).toFixed(2);
   el.deadScreen.classList.toggle('on', player.dead);
-  if (player.dead){ const t = player.deathMsg || 'ROZBITY'; if (el.deadScreen.firstChild.textContent !== t) el.deadScreen.firstChild.textContent = t; }
+  renderer.domElement.classList.toggle('dead', player.dead);
+  if (player.dead){
+    const t = player.deathMsg || 'NIE ŻYJESZ', why = DEATH_CAUSES[player.deathCause] || 'Tym razem się nie udało.';
+    const dsT = document.getElementById('dsTitle'), dsC = document.getElementById('dsCause');
+    if (dsT.textContent !== t) dsT.textContent = t;
+    if (dsC.textContent !== why) dsC.textContent = why;
+    const left = Math.max(0, ((player.respawnAt || 0) - performance.now()) / 1000);
+    document.getElementById('dsTimer').textContent = 'Odrodzenie w szpitalu za ' + Math.ceil(left) + ' s';
+    document.getElementById('dsBar').style.width = Math.round(100 - left / (RESPAWN_MS / 1000) * 100) + '%';
+  }
 
   if (hudAcc > 0.12){
     hudAcc = 0;

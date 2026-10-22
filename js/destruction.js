@@ -68,6 +68,18 @@ function explodeAt(x, y, z, power, opts){
     }
   }
   for (const p of planes){ if (!(p.wreckT > 0) && !p.wreck && p !== curPlane && Math.hypot(p.pos.x - x, p.pos.y - y, p.pos.z - z) < 6 * power) _boomQueue.push(() => planeCrash(p)); }
+  for (const a of airPlanes.slice()){ if (Math.hypot(a.pos.x - x, a.pos.y - y, a.pos.z - z) < 9 * power) _boomQueue.push(() => destroyAirPlane(a)); }
+  /* koty w zasięgu: skrzywdzone przez gracza (cats.js) */
+  if (!opts.noCats && typeof CATS !== 'undefined') for (const c of CATS){ if (!c.dead && Math.hypot(c.x - x, c.z - z) < R * 0.7) _boomQueue.push(() => catHarmed(c, 'wybuch')); }
+}
+/* samolot NPC trafiony: duża kula ognia w powietrzu i odłamki, samolot znika, wraca po 40 s */
+function destroyAirPlane(a){
+  if (airPlanes.indexOf(a) < 0) return;
+  const p = a.pos;
+  explodeAt(p.x, p.y, p.z, 1.8, { debrisCol: 0xe9eaec, noCats: true });
+  removeAirPlane(a);
+  hudToast('Samolot zestrzelony', 2.5);
+  setTimeout(() => setAirCount(AIR_COUNT), 40000);
 }
 /* wrak w miejscu auta: atrapa owner 'wreck' (spalony model, kolizja), dym i ogień */
 function addWreck(type, color, x, yGround, z, heading){
@@ -121,9 +133,10 @@ function removeActiveCar(){
 /* śmierć bez względu na nieśmiertelność (koty) — komunikat na ekranie śmierci */
 function killPlayer(msg){
   if (player.dead) return;
-  player.health = 0; player.dead = true; player.deathMsg = msg; player.hurtFlash = 1;
+  player.health = 0; player.dead = true; player.deathMsg = msg; player.deathCause = 'kot'; player.hurtFlash = 1;
   Sound.hurt();
-  setTimeout(respawnPlayer, 2800);
+  player.respawnAt = performance.now() + RESPAWN_MS + 600;
+  setTimeout(respawnPlayer, RESPAWN_MS + 600);
 }
 /* trafienie pojazdu kulą (weapons.js): body — ciało trafione promieniem */
 function vehicleBulletHit(body, dmg){
@@ -144,15 +157,26 @@ function carCrashDamage(v){
 /* --- rakiety RPG --- */
 const _rkGeo = (() => { const g = new THREE.CylinderGeometry(0.06, 0.06, 0.7, 8); g.rotateX(Math.PI / 2); return g; })();
 const _rkMat = new THREE.MeshLambertMaterial({ color: 0x4a5a3a });
-function fireRocket(from, dir){
+function fireRocket(from, dir, target){
   const m = new THREE.Mesh(_rkGeo, _rkMat); m.position.copy(from); m.lookAt(from.x + dir.x, from.y + dir.y, from.z + dir.z); scene.add(m);
   const flame = fxMesh(0xffb040, 0.95, true); flame.visible = true; flame.scale.setScalar(0.18); m.add(flame); flame.position.set(0, 0, -0.45);
-  rockets.push({ m: m, p: from.clone(), d: dir.clone().normalize(), dist: 0, smoke: 0 });
+  rockets.push({ m: m, p: from.clone(), d: dir.clone().normalize(), dist: 0, smoke: 0, target: target || null });
 }
 const _rkRay = new THREE.Raycaster(), _rkA = new THREE.Vector3();
 function updateRockets(dt){
   for (let i = rockets.length - 1; i >= 0; i--){
-    const r = rockets[i], step = 70 * dt;
+    const r = rockets[i], step = (r.target ? 58 : 70) * dt;
+    /* naprowadzanie: kierunek obracany do celu (maks. 2.6 rad/s), zapalnik zbliżeniowy 2.5 m */
+    if (r.target){
+      const tp = lockTargetPos(r.target);
+      if (!tp) r.target = null;
+      else {
+        _rkA.set(tp.x - r.p.x, tp.y - r.p.y, tp.z - r.p.z); const dd = _rkA.length();
+        if (dd < 2.5){ scene.remove(r.m); rockets.splice(i, 1); explodeAt(r.p.x, r.p.y, r.p.z, 1.15, { cause: 'rakieta' }); continue; }
+        _rkA.divideScalar(dd); const ang = Math.acos(clamp(r.d.dot(_rkA), -1, 1)), mx = 2.6 * dt;
+        if (ang > 1e-4){ r.d.lerp(_rkA, Math.min(1, mx / ang)).normalize(); r.m.lookAt(r.p.x + r.d.x, r.p.y + r.d.y, r.p.z + r.d.z); }
+      }
+    }
     _rkA.copy(r.p).addScaledVector(r.d, step);
     let hit = null, hd = step;
     const h = rayHit(r.p.x, r.p.y, r.p.z, _rkA.x, _rkA.y, _rkA.z, G_WORLD | G_CAR | G_PLANE);
@@ -172,6 +196,26 @@ function updateRockets(dt){
     r.smoke -= dt;
     if (r.smoke <= 0){ r.smoke = 0.03; const s = fxMesh(0xb8b4ac, 0.5, false); s.position.copy(r.p).addScaledVector(r.d, -0.5); fxAdd({ kind: 'smoke', m: s, t: 0, life: 1.6, rise: 0.6, r0: 0.25 }); }
   }
+}
+/* cele namierzania (RPG naprowadzane): auta NPC, piesi, samoloty NPC i na lotniskach, łodzie NPC — pozycja albo null, gdy cel zniknął */
+function lockTargets(){
+  const T = [];
+  for (const n of npcs) T.push({ kind: 'npc', o: n });
+  for (const a of airPlanes) T.push({ kind: 'air', o: a });
+  for (const b of boats) if (b.npc) T.push({ kind: 'boat', o: b });
+  for (const q of Pedestrians.list) if (q.state !== 'down') T.push({ kind: 'ped', o: q });
+  for (const p of planes) if (!p.wreck && !(p.wreckT > 0) && p !== curPlane) T.push({ kind: 'plane', o: p });
+  return T;
+}
+const _ltp = { x: 0, y: 0, z: 0 };
+function lockTargetPos(t){
+  const o = t.o;
+  if (t.kind === 'npc'){ if (npcs.indexOf(o) < 0) return null; _ltp.x = o.pos.x; _ltp.y = (o.y || 0) + 0.8; _ltp.z = o.pos.y; }
+  else if (t.kind === 'air'){ if (airPlanes.indexOf(o) < 0) return null; _ltp.x = o.pos.x; _ltp.y = o.pos.y; _ltp.z = o.pos.z; }
+  else if (t.kind === 'boat'){ if (boats.indexOf(o) < 0) return null; _ltp.x = o.pos.x; _ltp.y = WATER_Y + 0.8; _ltp.z = o.pos.z; }
+  else if (t.kind === 'ped'){ if (o.state === 'down' || Pedestrians.list.indexOf(o) < 0) return null; _ltp.x = o.pos.x; _ltp.y = (o.y || 0) + 1.1; _ltp.z = o.pos.y; }
+  else { if (o.wreck || o.wreckT > 0) return null; _ltp.x = o.pos.x; _ltp.y = o.pos.y; _ltp.z = o.pos.z; }
+  return _ltp;
 }
 /* co klatkę: kolejka wybuchów łańcuchowych, rakiety, dym i ogień wraków, sprzątanie starych wraków */
 function updateDestruction(dt){

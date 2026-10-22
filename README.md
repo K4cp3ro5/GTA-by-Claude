@@ -30,8 +30,9 @@ Klawisze można zmienić w menu (**STEROWANIE**). `Esc` w trakcie gry to pauza �
 | `Shift` / `Spacja` | bieg / skok |
 | `F` (albo `E`) | wsiądź do auta lub samolotu, ukradnij auto NPC, przejażdżka w parku rozrywki (przy wejściu na atrakcję) |
 | `V` (przytrzymaj) | menu pojazdów: twoje auto (zwykły, pickup, sportowy) albo rower |
-| `1` … `5`, `Q` (przytrzymaj) | broń: pięści, kij, pistolet, karabin, RPG / koło broni |
-| lewy przycisk myszy (karabin: przytrzymaj), `R` | atak, strzał / przeładowanie |
+| `1` … `9`, rolka myszy, `Q` (przytrzymaj) | pole paska ekwipunku (pięści, kij, pistolet, karabin, RPG, RPG naprowadzane, wędka, ryby) / koło broni |
+| `Tab` | plecak (ekwipunek: kliknij przedmiot, potem pole docelowe) |
+| lewy przycisk myszy (karabin: przytrzymaj), `R` | atak, strzał, zarzucenie wędki / zacięcie / przeładowanie |
 | prawy przycisk myszy | przycelowanie (bliżej, mniejszy rozrzut, wolniejszy chód) |
 
 **W aucie**
@@ -144,12 +145,20 @@ Jak wystartować: ustaw samolot na pasie, trzymaj `W`, a gdy prędkościomierz p
 |---|---|---|
 | ![Wybuch](screenshots/wybuch.jpg) | ![Wrak](screenshots/wrak.jpg) | ![Koty](screenshots/koty.jpg) |
 
+| Wędkowanie i pasek ekwipunku | Plecak (Tab) | Nakarmiony kot | Ekran śmierci |
+|---|---|---|---|
+| ![Wędkowanie](screenshots/wedkowanie.jpg) | ![Plecak](screenshots/plecak.jpg) | ![Kot](screenshots/kot-serca.jpg) | ![Śmierć](screenshots/smierc.jpg) |
+
 - Jazda z fizyką zawieszenia. Trzy typy aut: zwykły (0–100 km/h w 4,4 s, 181 km/h), pickup (6,9 s, 160 km/h), sportowy (3,0 s, 250 km/h), do tego rower. Twoje auto przywołujesz menu `V`, skradzione zostają tam, gdzie je porzucisz.
 - Broń: pięści, kij, pistolet i karabin (ogień ciągły, magazynek 30). Z bronią palną kamera przechodzi za prawe ramię — postać jest z lewej i nie zasłania celownika na środku ekranu, a obraca się w stronę celownika. Strzał leci przez środek celownika (z kontrolą, czy przed lufą nie ma ściany); rozrzut rośnie w ruchu i przy serii, odrzut podbija kamerę; smugacz, błysk, iskry na metalu, pył na murze, znacznik trafienia. Strzały w auto NPC zatrzymują je na światłach awaryjnych.
+- **Ekwipunek jak w Minecrafcie**: pasek 9 pól na dole ekranu (klawisze 1–9, rolka) i plecak na 27 pól pod `Tab`; ryby układają się w stosy po 16.
+- **Wędkowanie**: wędka w ręce, stań na brzegu albo pomoście przodem do wody, `LPM` — zarzucenie. Po kilku sekundach ryba bierze (spławik nurkuje, napis „Bierze!”) — `LPM` w ciągu ok. sekundy. Okoń, flądra, dorsz, karp, szczupak, łosoś (z wagą) trafiają do ekwipunku.
+- **RPG naprowadzane**: przytrzymaj celownik na celu (auto, pieszy, samolot — także lecący, łódź) — ramka „NAMIERZANIE…” zmienia się w czerwone „NAMIERZONY”; rakieta skręca za celem.
 - **RPG**: rakieta leci w punkt pod celownikiem (z dymem), wybucha przy trafieniu w cokolwiek — jedna rakieta niszczy auto. Magazynków jest bez limitu: HUD pokazuje tylko zawartość bieżącego magazynka, `R` przeładowuje.
 - **Niszczenie pojazdów**: auta mają wytrzymałość — wybuchają po mocnej kraksie, po kilku–kilkunastu strzałach (pistolet ok. 8) albo po jednej rakiecie. Wybuch rani w promieniu (gracz, piesi, inne auta — także łańcuchowo), zostaje płonący, dymiący wrak. Kierowca auta, które wybuchło, ginie (z nieśmiertelnością — wychodzi obok wraku). Twój zniszczony pojazd jest wyszarzony w menu `V` z odliczaniem 60 s; pozostałe typy można przywołać od razu.
 - Wysiadka w biegu: auto toczy się dalej i hamuje, a nie staje w miejscu (przy dużej prędkości wyskok boli).
-- **Koty** chodzą po chodnikach, przysiadają i czasem przebiegają przez ulicę. Przejechanie kota kończy się wybuchem auta, śmiercią (bez względu na nieśmiertelność), komunikatem „JAK MOGŁEŚ?!” i odrodzeniem w szpitalu.
+- **Koty** (ok. 34, liczbę zmienisz w menu deweloperskim) chodzą po chodnikach i przebiegają przez ulice, wędrują po trawie pasa podmiejskiego i spacerują alejkami parku rozrywki; na minimapie i mapie to pomarańczowe kropki. Nakarm kota rybą (ryba w ręce, `F` albo `LPM` przy kocie) — je, nad nim pojawiają się serduszka i przez półtorej minuty chodzi za tobą. Skrzywdzenie kota w jakikolwiek sposób (auto, strzał, cios, wybuch) kończy się wybuchem gracza i śmiercią bez względu na nieśmiertelność — „JAK MOGŁEŚ?!”.
+- **Ekran śmierci**: „NIE ŻYJESZ” z przyczyną (upadek, wypadek, wybuch, rakieta, katastrofa…), obraz w szarości i odliczanie do odrodzenia w szpitalu.
 - Zdrowie i kondycja, upadki z wysokości. Uderzenie w ścianę lub barierę pod małym kątem nie zatrzymuje auta — ślizga się wzdłuż ściany; zatrzymuje dopiero uderzenie czołowe. Po śmierci odradzasz się przed **szpitalem** w południowym pasie zieleni (dojazd z obwodnicy, lądowisko na dachu, karetki, parking).
 - HUD: kompas, zegarowy prędkościomierz, zegar, minimapa z całym światem.
 

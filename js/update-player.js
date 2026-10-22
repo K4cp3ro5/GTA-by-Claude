@@ -105,15 +105,16 @@ function updatePlayer(dt){
   player.hurtFlash = Math.max(0, player.hurtFlash - dt * 1.8);
 }
 
+const RESPAWN_MS = 3800;
 function damagePlayer(amount, cause){
   if (player.dead || amount <= 0 || godMode) return;
   player.health = clamp(player.health - amount, 0, 100);
   player.hurtFlash = 1;
   Sound.hurt();
   if (player.health <= 0 && !player.dead){
-    player.dead = true;
+    player.dead = true; player.deathCause = cause || ''; player.respawnAt = performance.now() + RESPAWN_MS;
     if (mode === 'car') Weapons.holster();
-    setTimeout(respawnPlayer, 1200);
+    setTimeout(respawnPlayer, RESPAWN_MS);
   }
 }
 
@@ -139,6 +140,6 @@ function respawnPlayer(){
   player.fallSpeed = 0;
   player.health = 100;
   player.stamina = 100;
-  player.dead = false; player.deathMsg = null;
+  player.dead = false; player.deathMsg = null; player.deathCause = '';
   hudToast('Szpital — wypisano cię po leczeniu', 3);
 }

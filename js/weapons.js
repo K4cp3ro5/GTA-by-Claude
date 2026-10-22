@@ -11,7 +11,8 @@ const WEAPON_DEFS = [
   { id:'bat',    name:'Kij',      kind:'melee',  range:2.1, dmg:30, cooldown:0.55 },
   { id:'pistol', name:'Pistolet', kind:'ranged', range:70,  dmg:40, cooldown:0.2,  magSize:12, reloadT:1.1, spread:0.010, kick:0.028, bloom:0.55, muzzle:0.2 },
   { id:'rifle',  name:'Karabin',  kind:'ranged', range:160, dmg:28, cooldown:0.095, magSize:30, reloadT:1.8, spread:0.008, kick:0.011, bloom:0.22, muzzle:0.8, auto:true },
-  { id:'rpg',    name:'RPG',      kind:'ranged', range:320, dmg:0,  cooldown:0.9, magSize:1, reloadT:2.2, spread:0.002, kick:0.07, bloom:0.1, muzzle:1.0, projectile:true }
+  { id:'rpg',    name:'RPG',      kind:'ranged', range:320, dmg:0,  cooldown:0.9, magSize:1, reloadT:2.2, spread:0.002, kick:0.07, bloom:0.1, muzzle:1.0, projectile:true },
+  { id:'rpgh',   name:'RPG naprowadzane', kind:'ranged', range:320, dmg:0, cooldown:0.9, magSize:1, reloadT:2.6, spread:0.002, kick:0.07, bloom:0.1, muzzle:1.0, projectile:true, homing:true },
 ];
 const weaponRay = new THREE.Raycaster();
 let infAmmo = false;                                                            // menu deweloperskie
@@ -59,17 +60,18 @@ function buildRifleMesh(){
   ], 1.05);
 }
 /* granatnik RPG: rura z wylotem, chwyt i spust, celownik, głowica (osobna siatka — znika po strzale do przeładowania) */
-function buildRpgMesh(){
+function buildRpgMesh(homing){
   const tube = new THREE.CylinderGeometry(0.075, 0.075, 1.25, 12); tube.rotateX(Math.PI / 2);
   const bell = new THREE.CylinderGeometry(0.11, 0.08, 0.22, 12); bell.rotateX(Math.PI / 2);
   const g = weaponMesh([
-    { geo: tube, color: 0x4a5a3a, x: 0, y: 0.08, z: 0.1 }, { geo: bell, color: 0x2a2c30, x: 0, y: 0.08, z: -0.6 },
+    { geo: tube, color: homing ? 0x3b4250 : 0x4a5a3a, x: 0, y: 0.08, z: 0.1 }, { geo: bell, color: 0x2a2c30, x: 0, y: 0.08, z: -0.6 },
     { geo: new THREE.BoxGeometry(0.04, 0.13, 0.06), color: 0x1b1c1f, x: 0, y: -0.03, z: 0 }, { geo: new THREE.BoxGeometry(0.04, 0.12, 0.05), color: 0x1b1c1f, x: 0, y: -0.02, z: 0.32 },
     { geo: new THREE.BoxGeometry(0.06, 0.1, 0.12), color: 0x1b1c1f, x: -0.08, y: 0.17, z: 0.12 }, { geo: new THREE.BoxGeometry(0.16, 0.03, 0.3), color: 0x6b5a3a, x: 0, y: 0.0, z: -0.25 }
   ], 1);
   const hc = new THREE.ConeGeometry(0.11, 0.32, 10); hc.rotateX(Math.PI / 2);
   const hb = new THREE.CylinderGeometry(0.07, 0.07, 0.18, 10); hb.rotateX(Math.PI / 2);
-  const head = new THREE.Mesh(mergeColored([{ geo: hc, color: 0x5d6b45, z: 0.97 }, { geo: hb, color: 0x3a4430, z: 0.74 }]), _wMat);
+  const head = new THREE.Mesh(mergeColored([{ geo: hc, color: homing ? 0xc8ccd2 : 0x5d6b45, z: 0.97 }, { geo: hb, color: homing ? 0xc0392b : 0x3a4430, z: 0.74 }]), _wMat);
+  if (homing){ const eye = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.08, 0.16), new THREE.MeshBasicMaterial({ color: 0x40ff70 })); eye.position.set(0.1, 0.18, 0.15); g.add(eye); }
   head.position.y = 0.08; head.castShadow = true; g.add(head); g.userData.head = head;
   return g;
 }
@@ -115,9 +117,10 @@ const Weapons = {
     this.meshes.pistol = buildPistolMesh();
     this.meshes.rifle = buildRifleMesh();
     this.meshes.rpg = buildRpgMesh();
+    this.meshes.rpgh = buildRpgMesh(true);
     this.meshes.bat.position.set(0, -0.63, 0.02); player.armR.add(this.meshes.bat);
     this.pivot = new THREE.Group(); player.mesh.add(this.pivot);
-    this.pivot.add(this.meshes.pistol); this.pivot.add(this.meshes.rifle); this.pivot.add(this.meshes.rpg);
+    this.pivot.add(this.meshes.pistol); this.pivot.add(this.meshes.rifle); this.pivot.add(this.meshes.rpg); this.pivot.add(this.meshes.rpgh); this.pivot.add(this.meshes.rpgh);
     for (const id in this.meshes) this.meshes[id].visible = false;
     WEAPON_DEFS.forEach(d => { if (d.kind === 'ranged') this.ammo[d.id] = { mag: d.magSize }; });   // magazynków bez limitu — liczy się tylko zawartość bieżącego
   },
@@ -183,7 +186,7 @@ const Weapons = {
   _muzzle(out){
     const d = this.def(), m = this.meshes[d.id];
     m.updateWorldMatrix(true, false);
-    return out.set(0, d.id === 'rifle' ? 0.05 : d.id === 'rpg' ? 0.08 : 0.1, d.muzzle).applyMatrix4(m.matrixWorld);
+    return out.set(0, d.id === 'rifle' ? 0.05 : d.projectile ? 0.08 : 0.1, d.muzzle).applyMatrix4(m.matrixWorld);
   },
   _fire(d){
     /* promień z kamery przez środek ekranu (z rozrzutem), początek przy postaci — nic za plecami nie blokuje */
@@ -198,20 +201,24 @@ const Weapons = {
     weaponRay.set(_wO, _wD); weaponRay.far = d.range;
     const ph = weaponRay.intersectObjects(Pedestrians.meshes(), true);
     if (ph.length){ dist = ph[0].distance; hitPed = ph[0].object; }
+    let hitCat = null;
+    if (typeof CATS !== 'undefined'){ const ch = weaponRay.intersectObjects(CATS.filter(c => !c.dead && c.m.g.visible).map(c => c.m.g), true); if (ch.length && ch[0].distance < dist){ dist = ch[0].distance; hitPed = null; let o = ch[0].object; while (o && !o.userData.catRef) o = o.parent; hitCat = o ? o.userData.catRef : null; } }
     _wB.copy(_wO).addScaledVector(_wD, d.range);
     const h = rayHit(_wO.x, _wO.y, _wO.z, _wB.x, _wB.y, _wB.z, G_WORLD | G_CAR | G_PLANE);
-    if (h && h.distance < dist){ dist = h.distance; hitPed = null; hitBody = h.body; nrm = h.hitNormalWorld; }
+    if (h && h.distance < dist){ dist = h.distance; hitPed = null; hitCat = null; hitBody = h.body; nrm = h.hitNormalWorld; }
     _wB.copy(_wO).addScaledVector(_wD, dist);
     this._muzzle(_wM);
     if (d.projectile){                                                       // RPG: rakieta z lufy w punkt pod celownikiem
-      fireRocket(_wM, _wT.copy(_wB).sub(_wM).normalize());
+      fireRocket(_wM, _wT.copy(_wB).sub(_wM).normalize(), d.homing && this.lock && this.lockT >= LOCK_TIME ? this.lock : null);
+      this.lock = null; this.lockT = 0;
       for (let k = 0; k < 5; k++){ const s = fxMesh(0xcfcac0, 0.55, false); s.position.copy(_wM).addScaledVector(_wT, -1.6 - k * 0.4); fxAdd({ kind: 'smoke', m: s, t: 0, life: 1.2, rise: 0.4, r0: 0.4 }); }   // podmuch z tyłu
       this._effects(_wM, _wM, null, null);
       return;
     }
     /* z lufy do punktu trafienia: ściana tuż przed postacią przejmuje strzał */
     const mh = rayHit(_wM.x, _wM.y, _wM.z, _wB.x, _wB.y, _wB.z, G_WORLD);
-    if (mh && mh.distance < _wM.distanceTo(_wB) - 0.3){ _wB.set(mh.hitPointWorld.x, mh.hitPointWorld.y, mh.hitPointWorld.z); hitPed = null; hitBody = mh.body; nrm = mh.hitNormalWorld; }
+    if (mh && mh.distance < _wM.distanceTo(_wB) - 0.3){ _wB.set(mh.hitPointWorld.x, mh.hitPointWorld.y, mh.hitPointWorld.z); hitPed = null; hitCat = null; hitBody = mh.body; nrm = mh.hitNormalWorld; }
+    if (hitCat){ this._effects(_wM, _wB, 'ped', null); catHarmed(hitCat, 'strzał'); return; }
     /* skutki */
     if (hitPed){ Pedestrians.hitMesh(hitPed, d.dmg); this.hitMark = 1; }
     else if (hitBody && vehicleBulletHit(hitBody, d.dmg)) this.hitMark = 1;       // auta: NPC, twoje, zaparkowane (destruction.js)
@@ -225,7 +232,7 @@ const Weapons = {
       t.position.copy(from).lerp(to, 0.5); t.scale.set(1, 1, len); t.lookAt(to);
       shotFxAdd(t, 0.05);
     }
-    const f = new THREE.Mesh(_flashGeo, _flashMat); f.position.copy(from); f.scale.setScalar(this.def().id === 'rpg' ? 0.25 : this.def().id === 'rifle' ? 0.075 : 0.06);
+    const f = new THREE.Mesh(_flashGeo, _flashMat); f.position.copy(from); f.scale.setScalar(this.def().projectile ? 0.25 : this.def().id === 'rifle' ? 0.075 : 0.06);
     shotFxAdd(f, 0.045);
     if (!kind) return;
     for (let k = 0; k < (kind === 'metal' ? 4 : 3); k++){
@@ -249,9 +256,32 @@ const Weapons = {
       while (diff < -Math.PI) diff += TAU;
       if (Math.abs(diff) < 0.9) Pedestrians.hit(n, d.dmg, true);
     }
+    if (typeof CATS !== 'undefined') for (const c of CATS){                      // cios w kota
+      if (c.dead || Math.hypot(c.x - p.x, c.z - p.z) > d.range + 0.3) continue;
+      if (Math.abs(wrapAngle(Math.atan2(c.x - p.x, c.z - p.z) - player.facing)) < 0.9){ catHarmed(c, 'cios'); return; }
+    }
+  },
+  /* namierzanie (RPG naprowadzane): cel najbliżej środka celownika (stożek ~7°, do 260 m, widoczny), utrzymany LOCK_TIME = namierzony */
+  updateLock(dt){
+    const d = this.def();
+    if (!d.homing || !this.aiming() || !pointerLocked){ this.lock = null; this.lockT = 0; return; }
+    camera.getWorldDirection(_wD);
+    const cp = camera.position;
+    let best = null, ba = 0.12;
+    for (const t of lockTargets()){
+      const p = lockTargetPos(t); if (!p) continue;
+      const dx = p.x - cp.x, dy = p.y - cp.y, dz = p.z - cp.z, l = Math.hypot(dx, dy, dz);
+      if (l < 6 || l > 260) continue;
+      const a = Math.acos(clamp((dx * _wD.x + dy * _wD.y + dz * _wD.z) / l, -1, 1));
+      if (a < ba){ ba = a; best = t; }
+    }
+    if (best){ const p = lockTargetPos(best); const h = rayHit(cp.x, cp.y, cp.z, p.x, p.y, p.z, G_WORLD); if (h && h.distance < Math.hypot(p.x - cp.x, p.y - cp.y, p.z - cp.z) - 3) best = null; }
+    if (best && this.lock && best.o === this.lock.o){ const was = this.lockT; this.lockT += dt; if (was < LOCK_TIME && this.lockT >= LOCK_TIME) Sound.tick(true); }
+    else { this.lock = best; this.lockT = 0; }
   },
   updatePose(dt){
     updateShotFx(dt);
+    this.updateLock(dt);
     this.cooldown = Math.max(0, this.cooldown - dt);
     this.swingT   = Math.max(0, this.swingT - dt * 2.4);
     this.recoil   = Math.max(0, this.recoil - dt * 9);
@@ -276,12 +306,12 @@ const Weapons = {
     const aim2 = this.aiming();
     if (aim2){ player.facing = angleDamp(player.facing, camYaw + Math.PI, 18, dt); player.mesh.rotation.y = player.facing; }
     const rel = this.reloadT > 0 ? Math.sin(Math.PI * clamp(1 - this.reloadT / d.reloadT, 0, 1)) : 0;
-    const rpg = d.id === 'rpg', e = (aim2 ? clamp(camPitch * 0.85 + 0.08, -0.7, 0.75) : -0.55) * (rpg ? 0.8 : 1) - rel * (rpg ? 0.3 : 0.6), rifle = d.id === 'rifle';
+    const rpg = d.id === 'rpg' || d.id === 'rpgh', e = (aim2 ? clamp(camPitch * 0.85 + 0.08, -0.7, 0.75) : -0.55) * (rpg ? 0.8 : 1) - rel * (rpg ? 0.3 : 0.6), rifle = d.id === 'rifle';
     const P = this.pivot, back = this.recoil * (rifle ? 0.04 : rpg ? 0.12 : 0.06);
     if (rpg) P.position.set(-0.3, 1.5 + Math.sin(e) * 0.15, 0.12 - back);                               // RPG na prawym barku
     else P.position.set(rifle ? -0.06 : 0, (rifle ? 1.22 : 1.3) + Math.sin(e) * (rifle ? 0.1 : 0.45), (rifle ? 0.42 : Math.cos(e) * 0.48) - back);
     P.rotation.set(-e - this.recoil * (rifle ? 0.05 : rpg ? 0.1 : 0.18), 0, rel * 0.7, 'YXZ');
-    if (rpg) this.meshes.rpg.userData.head.visible = this.ammo.rpg.mag > 0 && !(this.reloadT > 0 && this.reloadT > d.reloadT * 0.4);
+    if (rpg) this.meshes[d.id].userData.head.visible = this.ammo[d.id].mag > 0 && !(this.reloadT > 0 && this.reloadT > d.reloadT * 0.4);
     /* ręce: prawa do chwytu, lewa do łoża (karabin) / chwytu (pistolet) — kierunek od barku do punktu */
     P.updateMatrix();
     _wB.set(0, 0, 0).applyMatrix4(P.matrix);
@@ -290,12 +320,22 @@ const Weapons = {
     player.armL.quaternion.setFromUnitVectors(_down, _wA.copy(_wB).sub(player.armL.position).normalize());
   },
   updateHud(){
+    if (typeof invHud === 'function' && invHud()) return;                     // wędka / ryba w ręce (inventory.js)
     const d = this.def(), a = this.ammo[d.id];
     el.wname.textContent = d.name;
     el.wammo.textContent = d.kind === 'ranged' ? (this.reloadT > 0 ? 'PRZEŁADOWANIE' : String(a.mag)) : '';
-    el.weaponhud.classList.toggle('on', mode === 'foot');
+    el.weaponhud.classList.toggle('on', mode === 'foot' && !player.dead);
     const on = mode === 'foot' && d.kind === 'ranged' && !player.dead;
     el.crosshair.classList.toggle('on', on);
+    const lb = document.getElementById('lockBox');
+    if (this.lock && d.homing && on){
+      const p = lockTargetPos(this.lock);
+      if (p){ _wA.set(p.x, p.y, p.z).project(camera);
+        if (_wA.z < 1){ lb.style.display = 'block'; lb.style.left = ((_wA.x + 1) / 2 * innerWidth) + 'px'; lb.style.top = ((1 - _wA.y) / 2 * innerHeight) + 'px';
+          const locked = this.lockT >= LOCK_TIME; lb.classList.toggle('locked', locked); lb.style.setProperty('--k', locked ? 1 : 1.8 - this.lockT / LOCK_TIME * 0.8); lb.dataset.t = locked ? 'NAMIERZONY' : 'NAMIERZANIE…'; }
+        else lb.style.display = 'none'; }
+      else lb.style.display = 'none';
+    } else lb.style.display = 'none';
     if (on){
       const px = Math.max(3, Math.tan(this.spread()) / Math.tan(camera.fov * Math.PI / 360) * innerHeight / 2);   // rozrzut w pikselach
       el.crosshair.style.setProperty('--gap', px.toFixed(1) + 'px');
@@ -303,7 +343,7 @@ const Weapons = {
     }
   }
 };
-const _down = new THREE.Vector3(0, -1, 0);
+const _down = new THREE.Vector3(0, -1, 0), LOCK_TIME = 0.9;
 Weapons.init();
 
 /* --- koło wyboru (radialne, sterowane wirtualnym kursorem — pointer lock nie daje pozycji bezwzględnej):
@@ -352,6 +392,6 @@ function updateWheel(){
       wheelSel = ((idx % n) + n) % n;
     }
     drawWheel(labels, blk && blk.map(b => b > 0));
-  } else if (was === 'weapons') Weapons.select(wheelSel);
+  } else if (was === 'weapons') invSelectWeapon(wheelSel);
   else if (was === 'vehicles') vehicleMenuPick(wheelSel);
 }

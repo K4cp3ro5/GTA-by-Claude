@@ -17,7 +17,7 @@ const DEFAULT_BINDS = {
   forward:'KeyW', back:'KeyS', left:'KeyA', right:'KeyD',
   sprint:'ShiftLeft', jump:'Space',
   enter:'KeyF', horn:'KeyH', reload:'KeyR', wheel:'KeyQ', vehicleWheel:'KeyV', indLeft:'KeyQ', indRight:'KeyE',
-  slot1:'Digit1', slot2:'Digit2', slot3:'Digit3', slot4:'Digit4', slot5:'Digit5',
+  slot1:'Digit1', slot2:'Digit2', slot3:'Digit3', slot4:'Digit4', slot5:'Digit5', slot6:'Digit6', slot7:'Digit7', slot8:'Digit8', slot9:'Digit9', inventory:'Tab',
   daytime:'KeyT', mute:'KeyN', map:'KeyM'
 };
 const BIND_ROWS = [
@@ -28,7 +28,7 @@ const BIND_ROWS = [
   ['wheel','Koło broni (przytrzymaj)'],
   ['vehicleWheel','Menu pojazdów (przytrzymaj)'],
   ['indLeft','Kierunkowskaz lewy (w aucie)'], ['indRight','Kierunkowskaz prawy (w aucie)'],
-  ['slot1','Broń — slot 1'], ['slot2','Broń — slot 2'], ['slot3','Broń — slot 3'], ['slot4','Broń — slot 4'], ['slot5','Broń — slot 5'],
+  ['slot1','Pasek — pole 1'], ['slot2','Pasek — pole 2'], ['slot3','Pasek — pole 3'], ['slot4','Pasek — pole 4'], ['slot5','Pasek — pole 5'], ['slot6','Pasek — pole 6'], ['slot7','Pasek — pole 7'], ['slot8','Pasek — pole 8'], ['slot9','Pasek — pole 9'], ['inventory','Ekwipunek (plecak)'],
   ['horn','Klakson'], ['daytime','Przyspiesz dobę'], ['map','Mapa (PPM — cel trasy)'], ['mute','Wycisz dźwięk']
 ];
 function loadBinds(){
@@ -93,7 +93,7 @@ function buildGateKeys(){
   const rows = [
     [K('forward') + K('left') + K('back') + K('right'), 'Ruch / jazda'], [K('sprint') + K('jump'), 'Bieg · skok / ręczny'],
     [K('enter'), 'Wsiądź / wysiądź / ukradnij'], [K('vehicleWheel'), 'Menu pojazdów (przytrzymaj)'], null,
-    [T('LPM') + T('PPM'), 'Strzał · przycelowanie'], [K('wheel') + T('1–5'), 'Koło broni · wybór broni'], [K('reload'), 'Przeładuj / postaw auto'], null,
+    [T('LPM') + T('PPM'), 'Strzał · przycelowanie'], [K('wheel') + T('1–9'), 'Koło broni · pasek ekwipunku'], [K('inventory'), 'Plecak (ekwipunek)'], [K('reload'), 'Przeładuj / postaw auto'], null,
     [K('map') + K('daytime'), 'Mapa · przyspiesz dobę'], [K('mute') + T('Esc') + T('`'), 'Dźwięk · pauza · menu dev']
   ];
   box.innerHTML = rows.map(r => r ? '<span class="k">' + r[0] + '</span><span>' + r[1] + '</span>' : '<i class="sep"></i>').join('');
@@ -120,9 +120,9 @@ function lockPointer(){
 document.addEventListener('pointerlockchange', () => {
   pointerLocked = (document.pointerLockElement === renderer.domElement);
   if (pointerLocked) gameStarted = true;
-  gate.classList.toggle('hidden', pointerLocked || mapOpen);
+  gate.classList.toggle('hidden', pointerLocked || mapOpen || INV.open);
   gate.classList.toggle('paused', gameStarted);
-  Sound.setPaused(!pointerLocked && !debugOpen);                // pauza (menu): dźwięk wyciszony
+  Sound.setPaused(!pointerLocked && !debugOpen && !INV.open);                // pauza (menu): dźwięk wyciszony
   if (!pointerLocked){
     goBtn.textContent = 'WRÓĆ DO GRY';
     if (gameStarted){                                                       // pauza: stan gry w jednym wierszu
@@ -172,12 +172,13 @@ document.addEventListener('mousedown', e => {
   if (e.button === 2 && pointerLocked){ mouseDownR = true; return; }
   if (!pointerLocked || e.button !== 0 || wheelOpen) return;
   mouseDown = true;
+  if (invHandleClick()) return;                                          // wędka / ryba (inventory.js)
   Weapons.trigger();
 });
 document.addEventListener('mouseup', e => { if (e.button === 0) mouseDown = false; if (e.button === 2) mouseDownR = false; });
 document.addEventListener('wheel', e => {
   if (!pointerLocked || mode !== 'foot') return;
-  Weapons.cycle(e.deltaY > 0 ? 1 : -1);
+  invCycle(e.deltaY > 0 ? 1 : -1);
 }, { passive:true });
 
 document.addEventListener('keydown', e => {
@@ -192,6 +193,8 @@ document.addEventListener('keydown', e => {
     return;
   }
   if (k === 'Backquote'){ e.preventDefault(); toggleDebugMenu(); return; }
+  if (k === BIND.inventory && (pointerLocked || INV.open) && !mapOpen && (mode === 'foot' || INV.open)){ e.preventDefault(); toggleInventory(); return; }
+  if (INV.open && k === 'Escape'){ toggleInventory(); return; }
   if (mapOpen){ if (k === BIND.map || k === 'Escape'){ e.preventDefault(); closeMap(k === BIND.map); } return; }   // mapa: tylko zamknięcie
   if (!pointerLocked) return;   // menu/gate widoczne — klawisze nie sterują grą
   if (k === BIND.map){ openMap(); return; }
@@ -204,11 +207,7 @@ document.addEventListener('keydown', e => {
   if (k === BIND.reload){ if (mode === 'car') resetCar(); else Weapons.reload(); }
   if (k === BIND.mute){ muted = !muted; Sound.setMuted(muted); }
   if (mode === 'foot'){
-    if (k === BIND.slot1) Weapons.select(0);
-    if (k === BIND.slot2) Weapons.select(1);
-    if (k === BIND.slot3) Weapons.select(2);
-    if (k === BIND.slot4) Weapons.select(3);
-    if (k === BIND.slot5) Weapons.select(4);
+    for (let i = 1; i <= 9; i++) if (k === BIND['slot' + i]) invSelect(i - 1);
   }
 });
 document.addEventListener('keyup', e => {
@@ -251,6 +250,7 @@ const DBG_CTL = {
   peds:      { get: () => Pedestrians.list.length,               set: v => setPeds(v),             heavy: true },
   boats:     { get: () => boats.filter(b => b.npc).length,       set: v => setNpcBoatCount(v),     heavy: true },
   air:       { get: () => airPlanes.length,                      set: v => setAirCount(v),         heavy: true },
+  cats:      { get: () => CATS.length,                           set: v => setCatCount(v),         heavy: true },
   freezeNpc: { get: () => npcFrozen,                             set: v => setNpcFrozen(v) },
   lod:       { get: () => NPC_LOD_DIST < 1e6,                    set: v => { NPC_LOD_DIST = v ? 220 : Infinity; } },
   ram:       { get: () => PIRATE_RAM_CHANCE,                     set: v => { PIRATE_RAM_CHANCE = v; }, fmt: pct },
@@ -296,7 +296,7 @@ function toggleDebugMenu(){
   debugOpen = !debugOpen;
   debugEl.classList.toggle('on', debugOpen);
   if (debugOpen){
-    if (POP0.cars === undefined) ['cars', 'bikes', 'peds', 'boats', 'air'].forEach(k => { POP0[k] = DBG_CTL[k].get(); });   // liczebności startowe
+    if (POP0.cars === undefined) ['cars', 'bikes', 'peds', 'boats', 'air', 'cats'].forEach(k => { POP0[k] = DBG_CTL[k].get(); });   // liczebności startowe
     wasLockedBeforeDebug = pointerLocked;
     if (pointerLocked) document.exitPointerLock();
     syncDebugControls();
@@ -340,7 +340,7 @@ const dbgDrop = onMe => {
   b.pos.set(p.x + (onMe ? 0 : 5), (p.y || 0) + 22, p.z + (onMe ? 0 : 3)); b.prev.copy(b.pos); birdDrop(b);
 };
 const DBG_ACT = {
-  popDefault: () => { setNpcCars(POP0.cars); setNpcBikes(POP0.bikes); setPeds(POP0.peds); setNpcBoatCount(POP0.boats); setAirCount(POP0.air); },
+  popDefault: () => { setNpcCars(POP0.cars); setNpcBikes(POP0.bikes); setPeds(POP0.peds); setNpcBoatCount(POP0.boats); setAirCount(POP0.air); setCatCount(POP0.cats); },
   popClear:   () => { setNpcCars(0); setNpcBikes(0); setPeds(0); },
   addPirate:  () => { for (let t = 0; t < 12; t++){ const n = spawnRandomNpcCar(); if (n.type !== 'bike' && !n.path.hwyRoute){ npcMakePirate(n); break; } removeNpcCar(n); } },
   nearPirate: () => {
