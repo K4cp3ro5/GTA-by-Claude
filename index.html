@@ -130,19 +130,20 @@
     position:fixed;inset:0;z-index:20;pointer-events:none;opacity:0;
     background:radial-gradient(circle at 50% 50%,transparent 40%,rgba(200,20,10,.55) 100%);
   }
-  /* ekran śmierci: przyciemnienie z czerwoną winietą, tytuł, przyczyna, odliczanie do odrodzenia (obraz gry w szarości) */
+  /* ekran śmierci: szybkie przejście do czerni (0.45 s), tytuł, przyczyna, odliczanie do odrodzenia */
   #deadScreen{
     position:fixed;inset:0;z-index:35;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;
-    background:radial-gradient(circle at 50% 50%,rgba(20,4,4,.35),rgba(60,0,0,.85) 100%);pointer-events:none;opacity:0;transition:opacity .5s ease;
+    background:radial-gradient(circle at 50% 50%,#0a0303 0%,#000 75%);pointer-events:none;opacity:0;transition:opacity .45s ease-in;
   }
   #deadScreen.on{opacity:1}
   #deadScreen .dsTitle{font-size:clamp(46px,8vw,92px);font-weight:800;letter-spacing:.06em;color:#ff4a3d;text-shadow:0 0 40px rgba(255,40,30,.55),0 4px 0 #3a0503;transform:scale(1.15);transition:transform .9s cubic-bezier(.2,.8,.2,1)}
-  #deadScreen.on .dsTitle{transform:scale(1)}
+  #deadScreen.on .dsTitle{transform:scale(1);transition-delay:.25s}
+  #deadScreen .dsTitle,#deadScreen .dsCause,#deadScreen .dsBar,#deadScreen .dsTimer{opacity:0;transition:opacity .4s ease .35s,transform .9s cubic-bezier(.2,.8,.2,1) .25s}
+  #deadScreen.on .dsTitle,#deadScreen.on .dsCause,#deadScreen.on .dsBar,#deadScreen.on .dsTimer{opacity:1}
   #deadScreen .dsCause{font-size:16px;color:#f2d8d4;letter-spacing:.08em;max-width:520px}
   #deadScreen .dsTimer{margin-top:10px;font-size:12px;letter-spacing:.24em;color:#c9a9a4;text-transform:uppercase}
   #deadScreen .dsBar{width:min(320px,60vw);height:3px;border-radius:2px;background:rgba(255,255,255,.12);overflow:hidden}
   #deadScreen .dsBar i{display:block;height:100%;width:0;background:#ff4a3d}
-  canvas.dead{filter:grayscale(.85) contrast(1.05) brightness(.8);transition:filter .6s}
   /* pasek ekwipunku (jak w Minecrafcie) i plecak (Tab) */
   #hotbar{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);display:flex;gap:4px;padding:5px;background:rgba(16,18,22,.62);border:1px solid rgba(200,198,191,.14);border-radius:8px;opacity:0;transition:opacity .2s}
   #hotbar.on{opacity:1}
@@ -163,6 +164,15 @@
   #invGrid .islot:hover,#invHot .islot:hover{border-color:#6a6f7a}
   #invHot{margin-top:12px;padding-top:12px;border-top:1px solid #343944}
   #invClose{pointer-events:auto;cursor:pointer;margin-top:14px;float:right;background:var(--sodium);color:#14161b;border:0;border-radius:5px;padding:9px 18px;font-weight:700;font-size:11px;letter-spacing:.1em}
+  /* strefa namierzania RPG (kwadrat na środku ekranu, narożniki) i ramka na celu */
+  #lockZone{position:absolute;left:50%;top:50%;width:var(--s,260px);height:var(--s,260px);transform:translate(-50%,-50%);display:none;pointer-events:none}
+  #lockZone.on{display:block}
+  #lockZone i{position:absolute;width:26px;height:26px;border:2px solid rgba(246,244,238,.75);filter:drop-shadow(0 0 2px rgba(0,0,0,.6))}
+  #lockZone i:nth-child(1){left:0;top:0;border-right:0;border-bottom:0}
+  #lockZone i:nth-child(2){right:0;top:0;border-left:0;border-bottom:0}
+  #lockZone i:nth-child(3){left:0;bottom:0;border-right:0;border-top:0}
+  #lockZone i:nth-child(4){right:0;bottom:0;border-left:0;border-top:0}
+  #lockZone.has i{border-color:rgba(255,207,90,.9)}
   /* ramka namierzania RPG */
   #lockBox{position:absolute;display:none;width:calc(46px * var(--k,1.5));height:calc(46px * var(--k,1.5));transform:translate(-50%,-50%);border:2px dashed #ffcf5a;border-radius:4px;pointer-events:none;transition:width .1s,height .1s}
   #lockBox::after{content:attr(data-t);position:absolute;left:50%;top:100%;transform:translateX(-50%);margin-top:4px;font-size:10px;font-weight:700;letter-spacing:.12em;color:#ffcf5a;white-space:nowrap}
@@ -507,6 +517,7 @@ var LOADER = (function(){
 
   <div id="toast"></div>
   <div id="prompt">Naciśnij <kbd>F</kbd> lub <kbd>E</kbd>, aby wsiąść</div>
+  <div id="lockZone"><i></i><i></i><i></i><i></i></div>
   <div id="lockBox"></div>
   <div id="hotbar"></div><div id="invName"></div>
   <section class="panel" id="weaponhud"><span class="wname" id="wname">Pięści</span><span class="wammo" id="wammo"></span></section>

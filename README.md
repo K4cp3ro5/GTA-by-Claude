@@ -1,6 +1,6 @@
 # GTA by Claude
 
-**Mini-GTA w przeglądarce.** Miasto na wyspie: 12 × 12 kwartałów z ruchem ulicznym, pieszymi, rowerzystami i piratami drogowymi, dwie autostrady na estakadach z węzłem koniczynowym, lotnisko miejskie i port z łodziami, a za cieśniną wysepka z drugim lotniskiem — samolotami z obu można latać (i z których można wyskoczyć ze spadochronem), a po drugich pasach kursuje ruch lotniczy NPC. Po morzu pływają łodzie NPC, a na wschodzie wyspy jest duży park rozrywki z kolejkami górskimi, którymi można się przejechać. Do tego pełna mapa z wyznaczaniem trasy, cykl dnia i nocy, broń (pistolet, karabin, RPG) z kamerą zza ramienia, wybuchające pojazdy, koty na chodnikach i kradzież aut.
+**Mini-GTA w przeglądarce.** Miasto na wyspie: 12 × 12 kwartałów z ruchem ulicznym, pieszymi, rowerzystami i piratami drogowymi, dwie autostrady na estakadach z węzłem koniczynowym, lotnisko miejskie i port z łodziami, a za cieśniną wysepka z drugim lotniskiem — samolotami z obu można latać (i z których można wyskoczyć ze spadochronem), a po drugich pasach kursuje ruch lotniczy NPC. Po morzu pływają łodzie NPC, a na wschodzie wyspy jest duży park rozrywki z kolejkami górskimi, którymi można się przejechać. Do tego pełna mapa z wyznaczaniem trasy, cykl dnia i nocy, broń (pistolet, karabin, RPG naprowadzane) z kamerą zza ramienia, wybuchające pojazdy, koty na chodnikach i kradzież aut.
 
 Wszystko — asfalt, okna, modele aut i samolotów, znaki, dźwięk silnika i wybuchów — jest generowane w kodzie. Nie ma ani jednego pliku graficznego czy dźwiękowego, nie ma bundlera ani serwera: wystarczy otworzyć `index.html`.
 
@@ -30,7 +30,7 @@ Klawisze można zmienić w menu (**STEROWANIE**). `Esc` w trakcie gry to pauza �
 | `Shift` / `Spacja` | bieg / skok |
 | `F` (albo `E`) | wsiądź do auta lub samolotu, ukradnij auto NPC, przejażdżka w parku rozrywki (przy wejściu na atrakcję) |
 | `V` (przytrzymaj) | menu pojazdów: twoje auto (zwykły, pickup, sportowy) albo rower |
-| `1` … `9`, rolka myszy, `Q` (przytrzymaj) | pole paska ekwipunku (pięści, kij, pistolet, karabin, RPG, RPG naprowadzane, wędka, ryby) / koło broni |
+| `1` … `9`, rolka myszy, `Q` (przytrzymaj) | pole paska ekwipunku (pięści, kij, pistolet, karabin, RPG naprowadzane, wędka, ryby) / koło broni |
 | `Tab` | plecak (ekwipunek: kliknij przedmiot, potem pole docelowe) |
 | lewy przycisk myszy (karabin: przytrzymaj), `R` | atak, strzał, zarzucenie wędki / zacięcie / przeładowanie |
 | prawy przycisk myszy | przycelowanie (bliżej, mniejszy rozrzut, wolniejszy chód) |
@@ -149,16 +149,19 @@ Jak wystartować: ustaw samolot na pasie, trzymaj `W`, a gdy prędkościomierz p
 |---|---|---|---|
 | ![Wędkowanie](screenshots/wedkowanie.jpg) | ![Plecak](screenshots/plecak.jpg) | ![Kot](screenshots/kot-serca.jpg) | ![Śmierć](screenshots/smierc.jpg) |
 
+| Kot na dachu auta | Gracz i kot na łodzi | Namierzanie RPG |
+|---|---|---|
+| ![Kot na aucie](screenshots/kot-auto.jpg) | ![Kot na łodzi](screenshots/kot-lodz.jpg) | ![Namierzanie](screenshots/namierzanie.jpg) |
+
 - Jazda z fizyką zawieszenia. Trzy typy aut: zwykły (0–100 km/h w 4,4 s, 181 km/h), pickup (6,9 s, 160 km/h), sportowy (3,0 s, 250 km/h), do tego rower. Twoje auto przywołujesz menu `V`, skradzione zostają tam, gdzie je porzucisz.
 - Broń: pięści, kij, pistolet i karabin (ogień ciągły, magazynek 30). Z bronią palną kamera przechodzi za prawe ramię — postać jest z lewej i nie zasłania celownika na środku ekranu, a obraca się w stronę celownika. Strzał leci przez środek celownika (z kontrolą, czy przed lufą nie ma ściany); rozrzut rośnie w ruchu i przy serii, odrzut podbija kamerę; smugacz, błysk, iskry na metalu, pył na murze, znacznik trafienia. Strzały w auto NPC zatrzymują je na światłach awaryjnych.
 - **Ekwipunek jak w Minecrafcie**: pasek 9 pól na dole ekranu (klawisze 1–9, rolka) i plecak na 27 pól pod `Tab`; ryby układają się w stosy po 16.
-- **Wędkowanie**: wędka w ręce, stań na brzegu albo pomoście przodem do wody, `LPM` — zarzucenie. Po kilku sekundach ryba bierze (spławik nurkuje, napis „Bierze!”) — `LPM` w ciągu ok. sekundy. Okoń, flądra, dorsz, karp, szczupak, łosoś (z wagą) trafiają do ekwipunku.
-- **RPG naprowadzane**: przytrzymaj celownik na celu (auto, pieszy, samolot — także lecący, łódź) — ramka „NAMIERZANIE…” zmienia się w czerwone „NAMIERZONY”; rakieta skręca za celem.
-- **RPG**: rakieta leci w punkt pod celownikiem (z dymem), wybucha przy trafieniu w cokolwiek — jedna rakieta niszczy auto. Magazynków jest bez limitu: HUD pokazuje tylko zawartość bieżącego magazynka, `R` przeładowuje.
+- **Wędkowanie**: wędka w ręce, stań na brzegu albo pomoście przodem do wody, `LPM` — zarzucenie. Po kilku sekundach ryba bierze (spławik nurkuje, napis „Bierze!”) — `LPM` w ciągu ok. sekundy. Okoń, flądra, dorsz, karp, szczupak, łosoś (każdy z własnym modelem i ikoną, z wagą) trafiają do ekwipunku.
+- **RPG naprowadzane** (jak w GTA V): z wyrzutnią w ręce na środku ekranu pojawia się duży kwadrat — drugi celownik. Cel w kwadracie (auto, pieszy, samolot — także lecący, łódź) dostaje ramkę „NAMIERZANIE…”, po chwili czerwone „NAMIERZONY” i sygnał; rakieta skręca za celem (bez namierzenia leci prosto w punkt pod celownikiem). Jedna rakieta niszczy auto. Magazynków jest bez limitu: HUD pokazuje tylko zawartość bieżącego magazynka, `R` przeładowuje.
 - **Niszczenie pojazdów**: auta mają wytrzymałość — wybuchają po mocnej kraksie, po kilku–kilkunastu strzałach (pistolet ok. 8) albo po jednej rakiecie. Wybuch rani w promieniu (gracz, piesi, inne auta — także łańcuchowo), zostaje płonący, dymiący wrak. Kierowca auta, które wybuchło, ginie (z nieśmiertelnością — wychodzi obok wraku). Twój zniszczony pojazd jest wyszarzony w menu `V` z odliczaniem 60 s; pozostałe typy można przywołać od razu.
 - Wysiadka w biegu: auto toczy się dalej i hamuje, a nie staje w miejscu (przy dużej prędkości wyskok boli).
-- **Koty** (ok. 34, liczbę zmienisz w menu deweloperskim) chodzą po chodnikach i przebiegają przez ulice, wędrują po trawie pasa podmiejskiego i spacerują alejkami parku rozrywki; na minimapie i mapie to pomarańczowe kropki. Nakarm kota rybą (ryba w ręce, `F` albo `LPM` przy kocie) — je, nad nim pojawiają się serduszka i przez półtorej minuty chodzi za tobą. Skrzywdzenie kota w jakikolwiek sposób (auto, strzał, cios, wybuch) kończy się wybuchem gracza i śmiercią bez względu na nieśmiertelność — „JAK MOGŁEŚ?!”.
-- **Ekran śmierci**: „NIE ŻYJESZ” z przyczyną (upadek, wypadek, wybuch, rakieta, katastrofa…), obraz w szarości i odliczanie do odrodzenia w szpitalu.
+- **Koty** (ok. 34, liczbę zmienisz w menu deweloperskim) chodzą po chodnikach i przebiegają przez ulice, wędrują po trawie pasa podmiejskiego i spacerują alejkami parku rozrywki; na minimapie i mapie to pomarańczowe kropki. Koty mają różne umaszczenia: rudy i szary pręgowany, czarny, biały, tuxedo, syjamski, szylkretowy, niebieski rosyjski. Nakarm kota rybą (ryba w ręce, `F` albo `LPM` przy kocie) — je, pojawiają się serduszka i od tej pory jest twoim przyjacielem: zawsze chodzi za tobą, a gdy wsiadasz do pojazdu, jedzie z tobą — na dachu auta, na grzbiecie samolotu, na kanapie łodzi (na łodzi widać też gracza za sterem). Skrzywdzenie kota w jakikolwiek sposób (auto, strzał, cios, wybuch) kończy się wybuchem gracza i śmiercią bez względu na nieśmiertelność — „JAK MOGŁEŚ?!”.
+- **Ekran śmierci**: szybkie przejście do czerni (postać znika), „NIE ŻYJESZ” z przyczyną (upadek, wypadek, wybuch, rakieta, katastrofa…) i odliczanie do odrodzenia w szpitalu.
 - Zdrowie i kondycja, upadki z wysokości. Uderzenie w ścianę lub barierę pod małym kątem nie zatrzymuje auta — ślizga się wzdłuż ściany; zatrzymuje dopiero uderzenie czołowe. Po śmierci odradzasz się przed **szpitalem** w południowym pasie zieleni (dojazd z obwodnicy, lądowisko na dachu, karetki, parking).
 - HUD: kompas, zegarowy prędkościomierz, zegar, minimapa z całym światem.
 

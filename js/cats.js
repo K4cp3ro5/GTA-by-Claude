@@ -4,30 +4,46 @@
      kwartał (tylko gdy żadne auto NPC nie nadjeżdża; auto blisko w trakcie — sprint);
    - 'roam': wędrówka po trawie pasa podmiejskiego (losowe cele poza budynkami, autostradami i parkiem);
    - 'park': spacer po alejkach parku rozrywki (graf zwiedzających z park.js).
-   Spawn z dala od gracza (> 40 m), równomiernie po kwartałach; na minimapie i mapie — pomarańczowe kropki.
-   Nakarmiony rybą (inventory.js): je, serduszka, potem chodzi za graczem ~90 s.
+   Odmiany umaszczenia (CAT_COATS: rudy pręgowany, czarny, szary pręgowany, biały, tuxedo, syjamski, szylkretowy,
+   niebieski rosyjski) losowane. Spawn z dala od gracza (> 40 m); na minimapie i mapie — kropki.
+   Nakarmiony rybą (inventory.js) zostaje PRZYJACIELEM: je (serduszka), potem zawsze chodzi za graczem, a w pojeździe
+   jedzie z nim — na dachu auta, na kadłubie samolotu, na kanapie łodzi; po wysiadce zeskakuje obok.
    Skrzywdzenie kota przez gracza (auto, kula, cios, wybuch): gracz wybucha i ginie bez względu na nieśmiertelność,
-   „JAK MOGŁEŚ?!”, odrodzenie w szpitalu.
+   „JAK MOGŁEŚ?!”, odrodzenie w szpitalu. Kot jadący z graczem jest bezpieczny.
    --------------------------------------------------------------- */
 const CATS = [];
 let CAT_COUNT = 34;
-const CAT_COLS = [[0xd9822b, 0xf2f0ea], [0x1b1b1d, 0x1b1b1d], [0x8a8c8f, 0xd8d4cc], [0xf2f0ea, 0xd9822b], [0x8a6a48, 0x4a3a2c], [0xe8c48a, 0xf2f0ea]];
+/* odmiany: kolory części (ciało, brzuch/pyszczek, głowa, uszy, ogon, łapy) i desenie (pręgi, łaty) */
+const CAT_COATS = [
+  { name: 'rudy pręgowany', body: 0xd9822b, belly: 0xf2e6d0, head: 0xd9822b, ears: 0xd9822b, tail: 0xd9822b, paws: 0xf2e6d0, stripe: 0xa85a18 },
+  { name: 'czarny',         body: 0x18181a, belly: 0x232326, head: 0x18181a, ears: 0x18181a, tail: 0x18181a, paws: 0x18181a, eyes: 0xe8d040 },
+  { name: 'szary pręgowany', body: 0x8a8c8f, belly: 0xd8d4cc, head: 0x8a8c8f, ears: 0x8a8c8f, tail: 0x8a8c8f, paws: 0xd8d4cc, stripe: 0x4a4c50 },
+  { name: 'biały',          body: 0xf2f0ea, belly: 0xffffff, head: 0xf2f0ea, ears: 0xf2c0c0, tail: 0xf2f0ea, paws: 0xf2f0ea, eyes: 0x5aa0e8 },
+  { name: 'tuxedo',         body: 0x1b1b1d, belly: 0xf4f2ec, head: 0x1b1b1d, ears: 0x1b1b1d, tail: 0x1b1b1d, paws: 0xf4f2ec, muzzle: 0xf4f2ec },
+  { name: 'syjamski',       body: 0xeadcc4, belly: 0xf4ecdc, head: 0x4a3426, ears: 0x3a2618, tail: 0x3a2618, paws: 0x4a3426, eyes: 0x5aa0e8 },
+  { name: 'szylkretowy',    body: 0xf2ece0, belly: 0xffffff, head: 0x1b1b1d, ears: 0xd9822b, tail: 0xd9822b, paws: 0xf2ece0, patch: [0xd9822b, 0x1b1b1d] },
+  { name: 'niebieski rosyjski', body: 0x6f7c8c, belly: 0x7f8c9c, head: 0x6f7c8c, ears: 0x6f7c8c, tail: 0x6f7c8c, paws: 0x6f7c8c, eyes: 0x6fd06b }
+];
 const _catMat = new THREE.MeshLambertMaterial({ vertexColors: true });
-function buildCat(col){
-  const B = (w, h, d) => new THREE.BoxGeometry(w, h, d), c = col[0], c2 = col[1];
-  const ear = new THREE.ConeGeometry(0.045, 0.09, 4);
+function buildCat(coat){
+  const B = (w, h, d, sz) => new THREE.BoxGeometry(w, h, d, 1, 1, sz || 1), C = coat;
+  const ear = new THREE.ConeGeometry(0.045, 0.09, 4), eye = C.eyes || 0x8fd16b;
+  /* ciało z 8 odcinków wzdłuż: pręgi (co drugi odcinek grzbietu) albo łaty (szylkret) */
+  const bodyFn = C.stripe ? (x, y, z) => (y > 0.26 && Math.floor((z + 0.23) / 0.0575) % 2 ? C.stripe : null)
+               : C.patch ? (x, y, z) => { const k = Math.floor((z + 0.23) / 0.0575) + (x > 0 ? 3 : 0); return k % 5 === 1 ? C.patch[0] : k % 5 === 3 ? C.patch[1] : null; } : null;
   const g = new THREE.Group();
   const body = new THREE.Mesh(mergeColored([
-    { geo: B(0.2, 0.18, 0.46), color: c, y: 0.25 }, { geo: B(0.16, 0.06, 0.3), color: c2, y: 0.17 },
-    { geo: B(0.19, 0.17, 0.17), color: c, y: 0.37, z: 0.28 }, { geo: B(0.1, 0.07, 0.05), color: c2, y: 0.33, z: 0.37 },
-    { geo: ear, color: c, x: 0.06, y: 0.48, z: 0.27 }, { geo: ear, color: c, x: -0.06, y: 0.48, z: 0.27 },
-    { geo: B(0.03, 0.03, 0.01), color: 0x8fd16b, x: 0.05, y: 0.39, z: 0.367 }, { geo: B(0.03, 0.03, 0.01), color: 0x8fd16b, x: -0.05, y: 0.39, z: 0.367 },
-    { geo: B(0.05, 0.17, 0.05), color: c, x: 0.07, y: 0.085, z: 0.16 }, { geo: B(0.05, 0.17, 0.05), color: c, x: -0.07, y: 0.085, z: 0.16 },
-    { geo: B(0.05, 0.17, 0.05), color: c, x: 0.07, y: 0.085, z: -0.16 }, { geo: B(0.05, 0.17, 0.05), color: c, x: -0.07, y: 0.085, z: -0.16 }
+    { geo: B(0.2, 0.18, 0.46, 8), color: C.body, y: 0.25, colorFn: bodyFn }, { geo: B(0.16, 0.06, 0.3), color: C.belly, y: 0.17 },
+    { geo: B(0.19, 0.17, 0.17), color: C.head, y: 0.37, z: 0.28 }, { geo: B(0.1, 0.07, 0.05), color: C.muzzle || C.belly, y: 0.33, z: 0.37 },
+    { geo: B(0.03, 0.025, 0.02), color: 0xd88a8a, y: 0.355, z: 0.396 },
+    { geo: ear, color: C.ears, x: 0.06, y: 0.48, z: 0.27 }, { geo: ear, color: C.ears, x: -0.06, y: 0.48, z: 0.27 },
+    { geo: B(0.035, 0.03, 0.01), color: eye, x: 0.05, y: 0.39, z: 0.367 }, { geo: B(0.035, 0.03, 0.01), color: eye, x: -0.05, y: 0.39, z: 0.367 },
+    { geo: B(0.05, 0.17, 0.05), color: C.paws, x: 0.07, y: 0.085, z: 0.16 }, { geo: B(0.05, 0.17, 0.05), color: C.paws, x: -0.07, y: 0.085, z: 0.16 },
+    { geo: B(0.05, 0.17, 0.05), color: C.paws, x: 0.07, y: 0.085, z: -0.16 }, { geo: B(0.05, 0.17, 0.05), color: C.paws, x: -0.07, y: 0.085, z: -0.16 }
   ]), _catMat);
   body.castShadow = true; g.add(body);
   const tail = new THREE.Group(); tail.position.set(0, 0.3, -0.22);
-  tail.add(new THREE.Mesh(mergeColored([{ geo: B(0.04, 0.04, 0.3), color: c, z: -0.15 }]), _catMat));
+  tail.add(new THREE.Mesh(mergeColored([{ geo: B(0.04, 0.04, 0.3, 4), color: C.tail, z: -0.15, colorFn: C.stripe ? (x, y, z) => (Math.floor(-z / 0.075) % 2 ? C.stripe : null) : null }]), _catMat));
   g.add(tail);
   g.userData.catRef = null;
   scene.add(g);
@@ -49,7 +65,7 @@ function catRoamSpot(){
 }
 function catPlace(c, kind){
   const pp = typeof playerWorldPos === 'function' ? playerWorldPos() : player.body.position;   // boats.js wczytuje się później
-  c.kind = kind; c.state = 'sit'; c.t = rand(1, 5); c.dead = false; c.fedT = 0; c.eatT = 0;
+  c.kind = kind; c.state = 'sit'; c.t = rand(1, 5); c.dead = false; c.eatT = 0; c.friend = false; c.riding = false;
   for (let t = 0; t < 30; t++){
     if (kind === 'walk'){
       const b = pedBlockCandidates[randInt(0, pedBlockCandidates.length - 1)], k = randInt(0, 3), p = catCorner(b.bi, b.bj, k);
@@ -61,14 +77,14 @@ function catPlace(c, kind){
     } else {
       if (typeof PARK_GRAPH === 'undefined' || !PARK_GRAPH){ if (typeof parkGraph === 'function') PARK_GRAPH = parkGraph(); }
       const ids = Object.keys(PARK_GRAPH), a = PARK_GRAPH[ids[randInt(0, ids.length - 1)]];
-      c.from = a; c.to = PARK_GRAPH[a.nb[0]]; c.u = 0; c.x = c.tx = a.x; c.z = c.tz = a.z; break;
+      c.from = a; c.to = PARK_GRAPH[a.nb[0]]; c.x = c.tx = a.x; c.z = c.tz = a.z; break;
     }
   }
   c.m.g.visible = true;
 }
 function spawnCat(i){
-  const m = buildCat(CAT_COLS[i % CAT_COLS.length]);
-  const c = { m: m, i: i, dir: rnd() < 0.5 ? 1 : -1, x: 0, z: 0, tx: 0, tz: 0, sp: rand(0.8, 1.3), ph: rnd() * TAU, h: rnd() * TAU, dead: false };
+  const coat = CAT_COATS[Math.floor(Math.random() * CAT_COATS.length)], m = buildCat(coat);
+  const c = { m: m, i: i, coat: coat, dir: rnd() < 0.5 ? 1 : -1, x: 0, z: 0, tx: 0, tz: 0, sp: rand(0.8, 1.3), ph: rnd() * TAU, h: rnd() * TAU, dead: false };
   m.g.userData.catRef = c;
   catPlace(c, i % 6 === 4 ? 'roam' : i % 9 === 7 ? 'park' : 'walk');
   CATS.push(c);
@@ -114,25 +130,71 @@ function catNextTarget(c){
   }
   c.k = (c.k + c.dir + 4) % 4; const q = catCorner(c.bi, c.bj, c.k); c.tx = q.x; c.tz = q.z; c.state = 'walk';
 }
+/* wysokość podłoża pod kotem: chodnik albo jezdnia/trawa; kot-przyjaciel — podłoże pod nim (raycast co kilka klatek) */
 function catGroundY(c){
+  if (c.friend) return c.gy !== undefined ? c.gy : 0.02;
   if (c.kind !== 'walk') return 0.02;
   return Math.abs(c.x - blockCenter(c.bi)) > 15.2 || Math.abs(c.z - blockCenter(c.bj)) > 15.2 ? 0.02 : WALK_H;
+}
+/* miejsce kota-przyjaciela w pojeździe gracza (lokalnie w układzie modelu pojazdu); k = numer przyjaciela */
+const _catRideV = new THREE.Vector3(), _catRideQ = new THREE.Quaternion(), _catYawPi = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
+function catRideSpot(k){
+  const sx = (k % 3 - 1) * 0.32, sz = Math.floor(k / 3) * 0.5;
+  if (mode === 'car' && !activeCarGone){
+    const T = CAR_TYPES[carType], top = carTopOf(carType) - T.restY;
+    carModel.root.updateWorldMatrix(true, false);
+    _catRideV.set(sx, top + 0.01, 0.3 + sz).applyMatrix4(carModel.root.matrixWorld);       // dach (fizyczny przód auta = lokalne −Z)
+    _catRideQ.copy(carModel.root.quaternion).multiply(_catYawPi);
+    return true;
+  }
+  if (mode === 'plane' && curPlane){
+    curPlane.group.updateWorldMatrix(true, false);
+    _catRideV.set(sx, curPlane.T.half[1] + 0.02, -1.2 - sz).applyMatrix4(curPlane.group.matrixWorld);   // grzbiet kadłuba za kabiną
+    _catRideQ.copy(curPlane.group.quaternion);
+    return true;
+  }
+  if (mode === 'boat' && curBoat){
+    curBoat.group.updateWorldMatrix(true, false);
+    _catRideV.set(0.35 - sx, 0.9, -1.4 + sz).applyMatrix4(curBoat.group.matrixWorld);       // kanapa na rufie
+    _catRideQ.copy(curBoat.group.quaternion);
+    return true;
+  }
+  return false;
 }
 const _catQ = new CANNON.Quaternion(), _catV = new CANNON.Vec3();
 function updateCats(dt){
   const pp = playerWorldPos();
   const inCar = mode === 'car' && !activeCarGone, cv = chassisBody.velocity, carSp = Math.hypot(cv.x, cv.z);
   if (inCar) chassisBody.quaternion.conjugate(_catQ);
+  let friendK = 0;
   for (const c of CATS){
     if (c.dead){ c.t -= dt; if (c.t <= 0) catPlace(c, c.kind); continue; }
+    /* przyjaciel w pojeździe gracza: jedzie z nim */
+    if (c.friend && !player.dead && catRideSpot(friendK)){
+      friendK++; c.riding = true; c.eatT = 0;
+      c.m.g.visible = true; c.m.g.position.copy(_catRideV); c.m.g.quaternion.copy(_catRideQ);
+      c.x = _catRideV.x; c.z = _catRideV.z;
+      c.m.body.rotation.x = -0.25; c.m.body.position.y = -0.05;                                      // siedzi
+      c.m.tail.rotation.set(1.1, Math.sin(clock * 3 + c.ph) * 0.5, 0);
+      continue;
+    }
+    if (c.riding){                                                                        // wysiadka: zeskakuje obok gracza
+      c.riding = false; c.m.g.quaternion.set(0, 0, 0, 1);
+      const pb = player.body.position; c.x = pb.x + 1.1; c.z = pb.z + 0.6; c.gy = undefined;
+    }
+    if (c.friend) friendK++;
     const far = Math.hypot(c.x - pp.x, c.z - pp.z) > 260;
-    const follow = c.fedT > clock && mode === 'foot' && !player.dead;
+    const follow = c.friend && mode === 'foot' && !player.dead;
     if (c.eatT > 0){ c.eatT -= dt; c.state = 'sit'; }
-    else if (follow){                                                                     // nakarmiony: idzie za graczem
-      const px = player.body.position.x, pz = player.body.position.z, dx = px - c.x, dz = pz - c.z, d = Math.hypot(dx, dz);
-      if (d > 2.2){ const s = Math.min(d - 2, (d > 8 ? 4.5 : 1.6) * dt); c.x += dx / d * s; c.z += dz / d * s; c.h = angleDamp(c.h, Math.atan2(dx, dz), 8, dt); c.state = 'walk'; c.ph += dt * 9; }
+    else if (follow){                                                                     // przyjaciel: zawsze idzie za graczem
+      const px = player.body.position.x, pz = player.body.position.z;
+      let dx = px - c.x, dz = pz - c.z, d = Math.hypot(dx, dz);
+      if (d > 45){ c.x = px - 2; c.z = pz - 1.5; dx = 2; dz = 1.5; d = 2.5; }            // daleko (odrodzenie, teleport) — dobiega od razu
+      if (d > 2.2){ const s = Math.min(d - 2, (d > 8 ? 5 : 1.8) * dt); c.x += dx / d * s; c.z += dz / d * s; c.h = angleDamp(c.h, Math.atan2(dx, dz), 8, dt); c.state = 'walk'; c.ph += dt * 9; }
       else c.state = 'sit';
-      if (rnd() < dt * 0.4) catHearts(c, 1);
+      c.gyT = (c.gyT || 0) - dt;
+      if (c.gyT <= 0){ c.gyT = 0.25; const h = rayHit(c.x, player.body.position.y + 1, c.z, c.x, player.body.position.y - 3, c.z, G_WORLD); c.gy = h ? h.hitPointWorld.y + 0.01 : Math.max(0.02, player.body.position.y - 0.85); }
+      if (rnd() < dt * 0.25) catHearts(c, 1);
     } else if (c.state === 'sit'){ c.t -= dt; if (c.t <= 0) catNextTarget(c); }
     else {
       const dx = c.tx - c.x, dz = c.tz - c.z, d = Math.hypot(dx, dz);
@@ -152,16 +214,16 @@ function updateCats(dt){
     c.m.g.visible = true;
     const moving = c.state !== 'sit';
     c.m.g.position.set(c.x, catGroundY(c) + (moving ? Math.abs(Math.sin(c.ph)) * 0.025 : 0), c.z);
-    c.m.g.rotation.y = c.h;
+    c.m.g.rotation.set(0, c.h, 0);
     c.m.body.rotation.x = c.eatT > 0 ? 0.25 : moving ? 0 : -0.25; c.m.body.position.y = moving ? 0 : -0.05;          // siedzący: przód w górę; je: głowa w dół
-    c.m.tail.rotation.set(moving ? 0.5 : 1.1, Math.sin(clock * (moving ? 6 : c.fedT > clock ? 9 : 2.2) + c.ph) * 0.5, 0);
+    c.m.tail.rotation.set(moving ? 0.5 : 1.1, Math.sin(clock * (moving ? 6 : c.friend ? 9 : 2.2) + c.ph) * 0.5, 0);
   }
   updateHearts(dt);
 }
 /* kot skrzywdzony przez gracza: gracz wybucha i ginie (nieśmiertelność nie chroni) */
 function catHarmed(c, how){
-  if (c.dead) return;
-  c.dead = true; c.t = 25; c.m.g.visible = false;
+  if (c.dead || c.riding) return;
+  c.dead = true; c.t = 25; c.m.g.visible = false; c.friend = false;
   if (player.dead) return;
   hudToast('Jak mogłeś?! To był kot…', 4);
   if (mode === 'car' && !activeCarGone){ destroyActiveCar('kot', 'JAK MOGŁEŚ?!'); return; }
@@ -170,20 +232,23 @@ function catHarmed(c, how){
   explodeAt(p.x, (p.y || 1) - 0.4, p.z, 1, { noCats: true, cause: 'kot' });
 }
 /* kot najbliżej punktu (karmienie) */
-function catNear(x, z, r){ let best = null, bd = r; for (const c of CATS){ if (c.dead) continue; const d = Math.hypot(c.x - x, c.z - z); if (d < bd){ bd = d; best = c; } } return best; }
+function catNear(x, z, r){ let best = null, bd = r; for (const c of CATS){ if (c.dead || c.riding) continue; const d = Math.hypot(c.x - x, c.z - z); if (d < bd){ bd = d; best = c; } } return best; }
 function catFeed(c){
-  c.eatT = 3.2; c.fedT = clock + 3.2 + 90; c.state = 'sit';
+  const was = c.friend;
+  c.eatT = 3.2; c.friend = true; c.state = 'sit';
   c.h = Math.atan2(player.body.position.x - c.x, player.body.position.z - c.z);
   catHearts(c, 9);
+  return !was;
 }
 /* serduszka: płaskie kształty serca obracane do kamery, unoszą się i znikają */
 const _heartGeo = (() => { const s = new THREE.Shape(); s.moveTo(0, -0.12); s.bezierCurveTo(-0.02, -0.06, -0.16, -0.02, -0.16, 0.06); s.bezierCurveTo(-0.16, 0.14, -0.06, 0.17, 0, 0.09);
   s.bezierCurveTo(0.06, 0.17, 0.16, 0.14, 0.16, 0.06); s.bezierCurveTo(0.16, -0.02, 0.02, -0.06, 0, -0.12); return new THREE.ShapeGeometry(s); })();
 const hearts = [];
 function catHearts(c, n){
+  const base = c.m.g.position;
   for (let k = 0; k < n; k++){
     const m = new THREE.Mesh(_heartGeo, new THREE.MeshBasicMaterial({ color: k % 3 ? 0xff4d6d : 0xff8fa3, transparent: true, depthWrite: false, side: THREE.DoubleSide }));
-    m.position.set(c.x + rand(-0.3, 0.3), catGroundY(c) + 0.55, c.z + rand(-0.3, 0.3)); m.scale.setScalar(rand(0.8, 1.3)); scene.add(m);
+    m.position.set(base.x + rand(-0.3, 0.3), base.y + 0.55, base.z + rand(-0.3, 0.3)); m.scale.setScalar(rand(0.8, 1.3)); scene.add(m);
     hearts.push({ m: m, t: -k * 0.18, vx: rand(-0.2, 0.2), vz: rand(-0.2, 0.2) });
   }
 }

@@ -11,7 +11,6 @@ const WEAPON_DEFS = [
   { id:'bat',    name:'Kij',      kind:'melee',  range:2.1, dmg:30, cooldown:0.55 },
   { id:'pistol', name:'Pistolet', kind:'ranged', range:70,  dmg:40, cooldown:0.2,  magSize:12, reloadT:1.1, spread:0.010, kick:0.028, bloom:0.55, muzzle:0.2 },
   { id:'rifle',  name:'Karabin',  kind:'ranged', range:160, dmg:28, cooldown:0.095, magSize:30, reloadT:1.8, spread:0.008, kick:0.011, bloom:0.22, muzzle:0.8, auto:true },
-  { id:'rpg',    name:'RPG',      kind:'ranged', range:320, dmg:0,  cooldown:0.9, magSize:1, reloadT:2.2, spread:0.002, kick:0.07, bloom:0.1, muzzle:1.0, projectile:true },
   { id:'rpgh',   name:'RPG naprowadzane', kind:'ranged', range:320, dmg:0, cooldown:0.9, magSize:1, reloadT:2.6, spread:0.002, kick:0.07, bloom:0.1, muzzle:1.0, projectile:true, homing:true },
 ];
 const weaponRay = new THREE.Raycaster();
@@ -116,11 +115,10 @@ const Weapons = {
     this.meshes.bat = buildBatMesh();
     this.meshes.pistol = buildPistolMesh();
     this.meshes.rifle = buildRifleMesh();
-    this.meshes.rpg = buildRpgMesh();
     this.meshes.rpgh = buildRpgMesh(true);
     this.meshes.bat.position.set(0, -0.63, 0.02); player.armR.add(this.meshes.bat);
     this.pivot = new THREE.Group(); player.mesh.add(this.pivot);
-    this.pivot.add(this.meshes.pistol); this.pivot.add(this.meshes.rifle); this.pivot.add(this.meshes.rpg); this.pivot.add(this.meshes.rpgh); this.pivot.add(this.meshes.rpgh);
+    this.pivot.add(this.meshes.pistol); this.pivot.add(this.meshes.rifle); this.pivot.add(this.meshes.rpgh); this.pivot.add(this.meshes.rpgh);
     for (const id in this.meshes) this.meshes[id].visible = false;
     WEAPON_DEFS.forEach(d => { if (d.kind === 'ranged') this.ammo[d.id] = { mag: d.magSize }; });   // magazynków bez limitu — liczy się tylko zawartość bieżącego
   },
@@ -261,19 +259,22 @@ const Weapons = {
       if (Math.abs(wrapAngle(Math.atan2(c.x - p.x, c.z - p.z) - player.facing)) < 0.9){ catHarmed(c, 'cios'); return; }
     }
   },
-  /* namierzanie (RPG naprowadzane): cel najbliżej środka celownika (stożek ~7°, do 260 m, widoczny), utrzymany LOCK_TIME = namierzony */
+  /* namierzanie (RPG naprowadzane, jak w GTA V): cele w KWADRATOWEJ strefie na środku ekranu (połowa boku = LOCK_ZONE × wysokość
+     ekranu), do 280 m, widoczne; wybierany najbliższy środka; utrzymany LOCK_TIME = namierzony */
   updateLock(dt){
     const d = this.def();
     if (!d.homing || !this.aiming() || !pointerLocked){ this.lock = null; this.lockT = 0; return; }
-    camera.getWorldDirection(_wD);
-    const cp = camera.position;
-    let best = null, ba = 0.12;
+    const cp = camera.position, half = LOCK_ZONE * innerHeight, asp = innerWidth / innerHeight;
+    let best = null, ba = 1e9;
     for (const t of lockTargets()){
       const p = lockTargetPos(t); if (!p) continue;
-      const dx = p.x - cp.x, dy = p.y - cp.y, dz = p.z - cp.z, l = Math.hypot(dx, dy, dz);
-      if (l < 6 || l > 260) continue;
-      const a = Math.acos(clamp((dx * _wD.x + dy * _wD.y + dz * _wD.z) / l, -1, 1));
-      if (a < ba){ ba = a; best = t; }
+      const l = Math.hypot(p.x - cp.x, p.y - cp.y, p.z - cp.z);
+      if (l < 6 || l > 280) continue;
+      _wA.set(p.x, p.y, p.z).project(camera); if (_wA.z > 1) continue;
+      const sx = _wA.x * innerWidth / 2, sy = _wA.y * innerHeight / 2;                          // piksele od środka ekranu
+      if (Math.abs(sx) > half || Math.abs(sy) > half) continue;
+      const d = Math.hypot(sx, sy) + l * 0.05;                                            // bliżej środka i bliżej gracza
+      if (d < ba){ ba = d; best = t; }
     }
     if (best){ const p = lockTargetPos(best); const h = rayHit(cp.x, cp.y, cp.z, p.x, p.y, p.z, G_WORLD); if (h && h.distance < Math.hypot(p.x - cp.x, p.y - cp.y, p.z - cp.z) - 3) best = null; }
     if (best && this.lock && best.o === this.lock.o){ const was = this.lockT; this.lockT += dt; if (was < LOCK_TIME && this.lockT >= LOCK_TIME) Sound.tick(true); }
@@ -327,7 +328,8 @@ const Weapons = {
     el.weaponhud.classList.toggle('on', mode === 'foot' && !player.dead);
     const on = mode === 'foot' && d.kind === 'ranged' && !player.dead;
     el.crosshair.classList.toggle('on', on);
-    const lb = document.getElementById('lockBox');
+    const lb = document.getElementById('lockBox'), lz = document.getElementById('lockZone');
+    lz.classList.toggle('on', on && !!d.homing && this.aiming()); lz.style.setProperty('--s', (LOCK_ZONE * 2 * innerHeight) + 'px'); lz.classList.toggle('has', !!(this.lock && d.homing));
     if (this.lock && d.homing && on){
       const p = lockTargetPos(this.lock);
       if (p){ _wA.set(p.x, p.y, p.z).project(camera);
@@ -343,7 +345,7 @@ const Weapons = {
     }
   }
 };
-const _down = new THREE.Vector3(0, -1, 0), LOCK_TIME = 0.9;
+const _down = new THREE.Vector3(0, -1, 0), LOCK_TIME = 0.9, LOCK_ZONE = 0.17;
 Weapons.init();
 
 /* --- koło wyboru (radialne, sterowane wirtualnym kursorem — pointer lock nie daje pozycji bezwzględnej):

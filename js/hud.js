@@ -295,7 +295,7 @@ function updateHud(dt, kmh){
   Weapons.updateHud();
   el.hurtFlash.style.opacity = (player.hurtFlash * 0.7).toFixed(2);
   el.deadScreen.classList.toggle('on', player.dead);
-  renderer.domElement.classList.toggle('dead', player.dead);
+  if (player.dead) player.mesh.visible = false;                                    // martwy gracz znika (ekran gaśnie do czerni)
   if (player.dead){
     const t = player.deathMsg || 'NIE ŻYJESZ', why = DEATH_CAUSES[player.deathCause] || 'Tym razem się nie udało.';
     const dsT = document.getElementById('dsTitle'), dsC = document.getElementById('dsCause');

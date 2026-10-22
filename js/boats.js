@@ -69,7 +69,8 @@ const boatKeysHelp = 'W / S — gaz / wsteczny · A / D — ster · Spacja — h
 function enterBoat(b){
   if (b.npc){ b.group.remove(b.npc.driver); b.npc = null; }                     // łódź NPC przejęta: sternik „wyskakuje”
   curBoat = b; mode = 'boat';
-  player.mesh.visible = false; delBody(player.body);
+  delBody(player.body); Weapons.holster();
+  syncBoatDriver();                                                             // gracz stoi za konsolą (widoczny z kamery za rufą)
   hudToast(BOAT_T.name + ': ' + boatKeysHelp, 5);
 }
 function exitBoat(force){
@@ -78,10 +79,19 @@ function exitBoat(force){
   if (!s && !force){ hudToast('Podpłyń do pomostu albo nabrzeża, żeby wysiąść'); return; }
   const p = s || safeSpot(b.pos.x, b.pos.z, 2, 200) || { x: HOSPITAL_SPAWN.x, y: 0, z: HOSPITAL_SPAWN.z };
   mode = 'foot'; curBoat = null; b.thr = 0;
-  player.mesh.visible = true;
+  player.mesh.visible = true; player.mesh.quaternion.set(0, 0, 0, 1); player.mesh.rotation.y = player.facing;
   player.body.position.set(p.x, p.y + 1.2, p.z); player.body.velocity.set(0, 0, 0); player.body.wakeUp(); addBody(player.body);
   player.fallSpeed = 0;
   Sound.engine(false, 0, 0);
+}
+/* gracz na łodzi: za konsolą, ręce na sterze, przechyla się z łodzią */
+const _bdV = new THREE.Vector3();
+function syncBoatDriver(){
+  const b = curBoat; if (!b) return;
+  b.group.updateWorldMatrix(true, false);
+  _bdV.set(0, 0.5, -0.35).applyMatrix4(b.group.matrixWorld);
+  player.mesh.visible = !player.dead; player.mesh.position.copy(_bdV); player.mesh.quaternion.copy(b.group.quaternion);
+  player.armL.rotation.set(-1.05, 0, -0.18); player.armR.rotation.set(-1.05, 0, 0.18); player.legL.rotation.x = player.legR.rotation.x = 0;
 }
 /* sterowana łódź: zwraca km/h */
 function updateBoat(dt){
@@ -101,7 +111,7 @@ function updateBoat(dt){
     b.v *= -0.25;                                                                 // odbicie od brzegu / przeszkody
   } else { b.pos.x = nx; b.pos.z = nz; }
   if (Math.abs(b.pos.x) > 1300 || Math.abs(b.pos.z) > 1300){ b.heading += Math.PI; hudToast('Granica obszaru — zawracanie'); }
-  syncBoat(b, clock);
+  syncBoat(b, clock); syncBoatDriver();
   Sound.engine(true, 0.12 + Math.abs(b.thr) * 0.6 * clamp(Math.abs(b.v) / BOAT_T.vMax + 0.3, 0, 1), Math.abs(b.thr), { pitch: 1.35, bright: 0.9 });
   return Math.abs(b.v) * 3.6;
 }
