@@ -6,14 +6,15 @@
    - 'park': spacer po alejkach parku rozrywki (graf zwiedzających z park.js).
    Odmiany umaszczenia (CAT_COATS: rudy pręgowany, czarny, szary pręgowany, biały, tuxedo, syjamski, szylkretowy,
    niebieski rosyjski) losowane. Spawn z dala od gracza (> 40 m); na minimapie i mapie — kropki.
-   Nakarmiony rybą (inventory.js) zostaje PRZYJACIELEM: je (serduszka), potem zawsze chodzi za graczem — każdy na swoim
+   Nakarmiony rybą (inventory.js) zostaje PRZYJACIELEM (najwyżej CAT_FRIEND_MAX = 6; siódmy tylko zje): je (serduszka), potem zawsze chodzi za graczem — każdy na swoim
    miejscu w szyku za plecami (także za rowerem, biegiem); w pojeździe jedzie z nim — na dachu auta, na skrzydłach samolotu,
    na kanapie łodzi, na czaszy spadochronu (syncRidingCats); po wysiadce zeskakuje obok.
    Skrzywdzenie kota przez gracza (auto, kula, cios, wybuch): gracz wybucha i ginie bez względu na nieśmiertelność,
    „JAK MOGŁEŚ?!”, odrodzenie w szpitalu. Kot jadący z graczem jest bezpieczny.
    --------------------------------------------------------------- */
-const CATS = [];
+const CATS = [], CAT_FRIEND_MAX = 6;
 let CAT_COUNT = 34;
+const catFriendCount = () => CATS.filter(c => c.friend && !c.dead).length;
 /* odmiany: kolory części (ciało, brzuch/pyszczek, głowa, uszy, ogon, łapy) i desenie (pręgi, łaty) */
 const CAT_COATS = [
   { name: 'rudy pręgowany', body: 0xd9822b, belly: 0xf2e6d0, head: 0xd9822b, ears: 0xd9822b, tail: 0xd9822b, paws: 0xf2e6d0, stripe: 0xa85a18 },
@@ -297,13 +298,25 @@ function catHarmed(c, how){
 }
 /* kot najbliżej punktu (karmienie) */
 function catNear(x, z, r){ let best = null, bd = r; for (const c of CATS){ if (c.dead || c.riding) continue; const d = Math.hypot(c.x - x, c.z - z); if (d < bd){ bd = d; best = c; } } return best; }
+/* karmienie: kot je (serduszka) i zostaje przyjacielem — chyba że gracz ma już CAT_FRIEND_MAX przyjaciół (wtedy tylko je); wynik:
+   'new' | 'again' | 'full' */
 function catFeed(c){
-  const was = c.friend;
-  c.eatT = 3.2; c.friend = true; c.state = 'sit';
+  const was = c.friend, full = !was && catFriendCount() >= CAT_FRIEND_MAX;
+  c.eatT = 3.2; c.state = 'sit'; if (!full) c.friend = true; else { c.t = 4.5; }
   c.h = Math.atan2(player.body.position.x - c.x, player.body.position.z - c.z);
-  catHearts(c, 9);
-  return !was;
+  catHearts(c, full ? 3 : 9);
+  return was ? 'again' : full ? 'full' : 'new';
 }
+/* menu deweloperskie: najbliższy wolny kot przybiega i od razu zostaje przyjacielem / wszyscy przyjaciele wracają na swoje miejsca */
+function catAddFriend(){
+  if (catFriendCount() >= CAT_FRIEND_MAX) return false;
+  const p = playerWorldPos(), c = CATS.filter(q => !q.dead && !q.friend).sort((a, b) => Math.hypot(a.x - p.x, a.z - p.z) - Math.hypot(b.x - p.x, b.z - p.z))[0];
+  if (!c) return false;
+  const a = rnd() * TAU; c.x = p.x + Math.cos(a) * 1.6; c.z = p.z + Math.sin(a) * 1.6; c.gy = undefined;
+  c.friend = true; c.eatT = 0; c.state = 'sit'; c.m.g.visible = true; catHearts(c, 6);
+  return true;
+}
+function catReleaseFriends(){ for (const c of CATS) if (c.friend && !c.dead){ c.m.g.quaternion.set(0, 0, 0, 1); catPlace(c, c.kind); } }
 /* serduszka: płaskie kształty serca obracane do kamery, unoszą się i znikają */
 const _heartGeo = (() => { const s = new THREE.Shape(); s.moveTo(0, -0.12); s.bezierCurveTo(-0.02, -0.06, -0.16, -0.02, -0.16, 0.06); s.bezierCurveTo(-0.16, 0.14, -0.06, 0.17, 0, 0.09);
   s.bezierCurveTo(0.06, 0.17, 0.16, 0.14, 0.16, 0.06); s.bezierCurveTo(0.16, -0.02, 0.02, -0.06, 0, -0.12); return new THREE.ShapeGeometry(s); })();

@@ -9,8 +9,8 @@
    - Ryba w ręce przy kocie (≤ 2.6 m): F albo LPM — kot je, serduszka, potem chodzi za graczem (cats.js).
    --------------------------------------------------------------- */
 const ITEMS = {
-  fists:  { name: 'Pięści', weapon: 0 }, bat: { name: 'Kij', weapon: 1 }, pistol: { name: 'Pistolet', weapon: 2 }, rifle: { name: 'Karabin', weapon: 3 },
-  rpgh: { name: 'RPG naprowadzane', weapon: 4 }, rod: { name: 'Wędka', tool: 'rod' },
+  fists:  { name: 'Pięści', weapon: 0 }, pistol: { name: 'Pistolet', weapon: 1 }, rifle: { name: 'Karabin', weapon: 2 },
+  rpgh: { name: 'RPG naprowadzane', weapon: 3 }, rod: { name: 'Wędka', tool: 'rod' },
   karp:   { name: 'Karp', fish: true, col: '#b8893a', w: [1.2, 4.5] }, okon: { name: 'Okoń', fish: true, col: '#6f8f3a', w: [0.2, 1.1] },
   szczupak: { name: 'Szczupak', fish: true, col: '#7f9a5a', w: [1.5, 6] }, dorsz: { name: 'Dorsz', fish: true, col: '#8f8a7a', w: [0.8, 3.5] },
   losos:  { name: 'Łosoś', fish: true, col: '#d8826a', w: [1.5, 5.5] }, fladra: { name: 'Flądra', fish: true, col: '#a8946a', w: [0.4, 1.6] }
@@ -54,7 +54,7 @@ function buildFishMesh(id){
 }
 const FISH_TABLE = [['okon', 30], ['fladra', 20], ['dorsz', 20], ['karp', 14], ['szczupak', 9], ['losos', 7]];
 const INV = { slots: new Array(36).fill(null), sel: 0, open: false, pick: -1 };
-['fists', 'bat', 'pistol', 'rifle', 'rpgh', 'rod'].forEach((id, i) => { INV.slots[i] = { id: id, n: 1 }; });
+['fists', 'pistol', 'rifle', 'rpgh', 'rod'].forEach((id, i) => { INV.slots[i] = { id: id, n: 1 }; });
 const invItem = () => INV.slots[INV.sel];
 const invHeld = () => { const it = invItem(); return it ? it.id : 'fists'; };
 const invHeldFish = () => { const it = invItem(); return !!(it && ITEMS[it.id].fish); };
@@ -67,9 +67,8 @@ function itemIcon(id){
   g.lineCap = 'round'; g.lineJoin = 'round';
   const poly = (pts, fill) => { g.fillStyle = fill; g.beginPath(); pts.forEach((p, k) => k ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.closePath(); g.fill(); };
   if (id === 'fists'){ g.fillStyle = '#d9a882'; g.beginPath(); g.roundRect ? g.roundRect(16, 20, 32, 26, 8) : g.rect(16, 20, 32, 26); g.fill(); g.strokeStyle = '#a87a58'; g.lineWidth = 2; for (let k = 0; k < 3; k++){ g.beginPath(); g.moveTo(24 + k * 8, 20); g.lineTo(24 + k * 8, 32); g.stroke(); } poly([[16, 34], [10, 40], [14, 46], [20, 42]], '#d9a882'); }
-  else if (id === 'bat'){ g.strokeStyle = '#a8834e'; g.lineWidth = 9; g.beginPath(); g.moveTo(44, 14); g.lineTo(22, 44); g.stroke(); g.strokeStyle = '#26272b'; g.lineWidth = 6; g.beginPath(); g.moveTo(22, 44); g.lineTo(14, 54); g.stroke(); }
-  else if (id === 'pistol'){ poly([[12, 22], [52, 22], [52, 32], [30, 32], [26, 50], [16, 50], [20, 32], [12, 32]], '#2a2c31'); poly([[14, 24], [50, 24], [50, 27], [14, 27]], '#55585e'); }
-  else if (id === 'rifle'){ poly([[4, 26], [58, 26], [58, 32], [36, 32], [33, 42], [27, 42], [26, 32], [16, 32], [14, 38], [4, 38]], '#2c2e33'); poly([[30, 32], [36, 32], [38, 48], [32, 48]], '#1b1c1f'); poly([[22, 21], [40, 21], [40, 26], [22, 26]], '#151618'); poly([[40, 27], [54, 27], [54, 31], [40, 31]], '#4a4d3c'); }
+  else if (id === 'pistol'){ poly([[12, 22], [52, 22], [52, 32], [30, 32], [26, 50], [16, 50], [20, 32], [12, 32]], '#6a6f78'); poly([[12, 22], [52, 22], [52, 29], [12, 29]], '#a9aeb6'); poly([[20, 33], [29, 33], [26, 49], [17, 49]], '#3a3d44'); }   // jasne na ciemnym polu paska
+  else if (id === 'rifle'){ poly([[4, 26], [58, 26], [58, 32], [36, 32], [33, 42], [27, 42], [26, 32], [16, 32], [14, 38], [4, 38]], '#7a7f88'); poly([[30, 32], [36, 32], [38, 48], [32, 48]], '#4a4d55'); poly([[22, 21], [40, 21], [40, 26], [22, 26]], '#2f3238'); poly([[40, 27], [54, 27], [54, 31], [40, 31]], '#8c9468'); }
   else if (id === 'rpg' || id === 'rpgh'){ poly([[6, 30], [44, 30], [44, 38], [6, 38]], id === 'rpg' ? '#4a5a3a' : '#6a7488'); poly([[44, 27], [58, 34], [44, 41]], id === 'rpg' ? '#5d6b45' : '#c8ccd2'); poly([[20, 38], [25, 38], [25, 47], [20, 47]], '#1b1c1f'); if (id === 'rpgh'){ g.fillStyle = '#40ff70'; g.fillRect(28, 25, 6, 5); g.fillStyle = '#c0392b'; g.fillRect(40, 30, 4, 8); } }
   else if (id === 'rod'){ g.strokeStyle = '#7a5a3a'; g.lineWidth = 4; g.beginPath(); g.moveTo(10, 56); g.lineTo(52, 8); g.stroke(); g.fillStyle = '#2a2c30'; g.beginPath(); g.arc(18, 48, 5, 0, TAU); g.fill(); g.strokeStyle = '#e8e8e8'; g.lineWidth = 1; g.beginPath(); g.moveTo(52, 8); g.lineTo(54, 40); g.stroke(); g.fillStyle = '#e03a2a'; g.beginPath(); g.arc(54, 42, 4, 0, TAU); g.fill(); }
   else if (it && it.fish){
@@ -118,7 +117,18 @@ function invAdd(id, n){
   for (let i = 0; i < 36 && n > 0; i++){ const s = INV.slots[i]; if (s && s.id === id && ITEMS[id].fish && s.n < 16){ const k = Math.min(n, 16 - s.n); s.n += k; n -= k; } }
   for (let i = 0; i < 36 && n > 0; i++){ if (!INV.slots[i]){ INV.slots[i] = { id: id, n: Math.min(n, 16) }; n -= Math.min(n, 16); } }
   invRender();
+  if (n > 0) invFullWarn(ITEMS[id].name);
   return n === 0;
+}
+/* przedmiot się nie zmieścił: czerwone ostrzeżenie nad paskiem, pasek mruga, dźwięk */
+let _invWarnT = 0;
+function invFullWarn(name){
+  const w = document.getElementById('invWarn');
+  w.innerHTML = '<b>Ekwipunek pełny</b> — nie można podnieść: ' + name + '<small>Zrób miejsce — np. nakarm kota rybą (Tab — plecak)</small>';
+  w.classList.remove('on'); void w.offsetWidth; w.classList.add('on');
+  _hotbarEl.classList.remove('full'); void _hotbarEl.offsetWidth; _hotbarEl.classList.add('full');
+  clearTimeout(_invWarnT); _invWarnT = setTimeout(() => { w.classList.remove('on'); _hotbarEl.classList.remove('full'); }, 3200);
+  if (typeof Sound !== 'undefined' && Sound.tick) Sound.tick(false);
 }
 function invTake(i){ const s = INV.slots[i]; if (!s) return; s.n--; if (s.n <= 0) INV.slots[i] = null; invSelect(INV.sel); }
 function toggleInventory(){
@@ -201,7 +211,7 @@ function fishClick(){
     let r = rnd() * FISH_TABLE.reduce((a, q) => a + q[1], 0), id = 'okon';
     for (const [k, w] of FISH_TABLE){ if ((r -= w) <= 0){ id = k; break; } }
     const kg = rand(ITEMS[id].w[0], ITEMS[id].w[1]);
-    if (invAdd(id, 1)) hudToast('Złowiono: ' + ITEMS[id].name + ' · ' + kg.toFixed(1).replace('.', ',') + ' kg', 3); else hudToast('Ekwipunek pełny — ryba wróciła do wody', 3);
+    if (invAdd(id, 1)) hudToast('Złowiono: ' + ITEMS[id].name + ' · ' + kg.toFixed(1).replace('.', ',') + ' kg', 3); else hudToast('Ryba wróciła do wody', 3);
     Sound.reload(); fishCancel();
   }
 }
@@ -245,8 +255,8 @@ function invHandleClick(){
 function invFeedCat(){ return mode === 'foot' && invHeldFish() ? catNear(player.body.position.x, player.body.position.z, 2.6) : null; }
 function invTryFeed(){
   const c = invFeedCat(); if (!c) return false;
-  invTake(INV.sel); catFeed(c);
-  hudToast('Nakarmiłeś kota ♥ — teraz chodzi za tobą', 3);
+  invTake(INV.sel); const r = catFeed(c);
+  hudToast(r === 'full' ? 'Kot zjadł, ale masz już ' + CAT_FRIEND_MAX + ' kotów-przyjaciół — ten zostaje na swoim podwórku' : r === 'again' ? 'Twój kot zjadł rybę ♥' : 'Nakarmiłeś kota ♥ — teraz chodzi za tobą (' + catFriendCount() + '/' + CAT_FRIEND_MAX + ')', 3.5);
   return true;
 }
 function updateInventory(dt){

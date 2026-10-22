@@ -147,6 +147,12 @@
   /* pasek ekwipunku (jak w Minecrafcie) i plecak (Tab) */
   #hotbar{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);display:flex;gap:4px;padding:5px;background:rgba(16,18,22,.62);border:1px solid rgba(200,198,191,.14);border-radius:8px;opacity:0;transition:opacity .2s}
   #hotbar.on{opacity:1}
+  #hotbar.full{animation:hbFull .45s 3;border-color:rgba(232,72,58,.9)}
+  @keyframes hbFull{0%,100%{transform:translateX(-50%)}25%{transform:translateX(calc(-50% - 7px))}75%{transform:translateX(calc(-50% + 7px))}}
+  #invWarn{position:absolute;left:50%;bottom:118px;transform:translate(-50%,8px);padding:9px 16px;border-radius:8px;background:rgba(150,28,22,.92);border:1px solid rgba(255,140,120,.55);color:#fff3ee;font-size:15px;text-align:center;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;box-shadow:0 6px 20px rgba(0,0,0,.35)}
+  #invWarn::before{content:'⚠ ';color:#ffd36a}
+  #invWarn small{display:block;font-size:12px;opacity:.8;margin-top:2px}
+  #invWarn.on{opacity:1;transform:translate(-50%,0)}
   .islot{position:relative;width:50px;height:50px;border-radius:6px;background:rgba(40,43,50,.85);border:2px solid #3a3e48;display:flex;align-items:center;justify-content:center}
   .islot img{width:40px;height:40px;image-rendering:auto;pointer-events:none}
   .islot b{position:absolute;right:3px;bottom:1px;font-size:12px;font-weight:700;color:#fff;text-shadow:0 1px 2px #000}
@@ -519,7 +525,7 @@ var LOADER = (function(){
   <div id="prompt">Naciśnij <kbd>F</kbd> lub <kbd>E</kbd>, aby wsiąść</div>
   <div id="lockZone"><i></i><i></i><i></i><i></i></div>
   <div id="lockBox"></div>
-  <div id="hotbar"></div><div id="invName"></div>
+  <div id="hotbar"></div><div id="invName"></div><div id="invWarn"></div>
   <section class="panel" id="weaponhud"><span class="wname" id="wname">Pięści</span><span class="wammo" id="wammo"></span></section>
   <div id="crosshair"><i class="ct"></i><i class="cb"></i><i class="cl"></i><i class="cr"></i><i class="cd"></i></div>
   <div id="fps">— fps</div>
@@ -584,6 +590,7 @@ var LOADER = (function(){
         <div class="dctl"><span>Piesi</span><input type="range" data-dbg="peds" min="0" max="200" step="1"><output></output></div>
         <div class="dctl"><span>Łodzie NPC</span><input type="range" data-dbg="boats" min="0" max="24" step="1"><output></output></div>
         <div class="dctl"><span>Koty</span><input type="range" data-dbg="cats" min="0" max="80" step="1"><output></output></div>
+        <div class="drow"><span>Koty-przyjaciele: <b id="dbgCatFriends">0</b> / 6</span><span class="dbtnrow"><button class="dbtn" data-act="catFriend">+1 przyjaciel</button><button class="dbtn warn" data-act="catRelease">Puść wolno</button></span></div>
         <div class="dctl"><span>Samoloty NPC</span><input type="range" data-dbg="air" min="0" max="6" step="1"><output></output></div>
         <div class="hint">Na słabszym komputerze zmniejsz liczbę aut i pieszych — to one najbardziej obciążają fizykę.</div>
         <div class="dbtnrow"><button class="dbtn" data-act="popDefault">Domyślne</button><button class="dbtn warn" data-act="popClear">Puste ulice</button></div>

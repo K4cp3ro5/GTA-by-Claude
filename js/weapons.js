@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------
-   11c. EKWIPUNEK / BROŃ — pięści, kij, pistolet, karabin (ogień ciągły).
+   11c. EKWIPUNEK / BROŃ — pięści, pistolet, karabin (ogień ciągły), RPG naprowadzane.
    Broń palna: kamera „zza ramienia” (postać z lewej, celownik na środku ekranu nigdy nie zasłonięty — jak
    w strzelankach TPP), postać obraca się w stronę celownika, PPM = przycelowanie (bliżej, węższe pole widzenia,
    mniejszy rozrzut, wolniejszy chód). Strzał: promień z kamery przez środek ekranu (piesi — siatki THREE,
@@ -8,7 +8,6 @@
    --------------------------------------------------------------- */
 const WEAPON_DEFS = [
   { id:'fists',  name:'Pięści',   kind:'melee',  range:1.7, dmg:14, cooldown:0.42 },
-  { id:'bat',    name:'Kij',      kind:'melee',  range:2.1, dmg:30, cooldown:0.55 },
   { id:'pistol', name:'Pistolet', kind:'ranged', range:70,  dmg:40, cooldown:0.2,  magSize:12, reloadT:1.1, spread:0.010, kick:0.028, bloom:0.55, muzzle:0.2 },
   { id:'rifle',  name:'Karabin',  kind:'ranged', range:160, dmg:28, cooldown:0.095, magSize:30, reloadT:1.8, spread:0.008, kick:0.011, bloom:0.22, muzzle:0.8, auto:true },
   { id:'rpgh',   name:'RPG naprowadzane', kind:'ranged', range:1000, dmg:0, cooldown:0.9, magSize:1, reloadT:2.6, spread:0.002, kick:0.07, bloom:0.1, muzzle:1.0, projectile:true, homing:true },
@@ -74,26 +73,6 @@ function buildRpgMesh(homing){
   head.position.y = 0.08; head.castShadow = true; g.add(head); g.userData.head = head;
   return g;
 }
-/* kij baseballowy: jedna bryła obrotowa (profil gałka → rączka → stożek → beczka → zaokrąglony koniec), punkt mocowania
-   w dłoni = lokalne y = 0, kij w −Y; owijka na rączce, słoje drewna (pasy wzdłuż), wypalony znak i ciemniejszy koniec */
-function buildBatMesh(){
-  const prof = [[0, 0.07], [0.03, 0.07], [0.036, 0.06], [0.034, 0.045], [0.021, 0.035], [0.019, 0.0], [0.019, -0.2], [0.021, -0.3],
-    [0.028, -0.42], [0.037, -0.54], [0.044, -0.64], [0.047, -0.74], [0.047, -0.8], [0.044, -0.83], [0.034, -0.85], [0, -0.855]];
-  const geo = new THREE.LatheGeometry(prof.reverse().map(p => new THREE.Vector2(p[0], p[1])), 18);   // profil od dołu do góry — ściany na zewnątrz
-  const ring = (y, a, b) => y < a && y > b;
-  const fn = (x, y, z) => {
-    if (y > -0.24) return ring(y, 0.075, 0.034) ? 0x1a1b1e : (Math.floor((y + 0.4) * 55) % 2 ? 0x2b2d33 : 0x22242a);   // gałka, owijka (paski taśmy)
-    if (ring(y, -0.6, -0.69) && x > 0.02 && Math.abs(z) < 0.03) return 0x3a2412;                                          // wypalony znak
-    if (y < -0.825) return 0x6e4a26;                                                                                       // koniec beczki
-    const a = Math.atan2(z, x), grain = Math.sin(a * 7 + y * 3) + Math.sin(a * 13 - y * 9) * 0.5;
-    return grain > 0.9 ? 0x9a7240 : grain < -0.9 ? 0xc89c62 : 0xb58a52;                                                    // słoje
-  };
-  const m = new THREE.Mesh(mergeColored([{ geo: geo, color: 0xb58a52, colorFn: fn, quads: true }]), new THREE.MeshLambertMaterial({ vertexColors: true }));
-  m.castShadow = true;
-  const g = new THREE.Group(); g.add(m);
-  return g;
-}
-
 /* efekty strzału (proste siatki dodawane do sceny — bez nowych świateł, żeby nie przekompilowywać shaderów) */
 const _tracerMat = new THREE.MeshBasicMaterial({ color: 0xffe2a0, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false });
 const _flashMat = new THREE.MeshBasicMaterial({ color: 0xffc860, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false });
@@ -119,13 +98,11 @@ const Weapons = {
   meshes: {},
 
   init(){
-    this.meshes.bat = buildBatMesh();
     this.meshes.pistol = buildPistolMesh();
     this.meshes.rifle = buildRifleMesh();
     this.meshes.rpgh = buildRpgMesh(true);
-    this.meshes.bat.position.set(0, -0.63, 0.02); player.armR.add(this.meshes.bat);
     this.pivot = new THREE.Group(); player.mesh.add(this.pivot);
-    this.pivot.add(this.meshes.pistol); this.pivot.add(this.meshes.rifle); this.pivot.add(this.meshes.rpgh); this.pivot.add(this.meshes.rpgh);
+    this.pivot.add(this.meshes.pistol); this.pivot.add(this.meshes.rifle); this.pivot.add(this.meshes.rpgh);
     for (const id in this.meshes) this.meshes[id].visible = false;
     WEAPON_DEFS.forEach(d => { if (d.kind === 'ranged') this.ammo[d.id] = { mag: d.magSize }; });   // magazynków bez limitu — liczy się tylko zawartość bieżącego
   },

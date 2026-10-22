@@ -314,6 +314,7 @@ function refreshDebugInfo(){
   dbgEl('dbgSeaAir').textContent = boats.filter(b => b.npc).length + ' / ' + airPlanes.length;
   dbgEl('dbgMode').textContent = mode === 'car' ? CAR_TYPES[carType].name + (driving.owner === 'stolen' ? ' (kradzione)' : '') : mode === 'plane' && curPlane ? curPlane.T.name : mode === 'boat' ? BOAT_T.name : mode === 'ride' && curRide ? curRide.name : 'pieszo';
   dbgEl('dbgPirCount').textContent = String(npcs.filter(n => n.profile === 'pirat').length);
+  dbgEl('dbgCatFriends').textContent = String(catFriendCount());
 }
 debugEl.addEventListener('click', ev => { if (ev.target === debugEl) toggleDebugMenu(); });
 dbgEl('closeDebug').addEventListener('click', ev => { ev.stopPropagation(); toggleDebugMenu(); });
@@ -342,6 +343,8 @@ const dbgDrop = onMe => {
 const DBG_ACT = {
   popDefault: () => { setNpcCars(POP0.cars); setNpcBikes(POP0.bikes); setPeds(POP0.peds); setNpcBoatCount(POP0.boats); setAirCount(POP0.air); setCatCount(POP0.cats); },
   popClear:   () => { setNpcCars(0); setNpcBikes(0); setPeds(0); },
+  catFriend:  () => { if (!catAddFriend()) hudToast(catFriendCount() >= CAT_FRIEND_MAX ? 'Masz już ' + CAT_FRIEND_MAX + ' kotów-przyjaciół' : 'Brak wolnego kota', 2.5); },
+  catRelease: () => catReleaseFriends(),
   addPirate:  () => { for (let t = 0; t < 12; t++){ const n = spawnRandomNpcCar(); if (n.type !== 'bike' && !n.path.hwyRoute){ npcMakePirate(n); break; } removeNpcCar(n); } },
   nearPirate: () => {
     const p = playerWorldPos();

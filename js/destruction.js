@@ -147,10 +147,12 @@ function vehicleBulletHit(body, dmg){
   if (p && p.owner !== 'wreck'){ p.hp = (p.hp === undefined ? 100 : p.hp) - dmg * k; if (p.hp <= 0) destroyParked(p); return true; }
   return false;
 }
-/* kraksa auta gracza (sound.js): obrażenia pojazdu */
-function carCrashDamage(v){
-  if (activeCarGone || v < 9) return;
-  carHp -= (v - 9) * 5.5;
+/* kraksa auta gracza (sound.js): obrażenia od prędkości uderzenia ponad CAR_CRASH_V0 (50 km/h), w oknie 0.4 s liczy się tylko przyrost
+   najmocniejszego uderzenia (prev). Uderzenie 72 km/h ≈ −16, 108 km/h ≈ −42, wybuch od jednego uderzenia dopiero ~200 km/h. */
+const CAR_CRASH_V0 = 14, CAR_CRASH_K = 2.6;
+function carCrashDamage(v, prev){
+  if (activeCarGone || v < CAR_CRASH_V0) return;
+  carHp -= (v - Math.max(CAR_CRASH_V0, prev || 0)) * CAR_CRASH_K;
   if (carHp <= 0) destroyActiveCar('kraksa');
 }
 
