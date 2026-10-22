@@ -6,8 +6,9 @@
    - 'park': spacer po alejkach parku rozrywki (graf zwiedzających z park.js).
    Odmiany umaszczenia (CAT_COATS: rudy pręgowany, czarny, szary pręgowany, biały, tuxedo, syjamski, szylkretowy,
    niebieski rosyjski) losowane. Spawn z dala od gracza (> 40 m); na minimapie i mapie — kropki.
-   Nakarmiony rybą (inventory.js) zostaje PRZYJACIELEM: je (serduszka), potem zawsze chodzi za graczem, a w pojeździe
-   jedzie z nim — na dachu auta, na kadłubie samolotu, na kanapie łodzi; po wysiadce zeskakuje obok.
+   Nakarmiony rybą (inventory.js) zostaje PRZYJACIELEM: je (serduszka), potem zawsze chodzi za graczem — każdy na swoim
+   miejscu w szyku za plecami (także za rowerem, biegiem); w pojeździe jedzie z nim — na dachu auta, na skrzydłach samolotu,
+   na kanapie łodzi (syncRidingCats); po wysiadce zeskakuje obok.
    Skrzywdzenie kota przez gracza (auto, kula, cios, wybuch): gracz wybucha i ginie bez względu na nieśmiertelność,
    „JAK MOGŁEŚ?!”, odrodzenie w szpitalu. Kot jadący z graczem jest bezpieczny.
    --------------------------------------------------------------- */
@@ -136,65 +137,108 @@ function catGroundY(c){
   if (c.kind !== 'walk') return 0.02;
   return Math.abs(c.x - blockCenter(c.bi)) > 15.2 || Math.abs(c.z - blockCenter(c.bj)) > 15.2 ? 0.02 : WALK_H;
 }
-/* miejsce kota-przyjaciela w pojeździe gracza (lokalnie w układzie modelu pojazdu); k = numer przyjaciela */
-const _catRideV = new THREE.Vector3(), _catRideQ = new THREE.Quaternion(), _catYawPi = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
-function catRideSpot(k){
-  const sx = (k % 3 - 1) * 0.32, sz = Math.floor(k / 3) * 0.5;
-  if (mode === 'car' && !activeCarGone){
-    const T = CAR_TYPES[carType], top = carTopOf(carType) - T.restY;
-    carModel.root.updateWorldMatrix(true, false);
-    _catRideV.set(sx, top + 0.01, 0.3 + sz).applyMatrix4(carModel.root.matrixWorld);       // dach (fizyczny przód auta = lokalne −Z)
-    _catRideQ.copy(carModel.root.quaternion).multiply(_catYawPi);
-    return true;
+/* koty-przyjaciele w pojeździe gracza: miejsca w układzie modelu pojazdu (auto — dach, samolot — skrzydła na zmianę lewe/prawe,
+   łódź — kanapa na rufie); wysokość z promienia w dół na model (pamiętana dla modelu i miejsca), więc kot siedzi na powierzchni.
+   Rower nie ma miejsca — koty biegną za nim. */
+const _catYawPi = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
+const _rideRay = new THREE.Raycaster(), _rideY = new Map(), _rideO = new THREE.Vector3(), _rideD = new THREE.Vector3(), _rideQ = new THREE.Quaternion();
+function catRideFrame(){
+  if (mode === 'car' && !activeCarGone && !CAR_TYPES[carType].bike){
+    const T = CAR_TYPES[carType];
+    /* dach = najwyżej położona bryła lakieru; model jest obrócony o π (nos siatki +Z → fizyczny przód −Z) */
+    const roof = carParts(carType).filter(q => q[3] === 'paint').reduce((a, q) => q[5] + q[1] / 2 > a[5] + a[1] / 2 ? q : a);
+    const cols = roof[0] > 1.3 ? 3 : 2, dx = Math.min(0.36, (roof[0] - 0.3) / 2);
+    return { obj: carModel.root, yaw: true, fy: carTopOf(carType) - T.restY,
+      slot: (k, n) => { const r = Math.floor(k / cols), rows = Math.ceil(n / cols), c = k % cols;
+        return { x: cols === 3 ? (c - 1) * dx : (c ? -dx : dx) * 0.7, z: -roof[6] + (r - (rows - 1) / 2) * 0.52 }; } };
   }
   if (mode === 'plane' && curPlane){
-    curPlane.group.updateWorldMatrix(true, false);
-    _catRideV.set(sx, curPlane.T.half[1] + 0.02, -1.2 - sz).applyMatrix4(curPlane.group.matrixWorld);   // grzbiet kadłuba za kabiną
-    _catRideQ.copy(curPlane.group.quaternion);
-    return true;
+    const jet = curPlane.T === PLANE_TYPES.jet;
+    return { obj: curPlane.group, yaw: false, fy: curPlane.T.half[1],
+      slot: k => { const s = k % 2 ? -1 : 1, r = Math.floor(k / 2);
+        if (jet){ const x = Math.min(10.5, 3.6 + r * 1.6); return { x: s * x, z: -4.5 * x / 12.5 }; }       // środek cięciwy skośnego skrzydła
+        return { x: s * Math.min(5, 1.9 + r * 1.05), z: 0.95 }; } };                                        // górnopłat awionetki
   }
   if (mode === 'boat' && curBoat){
-    curBoat.group.updateWorldMatrix(true, false);
-    _catRideV.set(0.35 - sx, 0.9, -1.4 + sz).applyMatrix4(curBoat.group.matrixWorld);       // kanapa na rufie
-    _catRideQ.copy(curBoat.group.quaternion);
-    return true;
+    return { obj: curBoat.group, yaw: false, fy: 0.9,
+      slot: k => ({ x: 0.35 - (k % 3 - 1) * 0.32, z: -1.4 + Math.floor(k / 3) * 0.5 }) };
   }
-  return false;
+  return null;
 }
-const _catQ = new CANNON.Quaternion(), _catV = new CANNON.Vec3();
+function catSurfaceY(F, x, z){
+  const key = F.obj.uuid + ':' + x.toFixed(2) + ':' + z.toFixed(2);
+  let y = _rideY.get(key);
+  if (y !== undefined) return y;
+  F.obj.updateWorldMatrix(true, true);
+  _rideO.set(x, 8, z).applyMatrix4(F.obj.matrixWorld); _rideD.set(0, -1, 0).transformDirection(F.obj.matrixWorld);
+  _rideRay.set(_rideO, _rideD); _rideRay.far = 20;
+  const h = _rideRay.intersectObject(F.obj, true).find(q => q.object.isMesh && q.object.visible);
+  y = h ? F.obj.worldToLocal(h.point.clone()).y : F.fy;
+  if (_rideY.size > 400) _rideY.clear();
+  _rideY.set(key, y);
+  return y;
+}
+/* po syncCar (main-loop): model auta ma już pozycję tej klatki — kot nie zostaje w tyle */
+const _riders = [];
+function syncRidingCats(){
+  if (!_riders.length) return;
+  const F = catRideFrame(); if (!F) return;
+  F.obj.updateWorldMatrix(true, false); F.obj.getWorldQuaternion(_rideQ); if (F.yaw) _rideQ.multiply(_catYawPi);
+  _riders.forEach((c, k) => {
+    const s = F.slot(k, _riders.length);
+    c.m.g.position.set(s.x, catSurfaceY(F, s.x, s.z) + 0.005, s.z).applyMatrix4(F.obj.matrixWorld);
+    c.m.g.quaternion.copy(_rideQ); c.x = c.m.g.position.x; c.z = c.m.g.position.z;
+  });
+}
+const _catQ = new CANNON.Quaternion(), _catV = new CANNON.Vec3(), _followers = [];
+let _followH = null;
 function updateCats(dt){
   const pp = playerWorldPos();
   const inCar = mode === 'car' && !activeCarGone, cv = chassisBody.velocity, carSp = Math.hypot(cv.x, cv.z);
   if (inCar) chassisBody.quaternion.conjugate(_catQ);
-  let friendK = 0;
+  /* za kim idą przyjaciele: pieszy gracz albo rower (punkt i kurs); kurs wygładzony, żeby szyk nie skakał przy obrocie */
+  const bike = inCar && CAR_TYPES[carType].bike, anchor = !player.dead && (mode === 'foot' || bike) ? (bike ? chassisBody.position : player.body.position) : null;
+  if (anchor){
+    let h = player.facing;
+    if (bike){ _catV.set(0, 0, -1); chassisBody.quaternion.vmult(_catV, _catV); h = Math.atan2(_catV.x, _catV.z); }
+    if (carSp > 1 || !bike) _followH = _followH === null ? h : angleDamp(_followH, h, bike ? 4 : 2.5, dt);
+  } else _followH = null;
+  const rideF = player.dead ? null : catRideFrame();
+  _riders.length = 0; _followers.length = 0;
   for (const c of CATS){
     if (c.dead){ c.t -= dt; if (c.t <= 0) catPlace(c, c.kind); continue; }
-    /* przyjaciel w pojeździe gracza: jedzie z nim */
-    if (c.friend && !player.dead && catRideSpot(friendK)){
-      friendK++; c.riding = true; c.eatT = 0;
-      c.m.g.visible = true; c.m.g.position.copy(_catRideV); c.m.g.quaternion.copy(_catRideQ);
-      c.x = _catRideV.x; c.z = _catRideV.z;
+    /* przyjaciel w pojeździe gracza: jedzie z nim (pozycja w syncRidingCats) */
+    if (c.friend && rideF){
+      _riders.push(c); c.riding = true; c.eatT = 0; c.m.g.visible = true;
       c.m.body.rotation.x = -0.25; c.m.body.position.y = -0.05;                                      // siedzi
       c.m.tail.rotation.set(1.1, Math.sin(clock * 3 + c.ph) * 0.5, 0);
       continue;
     }
     if (c.riding){                                                                        // wysiadka: zeskakuje obok gracza
       c.riding = false; c.m.g.quaternion.set(0, 0, 0, 1);
-      const pb = player.body.position; c.x = pb.x + 1.1; c.z = pb.z + 0.6; c.gy = undefined;
+      const pb = player.body.position, a = _followers.length * 1.3; c.x = pb.x + Math.cos(a) * 1.2; c.z = pb.z + Math.sin(a) * 1.2; c.gy = undefined;
     }
-    if (c.friend) friendK++;
     const far = Math.hypot(c.x - pp.x, c.z - pp.z) > 260;
-    const follow = c.friend && mode === 'foot' && !player.dead;
+    const follow = c.friend && anchor && _followH !== null;
     if (c.eatT > 0){ c.eatT -= dt; c.state = 'sit'; }
-    else if (follow){                                                                     // przyjaciel: zawsze idzie za graczem
-      const px = player.body.position.x, pz = player.body.position.z;
-      let dx = px - c.x, dz = pz - c.z, d = Math.hypot(dx, dz);
-      if (d > 45){ c.x = px - 2; c.z = pz - 1.5; dx = 2; dz = 1.5; d = 2.5; }            // daleko (odrodzenie, teleport) — dobiega od razu
-      if (d > 2.2){ const s = Math.min(d - 2, (d > 8 ? 5 : 1.8) * dt); c.x += dx / d * s; c.z += dz / d * s; c.h = angleDamp(c.h, Math.atan2(dx, dz), 8, dt); c.state = 'walk'; c.ph += dt * 9; }
-      else c.state = 'sit';
+    else if (follow){                                                                     // przyjaciel: zawsze idzie za graczem — każdy na swoim miejscu w szyku
+      const k = _followers.length; _followers.push(c);
+      const r = Math.floor(k / 3), back = (bike ? 2.8 : 1.5) + r * 1.05, side = (k % 3 - 1) * 0.95 + (r % 2 ? 0.45 : 0);
+      const sh = Math.sin(_followH), ch = Math.cos(_followH);
+      const tx = anchor.x - sh * back + ch * side, tz = anchor.z - ch * back - sh * side;
+      let dx = tx - c.x, dz = tz - c.z, d = Math.hypot(dx, dz);
+      if (d > 45){ c.x = tx - dx / d * 2; c.z = tz - dz / d * 2; dx = tx - c.x; dz = tz - c.z; d = 2; }     // daleko (odrodzenie, teleport) — dobiega od razu
+      if (d > 0.3){
+        const run = clamp(d * 2.4, 1, bike ? 18 : 7) * (0.9 + c.sp * 0.1), s = Math.min(d, run * dt);
+        c.x += dx / d * s; c.z += dz / d * s; c.h = angleDamp(c.h, Math.atan2(dx, dz), 9, dt); c.state = 'walk'; c.ph += dt * Math.min(run, 9) * 2.4;
+      } else { c.state = 'sit'; c.h = angleDamp(c.h, _followH, 3, dt); }
+      for (let j = 0; j < k; j++){                                                        // nie wchodzą na siebie
+        const o = _followers[j], ox = c.x - o.x, oz = c.z - o.z, od = Math.hypot(ox, oz);
+        if (od < 0.55 && od > 1e-4){ const p = (0.55 - od) / 2; c.x += ox / od * p; c.z += oz / od * p; o.x -= ox / od * p; o.z -= oz / od * p; }
+      }
       c.gyT = (c.gyT || 0) - dt;
-      if (c.gyT <= 0){ c.gyT = 0.25; const h = rayHit(c.x, player.body.position.y + 1, c.z, c.x, player.body.position.y - 3, c.z, G_WORLD); c.gy = h ? h.hitPointWorld.y + 0.01 : Math.max(0.02, player.body.position.y - 0.85); }
-      if (rnd() < dt * 0.25) catHearts(c, 1);
+      if (c.gyT <= 0){ c.gyT = 0.25; const h = rayHit(c.x, anchor.y + 1.5, c.z, c.x, anchor.y - 3.5, c.z, G_WORLD); c.gy = h ? h.hitPointWorld.y + 0.01 : Math.max(0.02, anchor.y - 0.85); }
+      if (c.state === 'sit' && rnd() < dt * 0.2) catHearts(c, 1);
     } else if (c.state === 'sit'){ c.t -= dt; if (c.t <= 0) catNextTarget(c); }
     else {
       const dx = c.tx - c.x, dz = c.tz - c.z, d = Math.hypot(dx, dz);
@@ -205,7 +249,7 @@ function updateCats(dt){
       c.ph += dt * sp * 7;
     }
     /* auto gracza najechało na kota */
-    if (inCar && carSp > 1.2){
+    if (inCar && carSp > 1.2 && !c.friend){                                              // przyjaciel biegnący za rowerem — nie
       const T = CAR_TYPES[carType], p = chassisBody.position;
       _catV.set(c.x - p.x, catGroundY(c) + 0.2 - (p.y - T.restY), c.z - p.z); _catQ.vmult(_catV, _catV);
       if (Math.abs(_catV.x) < T.half[0] + 0.25 && Math.abs(_catV.z) < T.half[2] + 0.25 && Math.abs(_catV.y) < 1.2){ catHarmed(c, 'auto'); continue; }

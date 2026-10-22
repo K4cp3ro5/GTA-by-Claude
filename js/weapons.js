@@ -74,16 +74,23 @@ function buildRpgMesh(homing){
   head.position.y = 0.08; head.castShadow = true; g.add(head); g.userData.head = head;
   return g;
 }
+/* kij baseballowy: jedna bryła obrotowa (profil gałka → rączka → stożek → beczka → zaokrąglony koniec), punkt mocowania
+   w dłoni = lokalne y = 0, kij w −Y; owijka na rączce, słoje drewna (pasy wzdłuż), wypalony znak i ciemniejszy koniec */
 function buildBatMesh(){
-  const g = new THREE.Group();
-  const wood = new THREE.MeshLambertMaterial({ color:0xa8834e });
-  const grip = new THREE.MeshLambertMaterial({ color:0x26272b });
-  function cy(rt,rb,h,mat,y){ const m=new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,10),mat); m.position.set(0,y,0); m.castShadow=true; return m; }
-  /* uchwyt (owijka, gałka) przy dłoni (lokalne y = 0 — punkt mocowania), grubszy koniec dalej */
-  g.add(cy(0.03,0.03,0.025,grip, 0.0));
-  g.add(cy(0.019,0.022,0.24,grip, -0.12));
-  g.add(cy(0.022,0.058,0.52,wood, -0.5));
-  g.add(cy(0.058,0.05,0.04,wood, -0.78));
+  const prof = [[0, 0.07], [0.03, 0.07], [0.036, 0.06], [0.034, 0.045], [0.021, 0.035], [0.019, 0.0], [0.019, -0.2], [0.021, -0.3],
+    [0.028, -0.42], [0.037, -0.54], [0.044, -0.64], [0.047, -0.74], [0.047, -0.8], [0.044, -0.83], [0.034, -0.85], [0, -0.855]];
+  const geo = new THREE.LatheGeometry(prof.reverse().map(p => new THREE.Vector2(p[0], p[1])), 18);   // profil od dołu do góry — ściany na zewnątrz
+  const ring = (y, a, b) => y < a && y > b;
+  const fn = (x, y, z) => {
+    if (y > -0.24) return ring(y, 0.075, 0.034) ? 0x1a1b1e : (Math.floor((y + 0.4) * 55) % 2 ? 0x2b2d33 : 0x22242a);   // gałka, owijka (paski taśmy)
+    if (ring(y, -0.6, -0.69) && x > 0.02 && Math.abs(z) < 0.03) return 0x3a2412;                                          // wypalony znak
+    if (y < -0.825) return 0x6e4a26;                                                                                       // koniec beczki
+    const a = Math.atan2(z, x), grain = Math.sin(a * 7 + y * 3) + Math.sin(a * 13 - y * 9) * 0.5;
+    return grain > 0.9 ? 0x9a7240 : grain < -0.9 ? 0xc89c62 : 0xb58a52;                                                    // słoje
+  };
+  const m = new THREE.Mesh(mergeColored([{ geo: geo, color: 0xb58a52, colorFn: fn, quads: true }]), new THREE.MeshLambertMaterial({ vertexColors: true }));
+  m.castShadow = true;
+  const g = new THREE.Group(); g.add(m);
   return g;
 }
 
@@ -124,8 +131,15 @@ const Weapons = {
   },
   def(){ return WEAPON_DEFS[this.idx]; },
   armed(){ return this.idx !== 0; },
-  /* broń palna w dłoni, pieszo, nie pod czaszą: kamera zza ramienia i postać zwrócona w stronę celownika */
-  aiming(){ return mode === 'foot' && this.def().kind === 'ranged' && !player.dead && !(typeof parachute !== 'undefined' && parachute.on); },
+  /* broń palna w dłoni, pieszo: kamera zza ramienia i postać zwrócona w stronę celownika; pod otwartą czaszą tylko przy PPM
+     (bez celowania kamera zostaje za czaszą), w swobodnym spadku — nie */
+  aiming(){
+    if (mode !== 'foot' || this.def().kind !== 'ranged' || player.dead) return false;
+    if (typeof parachute !== 'undefined' && parachute.on) return parachute.t > 0.7 && !!mouseDownR;
+    return true;
+  },
+  /* namierzanie RPG trwa tylko przy przycelowaniu (PPM) */
+  locking(){ return !!this.def().homing && this.aiming() && pointerLocked && !!mouseDownR; },
 
   select(i){
     if (i < 0 || i >= WEAPON_DEFS.length) return;
@@ -259,24 +273,26 @@ const Weapons = {
       if (Math.abs(wrapAngle(Math.atan2(c.x - p.x, c.z - p.z) - player.facing)) < 0.9){ catHarmed(c, 'cios'); return; }
     }
   },
-  /* namierzanie (RPG naprowadzane, jak w GTA V): cele w KWADRATOWEJ strefie na środku ekranu (połowa boku = LOCK_ZONE × wysokość
-     ekranu), do 280 m, widoczne; wybierany najbliższy środka; utrzymany LOCK_TIME = namierzony */
+  /* namierzanie (RPG naprowadzane, jak w GTA V): po przycelowaniu (PPM) cele w KWADRATOWEJ strefie na środku ekranu (połowa boku =
+     LOCK_ZONE × wysokość ekranu), do 320 m, widoczne; wybierany najbliższy środka (zasłonięty — następny); utrzymany LOCK_TIME = namierzony */
   updateLock(dt){
-    const d = this.def();
-    if (!d.homing || !this.aiming() || !pointerLocked){ this.lock = null; this.lockT = 0; return; }
-    const cp = camera.position, half = LOCK_ZONE * innerHeight, asp = innerWidth / innerHeight;
-    let best = null, ba = 1e9;
+    if (!this.locking()){ this.lock = null; this.lockT = 0; return; }
+    const cp = camera.position, half = LOCK_ZONE * innerHeight, cand = [];
     for (const t of lockTargets()){
       const p = lockTargetPos(t); if (!p) continue;
       const l = Math.hypot(p.x - cp.x, p.y - cp.y, p.z - cp.z);
-      if (l < 6 || l > 280) continue;
+      if (l < 6 || l > 320) continue;
       _wA.set(p.x, p.y, p.z).project(camera); if (_wA.z > 1) continue;
       const sx = _wA.x * innerWidth / 2, sy = _wA.y * innerHeight / 2;                          // piksele od środka ekranu
       if (Math.abs(sx) > half || Math.abs(sy) > half) continue;
-      const d = Math.hypot(sx, sy) + l * 0.05;                                            // bliżej środka i bliżej gracza
-      if (d < ba){ ba = d; best = t; }
+      cand.push({ t: t, l: l, s: Math.hypot(sx, sy) + l * 0.05 + (this.lock && t.o === this.lock.o ? -40 : 0) });   // bliżej środka i gracza; obecny cel ma przewagę
     }
-    if (best){ const p = lockTargetPos(best); const h = rayHit(cp.x, cp.y, cp.z, p.x, p.y, p.z, G_WORLD); if (h && h.distance < Math.hypot(p.x - cp.x, p.y - cp.y, p.z - cp.z) - 3) best = null; }
+    cand.sort((a, b) => a.s - b.s);
+    let best = null;
+    for (const q of cand.slice(0, 5)){                                                   // pierwszy niezasłonięty
+      const p = lockTargetPos(q.t), h = rayHit(cp.x, cp.y, cp.z, p.x, p.y, p.z, G_WORLD);
+      if (!h || h.distance > q.l - 3){ best = q.t; break; }
+    }
     if (best && this.lock && best.o === this.lock.o){ const was = this.lockT; this.lockT += dt; if (was < LOCK_TIME && this.lockT >= LOCK_TIME) Sound.tick(true); }
     else { this.lock = best; this.lockT = 0; }
   },
@@ -329,8 +345,9 @@ const Weapons = {
     const on = mode === 'foot' && d.kind === 'ranged' && !player.dead;
     el.crosshair.classList.toggle('on', on);
     const lb = document.getElementById('lockBox'), lz = document.getElementById('lockZone');
-    lz.classList.toggle('on', on && !!d.homing && this.aiming()); lz.style.setProperty('--s', (LOCK_ZONE * 2 * innerHeight) + 'px'); lz.classList.toggle('has', !!(this.lock && d.homing));
-    if (this.lock && d.homing && on){
+    const lk = on && this.locking();
+    lz.classList.toggle('on', lk); lz.style.setProperty('--s', (LOCK_ZONE * 2 * innerHeight) + 'px'); lz.classList.toggle('has', !!(this.lock && lk));
+    if (this.lock && lk){
       const p = lockTargetPos(this.lock);
       if (p){ _wA.set(p.x, p.y, p.z).project(camera);
         if (_wA.z < 1){ lb.style.display = 'block'; lb.style.left = ((_wA.x + 1) / 2 * innerWidth) + 'px'; lb.style.top = ((1 - _wA.y) / 2 * innerHeight) + 'px';

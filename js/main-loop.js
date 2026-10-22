@@ -85,6 +85,7 @@ function frame(now){
     if (b._hasPrev === true) n.mesh.position.set(lerp(b._p0.x, b.position.x, alpha), n.y || 0, lerp(b._p0.z, b.position.z, alpha));
   }
   syncCar(alpha);
+  syncRidingCats();
   updateCamera(dt, vehKmh);
   applyCamShake(dt);
   updateLampLights();

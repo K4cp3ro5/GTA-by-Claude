@@ -70,10 +70,10 @@ function updateCamera(dt, kmh){
     const para = typeof parachute !== 'undefined' && parachute.on && parachute.t > 0.7;
     /* broń palna: kamera zza prawego ramienia (cel przesunięty w prawo od postaci) — celownik na środku ekranu
        nie jest zasłonięty przez postać; PPM (przycelowanie): bliżej i węższe pole widzenia */
-    const k = Weapons.aimK, ads = Weapons.adsK, sh = k * (0.82 - ads * 0.2);
-    tx = p.x + Math.cos(camYaw) * sh; ty = p.y + 0.85 + 0.72 + (para ? 1.6 : 0) - k * 0.1; tz = p.z - Math.sin(camYaw) * sh;
-    dist = para ? 10.5 : lerp(5.3, 3.3, k) - ads * 1.2;
-    height = para ? 1.2 : lerp(0.35, 0.16, k);
+    const k = Weapons.aimK, ads = Weapons.adsK, sh = k * (0.82 - ads * 0.2), pk = para ? 1 - k : 0;   // pod czaszą: kamera daleko, przy celowaniu — zza ramienia
+    tx = p.x + Math.cos(camYaw) * sh; ty = p.y + 0.85 + 0.72 + pk * 1.6 - k * 0.1; tz = p.z - Math.sin(camYaw) * sh;
+    dist = lerp(lerp(5.3, 3.3, k) - ads * 1.2, 10.5, pk);
+    height = lerp(lerp(0.35, 0.16, k), 1.2, pk);
     camFov = damp(camFov, 68 - ads * 18, k > 0.05 ? 10 : 4, dt);
   }
 

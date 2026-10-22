@@ -146,10 +146,36 @@ _invEl.addEventListener('click', ev => {
 document.getElementById('invClose').addEventListener('click', ev => { ev.stopPropagation(); toggleInventory(); });
 
 /* --- modele w dłoni: wędka i ryba --- */
+/* wędka spinningowa (oś −Y od dłoni do szczytówki, spód = lokalne −Z): korkowa rękojeść z dolnikiem, uchwyt kołowrotka,
+   kołowrotek (szpula z żyłką, kabłąk, korbka), dwuczęściowy blank zwężający się ku szczytówce z owijkami, przelotki od spodu */
 const _rodMesh = (() => {
-  const g = new THREE.Group();
-  const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.025, 2.2, 6), new THREE.MeshLambertMaterial({ color: 0x7a5a3a })); rod.position.y = -1.0; g.add(rod);
-  const reel = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.05, 10), new THREE.MeshLambertMaterial({ color: 0x2a2c30 })); reel.rotation.z = Math.PI / 2; reel.position.set(0.05, 0.1, 0); g.add(reel);
+  const P = [], cyl = (r0, r1, y0, y1, color, seg) => { const g = new THREE.CylinderGeometry(r1, r0, Math.abs(y1 - y0), seg || 10); P.push({ geo: g, color: color, y: (y0 + y1) / 2 }); };
+  cyl(0.024, 0.024, 0.34, 0.3, 0x1b1c1f);                                       // dolnik
+  cyl(0.021, 0.019, 0.3, 0.1, 0xc9a26a, 12);                                    // korek (rękojeść dolna)
+  cyl(0.017, 0.017, 0.1, -0.06, 0x2a2c30);                                      // uchwyt kołowrotka
+  cyl(0.02, 0.016, -0.06, -0.22, 0xc9a26a, 12);                                 // korek (rękojeść górna)
+  cyl(0.013, 0.011, -0.22, -0.26, 0x1b1c1f);                                    // pierścień
+  cyl(0.011, 0.007, -0.26, -1.2, 0x23415e, 8);                                  // blank — dolna część (granat)
+  cyl(0.0085, 0.0085, -1.17, -1.23, 0xc8ccd2, 8);                               // łącznik
+  cyl(0.007, 0.0028, -1.2, -2.1, 0x23415e, 6);                                  // blank — szczytówka
+  cyl(0.0035, 0.0028, -2.04, -2.1, 0xe8e2d0, 6);                                // biały koniec szczytówki
+  [-0.5, -0.85, -1.15, -1.45, -1.72, -1.95].forEach((y, i) => {                 // przelotki od spodu, coraz mniejsze
+    const r = 0.03 - i * 0.004, t = new THREE.TorusGeometry(r, 0.0025, 4, 12); t.rotateX(Math.PI / 2);
+    P.push({ geo: t, color: 0xb9bec6, y: y, z: -(r + 0.018 - i * 0.0015) });
+    P.push({ geo: new THREE.BoxGeometry(0.003, 0.004, 0.018 - i * 0.0015), color: 0x9aa0a8, y: y, z: -0.01 - (0.009 - i * 0.0008) });
+    cyl(0.0105 - i * 0.0012, 0.0105 - i * 0.0012, y + 0.012, y - 0.012, 0xb8302a, 8);      // owijka przelotki
+  });
+  /* kołowrotek pod uchwytem: stopka, korpus, szpula z żyłką (oś wzdłuż wędki), kabłąk, korbka z gałką */
+  P.push({ geo: new THREE.BoxGeometry(0.012, 0.05, 0.06), color: 0x2a2c30, y: 0.02, z: -0.04 });
+  P.push({ geo: new THREE.CylinderGeometry(0.03, 0.034, 0.06, 14), color: 0x3a3d44, y: 0.02, z: -0.085 });
+  P.push({ geo: new THREE.CylinderGeometry(0.037, 0.037, 0.035, 16), color: 0xa8acb4, y: -0.025, z: -0.085 });
+  P.push({ geo: new THREE.CylinderGeometry(0.033, 0.033, 0.022, 16), color: 0xe8ecef, y: -0.026, z: -0.085 });   // nawinięta żyłka
+  const bail = new THREE.TorusGeometry(0.04, 0.0025, 4, 16, Math.PI); bail.rotateX(Math.PI / 2);
+  P.push({ geo: bail, color: 0xc8ccd2, y: -0.05, z: -0.085 });
+  P.push({ geo: new THREE.BoxGeometry(0.07, 0.008, 0.008), color: 0x2a2c30, x: 0.045, y: 0.03, z: -0.085 });     // ramię korbki
+  P.push({ geo: new THREE.CylinderGeometry(0.009, 0.009, 0.025, 8), color: 0x1b1c1f, x: 0.08, y: 0.03, z: -0.072, rx: Math.PI / 2 });
+  const g = new THREE.Mesh(mergeColored(P), new THREE.MeshLambertMaterial({ vertexColors: true }));
+  g.castShadow = true;
   g.position.set(0, -0.62, 0.04); g.rotation.x = -1.36;                      // ręka w przód i w dół, wędka w przód i w górę
   g.visible = false; player.armR.add(g); return g;
 })();
@@ -234,7 +260,7 @@ function invHud(){
   el.wname.textContent = def.name + (it.n > 1 ? ' × ' + it.n : '');
   el.wammo.textContent = def.tool === 'rod' ? (FISH.state === 'wait' ? 'czekanie…' : FISH.state === 'bite' ? 'BIERZE!' : FISH.state === 'cast' ? '…' : 'LPM — zarzuć') : (invFeedCat() ? 'F — nakarm kota' : '');
   el.weaponhud.classList.toggle('on', mode === 'foot');
-  el.crosshair.classList.remove('on'); document.getElementById('lockBox').style.display = 'none';
+  el.crosshair.classList.remove('on'); document.getElementById('lockBox').style.display = 'none'; document.getElementById('lockZone').classList.remove('on');
   return true;
 }
 invRender();

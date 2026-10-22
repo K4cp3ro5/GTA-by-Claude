@@ -263,9 +263,11 @@ function updateParachute(dt){
   const sink = (fast ? PARA.sinkFast : slow ? PARA.sinkSlow : PARA.sink) + Math.abs(turn) * 1.2;
   parachute.sink = sink; parachute.open = s; parachute.pitch = fast ? -0.16 : slow ? 0.04 : -0.08;
   player.fallSpeed = Math.min(player.fallSpeed, 6);                                 // pod czaszą bez obrażeń od upadku
-  player.facing = parachute.heading; player.mesh.rotation.set(0, parachute.heading, 0);
-  if (clock - lastMouseMove > 0.5) camYaw = angleDamp(camYaw, parachute.heading + Math.PI, 4, dt);     // kamera za plecami
-  if (clock - lastMouseMove > 0.5) camPitch = damp(camPitch, -0.18, 2, dt);
+  if (!Weapons.aiming()){                                                           // celowanie spod czaszy (PPM): postać do celownika (Weapons.updatePose)
+    player.facing = parachute.heading; player.mesh.rotation.set(0, parachute.heading, 0);
+    if (clock - lastMouseMove > 0.5) camYaw = angleDamp(camYaw, parachute.heading + Math.PI, 4, dt);     // kamera za plecami
+    if (clock - lastMouseMove > 0.5) camPitch = damp(camPitch, -0.18, 2, dt);
+  }
   if (parachute.t > 1.3 && checkGrounded()){ endParachute(); hudToast('Wylądowano'); }
 }
 /* co krok fizyki (1/60 s): lot w kierunku czaszy, opadanie ze stałą prędkością (kompensacja grawitacji świata) */
