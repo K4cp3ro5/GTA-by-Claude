@@ -250,7 +250,7 @@ let hudAcc = 0, fpsAcc = 0, fpsCount = 0;
 function updateHud(dt, kmh){
   hudAcc += dt; fpsAcc += dt; fpsCount++;
 
-  el.speedo.classList.toggle('on', mode === 'car' || mode === 'plane' || mode === 'boat');
+  el.speedo.classList.toggle('on', mode === 'car' || mode === 'plane' || mode === 'boat' || mode === 'ride');
   if (mode === 'plane' && curPlane){
     const p = curPlane, lbl = 'Samolot · ' + p.T.name;
     if (el.carlblTxt.textContent !== lbl){ el.carlblTxt.textContent = lbl; el.carlbl.classList.remove('stolen'); }
@@ -263,6 +263,11 @@ function updateHud(dt, kmh){
     drawSpeedo(kmh, BOAT_T.gauge, Math.abs(curBoat.thr));
     el.gval.textContent = curBoat.v < -0.3 ? 'R' : curBoat.v > 0.3 ? 'D' : 'N';
     el.ghand.textContent = 'GAZ'; el.ghand.className = '';
+  } else if (mode === 'ride' && curRide){
+    const lbl = 'Przejażdżka · ' + curRide.name.replace('Kolejka ', '');
+    if (el.carlblTxt.textContent !== lbl){ el.carlblTxt.textContent = lbl; el.carlbl.classList.remove('stolen'); }
+    drawSpeedo(rideSpeed() * 3.6, 140, 0);
+    el.gval.textContent = 'WYS ' + Math.round(ridePos().y) + ' m'; el.ghand.textContent = 'KOLEJKA'; el.ghand.className = '';
   } else if (el.ghand.textContent !== 'RĘCZNY') el.ghand.textContent = 'RĘCZNY';
   if (_toastT > 0){ _toastT -= dt; if (_toastT <= 0) el.toast.classList.remove('on'); }
   if (mode === 'car'){
@@ -286,7 +291,7 @@ function updateHud(dt, kmh){
 
   if (hudAcc > 0.12){
     hudAcc = 0;
-    el.modetxt.textContent = mode === 'car' ? 'W pojeździe' : mode === 'plane' ? 'W powietrzu' : mode === 'boat' ? 'Na wodzie' : 'Pieszo';
+    el.modetxt.textContent = mode === 'car' ? 'W pojeździe' : mode === 'plane' ? 'W powietrzu' : mode === 'boat' ? 'Na wodzie' : mode === 'ride' ? 'Przejażdżka' : 'Pieszo';
     const hours = timeOfDay * 24;
     const hh = Math.floor(hours), mmn = Math.floor((hours - hh) * 60);
     el.clock.textContent = (hh < 10 ? '0' : '') + hh + ':' + (mmn < 10 ? '0' : '') + mmn;
@@ -305,15 +310,17 @@ function updateHud(dt, kmh){
   let nv = null;
   if (mode === 'foot') nv = nearestVehicle();
   const near = !!nv && nv.dist < 3.5;
-  promptEl.classList.toggle('on', near || mode === 'car' || mode === 'boat' || (mode === 'plane' && curPlane && ((curPlane.onGround && curPlane.v < 3) || (!curPlane.onGround && curPlane.agl > 15))));
-  const want = mode === 'car' ? 'out' : mode === 'boat' ? 'outBoat' : mode === 'plane' ? (curPlane && !curPlane.onGround ? 'bail' : 'outPlane') : (near ? (nv.kind === 'npc' ? 'jack' : nv.kind === 'plane' ? 'plane' : nv.kind === 'boat' ? 'boat' : 'in') : lastPrompt);
+  promptEl.classList.toggle('on', near || mode === 'car' || mode === 'boat' || (mode === 'ride' && curRide && curRide.canExit) || (mode === 'plane' && curPlane && ((curPlane.onGround && curPlane.v < 3) || (!curPlane.onGround && curPlane.agl > 15))));
+  const want = mode === 'ride' ? 'outRide' : mode === 'car' ? 'out' : mode === 'boat' ? 'outBoat' : mode === 'plane' ? (curPlane && !curPlane.onGround ? 'bail' : 'outPlane') : (near ? (nv.kind === 'npc' ? 'jack' : nv.kind === 'plane' ? 'plane' : nv.kind === 'boat' ? 'boat' : nv.kind === 'ride' ? (nv.ride.ready() ? 'ride:' : 'rideWait:') + nv.ride.name : 'in') : lastPrompt);
   if (want !== lastPrompt){
     lastPrompt = want;
-    promptEl.innerHTML = want === 'out' ? 'Naciśnij <kbd>F</kbd>, aby wysiąść'
+    promptEl.innerHTML = want === 'out' || want === 'outRide' ? 'Naciśnij <kbd>F</kbd>, aby wysiąść'
                         : want === 'outPlane' ? 'Naciśnij <kbd>F</kbd>, aby wysiąść z samolotu'
                         : want === 'bail' ? 'Naciśnij <kbd>F</kbd>, aby wyskoczyć ze spadochronem'
                         : want === 'outBoat' ? 'Naciśnij <kbd>F</kbd> przy brzegu, aby wysiąść'
                         : want === 'boat' ? 'Naciśnij <kbd>F</kbd>, aby wsiąść do łodzi'
+                        : want.indexOf('ride:') === 0 ? 'Naciśnij <kbd>F</kbd> — przejażdżka: ' + want.slice(5)
+                        : want.indexOf('rideWait:') === 0 ? (nv && nv.ride ? nv.ride.wait : '')
                         : want === 'jack' ? 'Naciśnij <kbd>F</kbd> lub <kbd>E</kbd>, aby ukraść auto'
                         : want === 'plane' ? 'Naciśnij <kbd>F</kbd> lub <kbd>E</kbd>, aby wsiąść do samolotu'
                         : 'Naciśnij <kbd>F</kbd> lub <kbd>E</kbd>, aby wsiąść';

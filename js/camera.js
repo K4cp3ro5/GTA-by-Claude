@@ -13,6 +13,7 @@ const _camEuler = new THREE.Euler();
 const _cpF = new THREE.Vector3(), _cpW = new THREE.Vector3(), _cpL = new THREE.Vector3();
 function updateCamera(dt, kmh){
   let dist, height, tx, ty, tz;
+  if (mode === 'ride' && curRide){ rideCamera(dt); return; }      // przejażdżka kolejką (park.js)
   if (mode === 'boat' && curBoat){
     /* łódź: kamera pościgowa za rufą (mysz obraca jak w samolocie) */
     const b = curBoat;

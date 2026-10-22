@@ -34,10 +34,14 @@ function texGlassWall(){
   g.fillStyle = '#c9ced2'; for (let k = 0; k <= 4; k++){ g.fillRect(k * S / 4 - 2, 0, 4, S); g.fillRect(0, k * S / 4 - 2, S, 4); }
   return toTex(c);
 }
-function texWordSign(word, bg, fg){
-  const W = 512, H = 96, c = mkCanvas(W, H), g = c.getContext('2d');
+/* napis: płótno o proporcjach tablicy (aspect = szerokość / wysokość quada — bez rozciągania liter), czcionka
+   zmniejszana, aż tekst zmieści się z marginesem (wcześniej dłuższe słowa wychodziły poza płótno 512 px i były ucięte) */
+function texWordSign(word, bg, fg, aspect){
+  const H = 96, W = Math.round(clamp(H * (aspect || 5.33), 160, 2048)), c = mkCanvas(W, H), g = c.getContext('2d');
   g.fillStyle = bg; g.fillRect(0, 0, W, H);
-  g.fillStyle = fg; g.font = 'bold 70px Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(word, W / 2, H / 2 + 3);
+  let fs = 70; g.font = 'bold ' + fs + 'px Arial, sans-serif';
+  while (fs > 18 && g.measureText(word).width > W * 0.9){ fs -= 2; g.font = 'bold ' + fs + 'px Arial, sans-serif'; }
+  g.fillStyle = fg; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(word, W / 2, H / 2 + 3);
   return toTex(c);
 }
 function texCorrugated(){
@@ -53,7 +57,9 @@ const shopMat = new THREE.MeshLambertMaterial({ map: shopTex.map, emissive: new 
 const shopBuf = new GeoBuf(), glassWallBuf = new GeoBuf(), corrBuf = new GeoBuf();
 const wordSigns = [];      // { buf, tex }
 function wordSignQuad(word, bg, fg, p0, p1, p2, p3){
-  const b = new GeoBuf(); b.quad(p0, p1, p2, p3, [0, 0], [1, 0], [1, 1], [0, 1]); wordSigns.push({ buf: b, tex: texWordSign(word, bg, fg) });
+  const b = new GeoBuf(); b.quad(p0, p1, p2, p3, [0, 0], [1, 0], [1, 1], [0, 1]);
+  const w = Math.hypot(p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]), h = Math.hypot(p3[0] - p0[0], p3[1] - p0[1], p3[2] - p0[2]) || 1;
+  wordSigns.push({ buf: b, tex: texWordSign(word, bg, fg, w / h) });
 }
 
 /* --- parter z witrynami (pas 4.5 m) --- */

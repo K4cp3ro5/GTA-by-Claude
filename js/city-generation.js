@@ -592,6 +592,7 @@ buildAirport();
 buildAirportWest();
 buildHospital();
 buildLandmarks();
+buildPark();
 
 /* (dawny mur dookoła świata zastąpiony nabrzeżem z balustradą — islands.js) */
 
