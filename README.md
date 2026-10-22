@@ -1,6 +1,6 @@
 # GTA by Claude
 
-**Mini-GTA w przeglądarce.** Miasto na wyspie: 12 × 12 kwartałów z ruchem ulicznym, pieszymi, rowerzystami i piratami drogowymi, dwie autostrady na estakadach z węzłem koniczynowym, lotnisko miejskie i port z łodziami, a za cieśniną wysepka z drugim lotniskiem — samolotami z obu można latać (i z których można wyskoczyć ze spadochronem), a po drugich pasach kursuje ruch lotniczy NPC. Po morzu pływają łodzie NPC, a na wschodzie wyspy jest duży park rozrywki z kolejkami górskimi, którymi można się przejechać. Do tego pełna mapa z wyznaczaniem trasy, cykl dnia i nocy, broń (pistolet, karabin) z kamerą zza ramienia i kradzież aut.
+**Mini-GTA w przeglądarce.** Miasto na wyspie: 12 × 12 kwartałów z ruchem ulicznym, pieszymi, rowerzystami i piratami drogowymi, dwie autostrady na estakadach z węzłem koniczynowym, lotnisko miejskie i port z łodziami, a za cieśniną wysepka z drugim lotniskiem — samolotami z obu można latać (i z których można wyskoczyć ze spadochronem), a po drugich pasach kursuje ruch lotniczy NPC. Po morzu pływają łodzie NPC, a na wschodzie wyspy jest duży park rozrywki z kolejkami górskimi, którymi można się przejechać. Do tego pełna mapa z wyznaczaniem trasy, cykl dnia i nocy, broń (pistolet, karabin, RPG) z kamerą zza ramienia, wybuchające pojazdy, koty na chodnikach i kradzież aut.
 
 Wszystko — asfalt, okna, modele aut i samolotów, znaki, dźwięk silnika i wybuchów — jest generowane w kodzie. Nie ma ani jednego pliku graficznego czy dźwiękowego, nie ma bundlera ani serwera: wystarczy otworzyć `index.html`.
 
@@ -30,7 +30,7 @@ Klawisze można zmienić w menu (**STEROWANIE**). `Esc` w trakcie gry to pauza �
 | `Shift` / `Spacja` | bieg / skok |
 | `F` (albo `E`) | wsiądź do auta lub samolotu, ukradnij auto NPC, przejażdżka w parku rozrywki (przy wejściu na atrakcję) |
 | `V` (przytrzymaj) | menu pojazdów: twoje auto (zwykły, pickup, sportowy) albo rower |
-| `1` `2` `3` `4`, `Q` (przytrzymaj) | broń: pięści, kij, pistolet, karabin / koło broni |
+| `1` … `5`, `Q` (przytrzymaj) | broń: pięści, kij, pistolet, karabin, RPG / koło broni |
 | lewy przycisk myszy (karabin: przytrzymaj), `R` | atak, strzał / przeładowanie |
 | prawy przycisk myszy | przycelowanie (bliżej, mniejszy rozrzut, wolniejszy chód) |
 
@@ -92,7 +92,7 @@ Jak wystartować: ustaw samolot na pasie, trzymaj `W`, a gdy prędkościomierz p
 |---|---|---|---|
 | ![Park rozrywki](screenshots/park.jpg) | ![Brama](screenshots/park-brama.jpg) | ![Plac z fontanną](screenshots/park-atrakcje.jpg) | ![Kolejka](screenshots/kolejka.jpg) |
 
-- We wschodnim pasie zieleni wyspy głównej (112 × 320 m). Brama z dwiema wieżami, flagami i podświetlaną tablicą, kasy, kołowrotki. Alejki z krawężnikami, plac z fontanną, budki z szyldami i markizami (lody, wata, hot dog, popcorn…), stoliki z parasolami, ławki, kosze, klomby, żywopłoty, drogowskazy, tablice i barierki przy atrakcjach, spacerujący zwiedzający (niektórzy z balonikami); całość można obejść pieszo.
+- We wschodnim pasie zieleni wyspy głównej (112 × 320 m). Każda atrakcja ma bramkę wejściową (łuk z nazwą, kolorowa posadzka, flagi, tabliczka, barierki kolejki). Zwiedzający chodzą tylko alejkami. Brama z dwiema wieżami, flagami i podświetlaną tablicą, kasy, kołowrotki. Alejki z krawężnikami, plac z fontanną, budki z szyldami i markizami (lody, wata, hot dog, popcorn…), stoliki z parasolami, ławki, kosze, klomby, żywopłoty, drogowskazy, tablice i barierki przy atrakcjach, spacerujący zwiedzający (niektórzy z balonikami); całość można obejść pieszo.
 - **Kolejka SMOK** (370 m toru, wyciąg na 42 m, pierwszy zjazd ok. 70°, do 103 km/h, trzy górki o malejącej wysokości, tor przechylony w zakrętach) i rodzinna **kolejka ŻABKA** (142 m, 12 m, do 53 km/h). Pociągi jeżdżą cały czas z pasażerami.
 - **Diabelski młyn** (średnica 42 m, 16 gondoli zawsze w pionie), **karuzela z konikami**, **karuzela łańcuchowa** (krzesełka odchylają się z prędkością), **wieża swobodnego spadania** (52 m: powolny wjazd, zawis, spadek), **autodrom**.
 - **Przejażdżki** — `F` przy wejściu na atrakcję (podpowiedź na ekranie):
@@ -140,8 +140,16 @@ Jak wystartować: ustaw samolot na pasie, trzymaj `W`, a gdy prędkościomierz p
 |---|---|---|
 | ![HUD](screenshots/hud-auto.jpg) | ![Broń](screenshots/bron.jpg) | ![Szpital](screenshots/szpital.jpg) |
 
+| RPG — wybuch | Wrak | Koty |
+|---|---|---|
+| ![Wybuch](screenshots/wybuch.jpg) | ![Wrak](screenshots/wrak.jpg) | ![Koty](screenshots/koty.jpg) |
+
 - Jazda z fizyką zawieszenia. Trzy typy aut: zwykły (0–100 km/h w 4,4 s, 181 km/h), pickup (6,9 s, 160 km/h), sportowy (3,0 s, 250 km/h), do tego rower. Twoje auto przywołujesz menu `V`, skradzione zostają tam, gdzie je porzucisz.
 - Broń: pięści, kij, pistolet i karabin (ogień ciągły, magazynek 30). Z bronią palną kamera przechodzi za prawe ramię — postać jest z lewej i nie zasłania celownika na środku ekranu, a obraca się w stronę celownika. Strzał leci przez środek celownika (z kontrolą, czy przed lufą nie ma ściany); rozrzut rośnie w ruchu i przy serii, odrzut podbija kamerę; smugacz, błysk, iskry na metalu, pył na murze, znacznik trafienia. Strzały w auto NPC zatrzymują je na światłach awaryjnych.
+- **RPG**: rakieta leci w punkt pod celownikiem (z dymem), wybucha przy trafieniu w cokolwiek — jedna rakieta niszczy auto. Magazynków jest bez limitu: HUD pokazuje tylko zawartość bieżącego magazynka, `R` przeładowuje.
+- **Niszczenie pojazdów**: auta mają wytrzymałość — wybuchają po mocnej kraksie, po kilku–kilkunastu strzałach (pistolet ok. 8) albo po jednej rakiecie. Wybuch rani w promieniu (gracz, piesi, inne auta — także łańcuchowo), zostaje płonący, dymiący wrak. Kierowca auta, które wybuchło, ginie (z nieśmiertelnością — wychodzi obok wraku). Twój zniszczony pojazd jest wyszarzony w menu `V` z odliczaniem 60 s; pozostałe typy można przywołać od razu.
+- Wysiadka w biegu: auto toczy się dalej i hamuje, a nie staje w miejscu (przy dużej prędkości wyskok boli).
+- **Koty** chodzą po chodnikach, przysiadają i czasem przebiegają przez ulicę. Przejechanie kota kończy się wybuchem auta, śmiercią (bez względu na nieśmiertelność), komunikatem „JAK MOGŁEŚ?!” i odrodzeniem w szpitalu.
 - Zdrowie i kondycja, upadki z wysokości. Uderzenie w ścianę lub barierę pod małym kątem nie zatrzymuje auta — ślizga się wzdłuż ściany; zatrzymuje dopiero uderzenie czołowe. Po śmierci odradzasz się przed **szpitalem** w południowym pasie zieleni (dojazd z obwodnicy, lądowisko na dachu, karetki, parking).
 - HUD: kompas, zegarowy prędkościomierz, zegar, minimapa z całym światem.
 
