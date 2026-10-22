@@ -211,7 +211,7 @@ function buildParachute(){
     nose.position.set(Math.sin(a) * R, Math.cos(a) * R - R - 0.04, chord / 2 + 0.02); nose.rotation.z = -a; canopy.add(nose);
   }
   canopy.position.y = 5.2; g.add(canopy);
-  const lineMat = new THREE.MeshBasicMaterial({ color: 0x2a2a2a }), lineGeo = new THREE.BoxGeometry(0.025, 1, 0.025);
+  const lineMat = new THREE.MeshBasicMaterial({ color: 0x2a2a2a, transparent: true }), lineGeo = new THREE.BoxGeometry(0.025, 1, 0.025);
   /* linki: od uprzęży (nad barkami) do spodu brzegów komór; zaczep w układzie czaszy — co klatkę przeliczany
      po przechyle i pochyleniu czaszy (syncParachute), więc linki nie przechodzą przez czaszę w skręcie */
   const lines = [];
@@ -292,6 +292,8 @@ function syncParachute(){
   m.rotation.set(0, parachute.heading, 0);
   const c = m.userData.canopy;
   c.rotation.set(parachute.pitch || 0, 0, parachute.bank); c.updateMatrix();
+  const lm = m.userData.lines[0].material, op = 1 - Weapons.aimK * 0.85;          // celowanie: kamera między linkami — linki prawie przezroczyste
+  lm.opacity = op; lm.depthWrite = op > 0.9;
   for (const l of m.userData.lines){
     _paraTo.copy(l.userData.anchor).applyMatrix4(c.matrix);
     _paraD.copy(_paraTo).sub(l.userData.from);

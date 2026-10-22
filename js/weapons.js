@@ -11,7 +11,7 @@ const WEAPON_DEFS = [
   { id:'bat',    name:'Kij',      kind:'melee',  range:2.1, dmg:30, cooldown:0.55 },
   { id:'pistol', name:'Pistolet', kind:'ranged', range:70,  dmg:40, cooldown:0.2,  magSize:12, reloadT:1.1, spread:0.010, kick:0.028, bloom:0.55, muzzle:0.2 },
   { id:'rifle',  name:'Karabin',  kind:'ranged', range:160, dmg:28, cooldown:0.095, magSize:30, reloadT:1.8, spread:0.008, kick:0.011, bloom:0.22, muzzle:0.8, auto:true },
-  { id:'rpgh',   name:'RPG naprowadzane', kind:'ranged', range:320, dmg:0, cooldown:0.9, magSize:1, reloadT:2.6, spread:0.002, kick:0.07, bloom:0.1, muzzle:1.0, projectile:true, homing:true },
+  { id:'rpgh',   name:'RPG naprowadzane', kind:'ranged', range:1000, dmg:0, cooldown:0.9, magSize:1, reloadT:2.6, spread:0.002, kick:0.07, bloom:0.1, muzzle:1.0, projectile:true, homing:true },
 ];
 const weaponRay = new THREE.Raycaster();
 let infAmmo = false;                                                            // menu deweloperskie
@@ -274,25 +274,28 @@ const Weapons = {
     }
   },
   /* namierzanie (RPG naprowadzane, jak w GTA V): po przycelowaniu (PPM) cele w KWADRATOWEJ strefie na środku ekranu (połowa boku =
-     LOCK_ZONE × wysokość ekranu), do 320 m, widoczne; wybierany najbliższy środka (zasłonięty — następny); utrzymany LOCK_TIME = namierzony */
+     LOCK_ZONE × wysokość ekranu), do LOCK_RANGE = 1 km, widoczne; wybierany najbliższy środka (zasłonięty — następny); utrzymany LOCK_TIME =
+     namierzony. Widoczność (długi raycast przez komórki kolizji) sprawdzana co 0.15 s dla trzech najlepszych kandydatów. */
   updateLock(dt){
     if (!this.locking()){ this.lock = null; this.lockT = 0; return; }
     const cp = camera.position, half = LOCK_ZONE * innerHeight, cand = [];
     for (const t of lockTargets()){
       const p = lockTargetPos(t); if (!p) continue;
       const l = Math.hypot(p.x - cp.x, p.y - cp.y, p.z - cp.z);
-      if (l < 6 || l > 320) continue;
+      if (l < 6 || l > LOCK_RANGE) continue;
       _wA.set(p.x, p.y, p.z).project(camera); if (_wA.z > 1) continue;
       const sx = _wA.x * innerWidth / 2, sy = _wA.y * innerHeight / 2;                          // piksele od środka ekranu
       if (Math.abs(sx) > half || Math.abs(sy) > half) continue;
-      cand.push({ t: t, l: l, s: Math.hypot(sx, sy) + l * 0.05 + (this.lock && t.o === this.lock.o ? -40 : 0) });   // bliżej środka i gracza; obecny cel ma przewagę
+      cand.push({ t: t, l: l, s: Math.hypot(sx, sy) + l * 0.02 + (this.lock && t.o === this.lock.o ? -40 : 0) });   // bliżej środka i gracza; obecny cel ma przewagę
     }
     cand.sort((a, b) => a.s - b.s);
-    let best = null;
-    for (const q of cand.slice(0, 5)){                                                   // pierwszy niezasłonięty
-      const p = lockTargetPos(q.t), h = rayHit(cp.x, cp.y, cp.z, p.x, p.y, p.z, G_WORLD);
-      if (!h || h.distance > q.l - 3){ best = q.t; break; }
+    this._losT = (this._losT || 0) - dt;
+    if (this._losT <= 0 || !this._hidden){
+      this._losT = 0.15; this._hidden = new Set();
+      for (const q of cand.slice(0, 3)){ const p = lockTargetPos(q.t), h = rayHit(cp.x, cp.y, cp.z, p.x, p.y, p.z, G_WORLD); if (h && h.distance < q.l - 3) this._hidden.add(q.t.o); }
     }
+    const bq = cand.find(q => !this._hidden.has(q.t.o)), best = bq ? bq.t : null;                // pierwszy niezasłonięty
+    this.lockDist = bq ? bq.l : 0;
     if (best && this.lock && best.o === this.lock.o){ const was = this.lockT; this.lockT += dt; if (was < LOCK_TIME && this.lockT >= LOCK_TIME) Sound.tick(true); }
     else { this.lock = best; this.lockT = 0; }
   },
@@ -351,7 +354,7 @@ const Weapons = {
       const p = lockTargetPos(this.lock);
       if (p){ _wA.set(p.x, p.y, p.z).project(camera);
         if (_wA.z < 1){ lb.style.display = 'block'; lb.style.left = ((_wA.x + 1) / 2 * innerWidth) + 'px'; lb.style.top = ((1 - _wA.y) / 2 * innerHeight) + 'px';
-          const locked = this.lockT >= LOCK_TIME; lb.classList.toggle('locked', locked); lb.style.setProperty('--k', locked ? 1 : 1.8 - this.lockT / LOCK_TIME * 0.8); lb.dataset.t = locked ? 'NAMIERZONY' : 'NAMIERZANIE…'; }
+          const locked = this.lockT >= LOCK_TIME; lb.classList.toggle('locked', locked); lb.style.setProperty('--k', locked ? 1 : 1.8 - this.lockT / LOCK_TIME * 0.8); lb.dataset.t = (locked ? 'NAMIERZONY' : 'NAMIERZANIE…') + ' · ' + Math.round(this.lockDist || 0) + ' m'; }
         else lb.style.display = 'none'; }
       else lb.style.display = 'none';
     } else lb.style.display = 'none';
@@ -362,7 +365,7 @@ const Weapons = {
     }
   }
 };
-const _down = new THREE.Vector3(0, -1, 0), LOCK_TIME = 0.9, LOCK_ZONE = 0.17;
+const _down = new THREE.Vector3(0, -1, 0), LOCK_TIME = 0.9, LOCK_ZONE = 0.17, LOCK_RANGE = 1000;
 Weapons.init();
 
 /* --- koło wyboru (radialne, sterowane wirtualnym kursorem — pointer lock nie daje pozycji bezwzględnej):

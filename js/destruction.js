@@ -160,20 +160,22 @@ const _rkMat = new THREE.MeshLambertMaterial({ color: 0x4a5a3a });
 function fireRocket(from, dir, target){
   const m = new THREE.Mesh(_rkGeo, _rkMat); m.position.copy(from); m.lookAt(from.x + dir.x, from.y + dir.y, from.z + dir.z); scene.add(m);
   const flame = fxMesh(0xffb040, 0.95, true); flame.visible = true; flame.scale.setScalar(0.18); m.add(flame); flame.position.set(0, 0, -0.45);
-  rockets.push({ m: m, p: from.clone(), d: dir.clone().normalize(), dist: 0, smoke: 0, target: target || null });
+  rockets.push({ m: m, p: from.clone(), d: dir.clone().normalize(), dist: 0, smoke: 0, v: 55, target: target || null });
 }
 const _rkRay = new THREE.Raycaster(), _rkA = new THREE.Vector3();
 function updateRockets(dt){
   for (let i = rockets.length - 1; i >= 0; i--){
-    const r = rockets[i], step = (r.target ? 58 : 70) * dt;
-    /* naprowadzanie: kierunek obracany do celu (maks. 2.6 rad/s), zapalnik zbliżeniowy 2.5 m */
+    const r = rockets[i];
+    r.v = Math.min(r.target ? 150 : 120, r.v + 90 * dt);                                  // przyspiesza: start 55 m/s, naprowadzana do 150 m/s
+    const step = r.v * dt;
+    /* naprowadzanie: kierunek obracany do celu (maks. 2.6 rad/s, szybciej blisko celu), zapalnik zbliżeniowy 2.5 m (+ droga w klatce) */
     if (r.target){
       const tp = lockTargetPos(r.target);
       if (!tp) r.target = null;
       else {
         _rkA.set(tp.x - r.p.x, tp.y - r.p.y, tp.z - r.p.z); const dd = _rkA.length();
-        if (dd < 2.5){ scene.remove(r.m); rockets.splice(i, 1); explodeAt(r.p.x, r.p.y, r.p.z, 1.15, { cause: 'rakieta' }); continue; }
-        _rkA.divideScalar(dd); const ang = Math.acos(clamp(r.d.dot(_rkA), -1, 1)), mx = 2.6 * dt;
+        if (dd < 2.5 + step * 0.5){ scene.remove(r.m); rockets.splice(i, 1); explodeAt(r.p.x, r.p.y, r.p.z, 1.15, { cause: 'rakieta' }); continue; }
+        _rkA.divideScalar(dd); const ang = Math.acos(clamp(r.d.dot(_rkA), -1, 1)), mx = (dd < 60 ? 4.5 : 2.6) * dt;
         if (ang > 1e-4){ r.d.lerp(_rkA, Math.min(1, mx / ang)).normalize(); r.m.lookAt(r.p.x + r.d.x, r.p.y + r.d.y, r.p.z + r.d.z); }
       }
     }
@@ -186,7 +188,7 @@ function updateRockets(dt){
     if (ph.length){ hd = ph[0].distance; hit = ph[0].point; }
     if (!hit && _rkA.y < WATER_Y && !isLand(_rkA.x, _rkA.z)){ hit = _rkA.clone(); hit.y = WATER_Y; }
     r.dist += step;
-    if (hit || r.dist > 320){
+    if (hit || r.dist > 1200){
       const at = hit ? new THREE.Vector3(hit.x, hit.y, hit.z).addScaledVector(r.d, -0.3) : _rkA;
       scene.remove(r.m); rockets.splice(i, 1);
       explodeAt(at.x, at.y, at.z, 1.15, { cause: 'rakieta' });

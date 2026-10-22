@@ -8,7 +8,7 @@
    niebieski rosyjski) losowane. Spawn z dala od gracza (> 40 m); na minimapie i mapie — kropki.
    Nakarmiony rybą (inventory.js) zostaje PRZYJACIELEM: je (serduszka), potem zawsze chodzi za graczem — każdy na swoim
    miejscu w szyku za plecami (także za rowerem, biegiem); w pojeździe jedzie z nim — na dachu auta, na skrzydłach samolotu,
-   na kanapie łodzi (syncRidingCats); po wysiadce zeskakuje obok.
+   na kanapie łodzi, na czaszy spadochronu (syncRidingCats); po wysiadce zeskakuje obok.
    Skrzywdzenie kota przez gracza (auto, kula, cios, wybuch): gracz wybucha i ginie bez względu na nieśmiertelność,
    „JAK MOGŁEŚ?!”, odrodzenie w szpitalu. Kot jadący z graczem jest bezpieczny.
    --------------------------------------------------------------- */
@@ -133,9 +133,17 @@ function catNextTarget(c){
 }
 /* wysokość podłoża pod kotem: chodnik albo jezdnia/trawa; kot-przyjaciel — podłoże pod nim (raycast co kilka klatek) */
 function catGroundY(c){
-  if (c.friend) return c.gy !== undefined ? c.gy : 0.02;
-  if (c.kind !== 'walk') return 0.02;
+  if (c.friend && c.gy !== undefined) return c.gy;
+  return catBaseY(c);
+}
+function catBaseY(c){
+  if (c.kind !== 'walk' || c.bi === undefined) return 0.02;
   return Math.abs(c.x - blockCenter(c.bi)) > 15.2 || Math.abs(c.z - blockCenter(c.bj)) > 15.2 ? 0.02 : WALK_H;
+}
+/* podłoże pod kotem-przyjacielem: promień w dół od wysokości odniesienia (ostatnie podłoże albo stopy gracza); chodnik, nasyp, pomost */
+function catProbeY(c, y0){
+  const h = rayHit(c.x, y0 + 1.6, c.z, c.x, y0 - 4, c.z, G_WORLD);
+  return h && h.hitNormalWorld.y > 0.5 ? h.hitPointWorld.y + 0.01 : catBaseY(c);
 }
 /* koty-przyjaciele w pojeździe gracza: miejsca w układzie modelu pojazdu (auto — dach, samolot — skrzydła na zmianę lewe/prawe,
    łódź — kanapa na rufie); wysokość z promienia w dół na model (pamiętana dla modelu i miejsca), więc kot siedzi na powierzchni.
@@ -151,6 +159,12 @@ function catRideFrame(){
     return { obj: carModel.root, yaw: true, fy: carTopOf(carType) - T.restY,
       slot: (k, n) => { const r = Math.floor(k / cols), rows = Math.ceil(n / cols), c = k % cols;
         return { x: cols === 3 ? (c - 1) * dx : (c ? -dx : dx) * 0.7, z: -roof[6] + (r - (rows - 1) / 2) * 0.52 }; } };
+  }
+  if (mode === 'foot' && typeof parachute !== 'undefined' && parachute.on && parachute.mesh){
+    /* czasza: komory na łuku R = 6.5 m (rozpiętość 7.6 m) — koty w poprzek czaszy od środka na zmianę w prawo i w lewo,
+       przechyleni wg łuku; w swobodnym spadku (czasza jeszcze zamknięta) niewidoczne */
+    return { obj: parachute.mesh.userData.canopy, yaw: false, fy: 0.21, hidden: parachute.t < 0.7 || (parachute.open || 0) < 0.6,
+      slot: k => { const r = k % 7, x = r ? (r % 2 ? 1 : -1) * Math.ceil(r / 2) * 1.05 : 0; return { x: x, z: Math.floor(k / 7) * -0.9 + 0.2, rz: -Math.asin(x / 6.5) }; } };
   }
   if (mode === 'plane' && curPlane){
     const jet = curPlane.T === PLANE_TYPES.jet;
@@ -179,15 +193,17 @@ function catSurfaceY(F, x, z){
   return y;
 }
 /* po syncCar (main-loop): model auta ma już pozycję tej klatki — kot nie zostaje w tyle */
-const _riders = [];
+const _riders = [], _rideRz = new THREE.Quaternion(), _zAxis = new THREE.Vector3(0, 0, 1);
 function syncRidingCats(){
   if (!_riders.length) return;
   const F = catRideFrame(); if (!F) return;
   F.obj.updateWorldMatrix(true, false); F.obj.getWorldQuaternion(_rideQ); if (F.yaw) _rideQ.multiply(_catYawPi);
   _riders.forEach((c, k) => {
+    c.m.g.visible = !F.hidden; if (F.hidden) return;
     const s = F.slot(k, _riders.length);
     c.m.g.position.set(s.x, catSurfaceY(F, s.x, s.z) + 0.005, s.z).applyMatrix4(F.obj.matrixWorld);
-    c.m.g.quaternion.copy(_rideQ); c.x = c.m.g.position.x; c.z = c.m.g.position.z;
+    c.m.g.quaternion.copy(_rideQ); if (s.rz) c.m.g.quaternion.multiply(_rideRz.setFromAxisAngle(_zAxis, s.rz));
+    c.x = c.m.g.position.x; c.z = c.m.g.position.z;
   });
 }
 const _catQ = new CANNON.Quaternion(), _catV = new CANNON.Vec3(), _followers = [];
@@ -236,8 +252,6 @@ function updateCats(dt){
         const o = _followers[j], ox = c.x - o.x, oz = c.z - o.z, od = Math.hypot(ox, oz);
         if (od < 0.55 && od > 1e-4){ const p = (0.55 - od) / 2; c.x += ox / od * p; c.z += oz / od * p; o.x -= ox / od * p; o.z -= oz / od * p; }
       }
-      c.gyT = (c.gyT || 0) - dt;
-      if (c.gyT <= 0){ c.gyT = 0.25; const h = rayHit(c.x, anchor.y + 1.5, c.z, c.x, anchor.y - 3.5, c.z, G_WORLD); c.gy = h ? h.hitPointWorld.y + 0.01 : Math.max(0.02, anchor.y - 0.85); }
       if (c.state === 'sit' && rnd() < dt * 0.2) catHearts(c, 1);
     } else if (c.state === 'sit'){ c.t -= dt; if (c.t <= 0) catNextTarget(c); }
     else {
@@ -253,6 +267,12 @@ function updateCats(dt){
       const T = CAR_TYPES[carType], p = chassisBody.position;
       _catV.set(c.x - p.x, catGroundY(c) + 0.2 - (p.y - T.restY), c.z - p.z); _catQ.vmult(_catV, _catV);
       if (Math.abs(_catV.x) < T.half[0] + 0.25 && Math.abs(_catV.z) < T.half[2] + 0.25 && Math.abs(_catV.y) < 1.2){ catHarmed(c, 'auto'); continue; }
+    }
+    if (c.friend){                                                                        // podłoże: w ruchu co klatkę, siedząc co 0.3 s
+      c.gyT = (c.gyT || 0) - dt;
+      if (c.gy === undefined || c.gyT <= 0 || c.state !== 'sit'){
+        c.gyT = 0.3; c.gy = catProbeY(c, c.gy !== undefined ? c.gy : anchor ? anchor.y - (bike ? 0.5 : 0.85) : catBaseY(c));
+      }
     }
     if (far){ c.m.g.visible = false; continue; }
     c.m.g.visible = true;
