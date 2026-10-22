@@ -211,7 +211,7 @@ function buildParachute(){
     nose.position.set(Math.sin(a) * R, Math.cos(a) * R - R - 0.04, chord / 2 + 0.02); nose.rotation.z = -a; canopy.add(nose);
   }
   canopy.position.y = 5.2; g.add(canopy);
-  const lineMat = new THREE.MeshBasicMaterial({ color: 0x2a2a2a }), lineGeo = new THREE.BoxGeometry(0.025, 1, 0.025);
+  const lineMat = new THREE.MeshBasicMaterial({ color: 0x2a2a2a, transparent: true }), lineGeo = new THREE.BoxGeometry(0.025, 1, 0.025);
   /* linki: od uprzęży (nad barkami) do spodu brzegów komór; zaczep w układzie czaszy — co klatkę przeliczany
      po przechyle i pochyleniu czaszy (syncParachute), więc linki nie przechodzą przez czaszę w skręcie */
   const lines = [];
@@ -263,9 +263,11 @@ function updateParachute(dt){
   const sink = (fast ? PARA.sinkFast : slow ? PARA.sinkSlow : PARA.sink) + Math.abs(turn) * 1.2;
   parachute.sink = sink; parachute.open = s; parachute.pitch = fast ? -0.16 : slow ? 0.04 : -0.08;
   player.fallSpeed = Math.min(player.fallSpeed, 6);                                 // pod czaszą bez obrażeń od upadku
-  player.facing = parachute.heading; player.mesh.rotation.set(0, parachute.heading, 0);
-  if (clock - lastMouseMove > 0.5) camYaw = angleDamp(camYaw, parachute.heading + Math.PI, 4, dt);     // kamera za plecami
-  if (clock - lastMouseMove > 0.5) camPitch = damp(camPitch, -0.18, 2, dt);
+  if (!Weapons.aiming()){                                                           // celowanie spod czaszy (PPM): postać do celownika (Weapons.updatePose)
+    player.facing = parachute.heading; player.mesh.rotation.set(0, parachute.heading, 0);
+    if (clock - lastMouseMove > 0.5) camYaw = angleDamp(camYaw, parachute.heading + Math.PI, 4, dt);     // kamera za plecami
+    if (clock - lastMouseMove > 0.5) camPitch = damp(camPitch, -0.18, 2, dt);
+  }
   if (parachute.t > 1.3 && checkGrounded()){ endParachute(); hudToast('Wylądowano'); }
 }
 /* co krok fizyki (1/60 s): lot w kierunku czaszy, opadanie ze stałą prędkością (kompensacja grawitacji świata) */
@@ -290,6 +292,8 @@ function syncParachute(){
   m.rotation.set(0, parachute.heading, 0);
   const c = m.userData.canopy;
   c.rotation.set(parachute.pitch || 0, 0, parachute.bank); c.updateMatrix();
+  const lm = m.userData.lines[0].material, op = 1 - Weapons.aimK * 0.85;          // celowanie: kamera między linkami — linki prawie przezroczyste
+  lm.opacity = op; lm.depthWrite = op > 0.9;
   for (const l of m.userData.lines){
     _paraTo.copy(l.userData.anchor).applyMatrix4(c.matrix);
     _paraD.copy(_paraTo).sub(l.userData.from);

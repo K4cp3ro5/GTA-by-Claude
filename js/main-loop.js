@@ -40,7 +40,7 @@ function frame(now){
   if (dt > 0.1) dt = 0.1;
   dt *= gameSpeed;                             // tempo gry (menu deweloperskie)
   /* pauza: menu otwarte klawiszem Esc po starcie gry (debug menu nie zatrzymuje świata) — tylko render */
-  if (gameStarted && !pointerLocked && !debugOpen){ renderer.render(scene, camera); return; }
+  if (gameStarted && !pointerLocked && !debugOpen && !INV.open){ renderer.render(scene, camera); return; }
   clock += dt;
   indBlinkOn = (clock * 1.4) % 1 < 0.5;
 
@@ -55,6 +55,8 @@ function frame(now){
   updateBoatsIdle(dt);
   updateBirds(dt);
   updatePark(dt);
+  updateDestruction(dt);
+  updateCats(dt);
   const vehKmh = mode === 'plane' ? planeKmh : mode === 'boat' ? boatKmh : carState.kmh;
   if (mode === 'foot' && pointerLocked){ if (!(parachute.on && parachute.t > 0.7)) updatePlayer(dt); }   // pod otwartą czaszą steruje updateParachute
   else if (mode === 'foot') {
@@ -64,6 +66,7 @@ function frame(now){
   }
   updateParachute(dt);                         // po updatePlayer: nadpisuje prędkość i obrót postaci pod czaszą
   Weapons.updatePose(dt);
+  updateInventory(dt);
   updateWheel();
   pruneParked();
 
@@ -82,6 +85,7 @@ function frame(now){
     if (b._hasPrev === true) n.mesh.position.set(lerp(b._p0.x, b.position.x, alpha), n.y || 0, lerp(b._p0.z, b.position.z, alpha));
   }
   syncCar(alpha);
+  syncRidingCats();
   updateCamera(dt, vehKmh);
   applyCamShake(dt);
   updateLampLights();

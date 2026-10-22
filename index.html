@@ -122,7 +122,7 @@
   #prompt.on{opacity:1;transform:translateX(-50%)}
 
   #fps{
-    position:absolute;bottom:16px;left:50%;transform:translateX(-50%);
+    position:absolute;top:50px;left:50%;transform:translateX(-50%);
     font-size:10px;color:#4e4c49;letter-spacing:.08em;font-variant-numeric:tabular-nums;
   }
 
@@ -130,12 +130,60 @@
     position:fixed;inset:0;z-index:20;pointer-events:none;opacity:0;
     background:radial-gradient(circle at 50% 50%,transparent 40%,rgba(200,20,10,.55) 100%);
   }
+  /* ekran śmierci: szybkie przejście do czerni (0.45 s), tytuł, przyczyna, odliczanie do odrodzenia */
   #deadScreen{
-    position:fixed;inset:0;z-index:35;display:flex;align-items:center;justify-content:center;
-    background:rgba(10,4,4,0);pointer-events:none;opacity:0;transition:opacity .3s ease,background .3s ease;
+    position:fixed;inset:0;z-index:35;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;
+    background:radial-gradient(circle at 50% 50%,#0a0303 0%,#000 75%);pointer-events:none;opacity:0;transition:opacity .45s ease-in;
   }
-  #deadScreen.on{opacity:1;background:rgba(10,4,4,.72)}
-  #deadScreen span{font-size:34px;font-weight:200;letter-spacing:.1em;color:var(--brake)}
+  #deadScreen.on{opacity:1}
+  #deadScreen .dsTitle{font-size:clamp(46px,8vw,92px);font-weight:800;letter-spacing:.06em;color:#ff4a3d;text-shadow:0 0 40px rgba(255,40,30,.55),0 4px 0 #3a0503;transform:scale(1.15);transition:transform .9s cubic-bezier(.2,.8,.2,1)}
+  #deadScreen.on .dsTitle{transform:scale(1);transition-delay:.25s}
+  #deadScreen .dsTitle,#deadScreen .dsCause,#deadScreen .dsBar,#deadScreen .dsTimer{opacity:0;transition:opacity .4s ease .35s,transform .9s cubic-bezier(.2,.8,.2,1) .25s}
+  #deadScreen.on .dsTitle,#deadScreen.on .dsCause,#deadScreen.on .dsBar,#deadScreen.on .dsTimer{opacity:1}
+  #deadScreen .dsCause{font-size:16px;color:#f2d8d4;letter-spacing:.08em;max-width:520px}
+  #deadScreen .dsTimer{margin-top:10px;font-size:12px;letter-spacing:.24em;color:#c9a9a4;text-transform:uppercase}
+  #deadScreen .dsBar{width:min(320px,60vw);height:3px;border-radius:2px;background:rgba(255,255,255,.12);overflow:hidden}
+  #deadScreen .dsBar i{display:block;height:100%;width:0;background:#ff4a3d}
+  /* pasek ekwipunku (jak w Minecrafcie) i plecak (Tab) */
+  #hotbar{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);display:flex;gap:4px;padding:5px;background:rgba(16,18,22,.62);border:1px solid rgba(200,198,191,.14);border-radius:8px;opacity:0;transition:opacity .2s}
+  #hotbar.on{opacity:1}
+  #hotbar.full{animation:hbFull .45s 3;border-color:rgba(232,72,58,.9)}
+  @keyframes hbFull{0%,100%{transform:translateX(-50%)}25%{transform:translateX(calc(-50% - 7px))}75%{transform:translateX(calc(-50% + 7px))}}
+  #invWarn{position:absolute;left:50%;bottom:118px;transform:translate(-50%,8px);padding:9px 16px;border-radius:8px;background:rgba(150,28,22,.92);border:1px solid rgba(255,140,120,.55);color:#fff3ee;font-size:15px;text-align:center;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;box-shadow:0 6px 20px rgba(0,0,0,.35)}
+  #invWarn::before{content:'⚠ ';color:#ffd36a}
+  #invWarn small{display:block;font-size:12px;opacity:.8;margin-top:2px}
+  #invWarn.on{opacity:1;transform:translate(-50%,0)}
+  .islot{position:relative;width:50px;height:50px;border-radius:6px;background:rgba(40,43,50,.85);border:2px solid #3a3e48;display:flex;align-items:center;justify-content:center}
+  .islot img{width:40px;height:40px;image-rendering:auto;pointer-events:none}
+  .islot b{position:absolute;right:3px;bottom:1px;font-size:12px;font-weight:700;color:#fff;text-shadow:0 1px 2px #000}
+  .islot .ik{position:absolute;left:4px;top:1px;font-size:9px;color:#8d8b86}
+  .islot.sel{border-color:var(--sodium);box-shadow:0 0 0 2px rgba(255,176,58,.35);background:rgba(70,58,38,.9)}
+  .islot.pick{border-color:#7fc4e8;box-shadow:0 0 0 2px rgba(127,196,232,.4)}
+  #invName{display:none;position:absolute;left:50%;bottom:78px;transform:translateX(-50%);font-size:12px;letter-spacing:.08em;color:var(--paint);text-shadow:0 1px 3px #000;white-space:nowrap}
+  #invPanel{position:fixed;inset:0;z-index:48;display:none;align-items:center;justify-content:center;background:rgba(5,6,10,.55)}
+  #invPanel.on{display:flex}
+  .invBox{background:rgba(22,24,30,.96);border:1px solid #343944;border-radius:12px;padding:18px 20px;box-shadow:0 24px 70px rgba(0,0,0,.55)}
+  .invBox h3{font-size:13px;letter-spacing:.2em;color:var(--sodium);margin-bottom:4px}
+  .invBox .sub{font-size:11.5px;color:#8d8b86;margin-bottom:12px}
+  #invGrid,#invHot{display:grid;grid-template-columns:repeat(9,50px);gap:4px}
+  #invGrid .islot,#invHot .islot{cursor:pointer;pointer-events:auto}
+  #invGrid .islot:hover,#invHot .islot:hover{border-color:#6a6f7a}
+  #invHot{margin-top:12px;padding-top:12px;border-top:1px solid #343944}
+  #invClose{pointer-events:auto;cursor:pointer;margin-top:14px;float:right;background:var(--sodium);color:#14161b;border:0;border-radius:5px;padding:9px 18px;font-weight:700;font-size:11px;letter-spacing:.1em}
+  /* strefa namierzania RPG (kwadrat na środku ekranu, narożniki) i ramka na celu */
+  #lockZone{position:absolute;left:50%;top:50%;width:var(--s,260px);height:var(--s,260px);transform:translate(-50%,-50%);display:none;pointer-events:none}
+  #lockZone.on{display:block}
+  #lockZone i{position:absolute;width:26px;height:26px;border:2px solid rgba(246,244,238,.75);filter:drop-shadow(0 0 2px rgba(0,0,0,.6))}
+  #lockZone i:nth-child(1){left:0;top:0;border-right:0;border-bottom:0}
+  #lockZone i:nth-child(2){right:0;top:0;border-left:0;border-bottom:0}
+  #lockZone i:nth-child(3){left:0;bottom:0;border-right:0;border-top:0}
+  #lockZone i:nth-child(4){right:0;bottom:0;border-left:0;border-top:0}
+  #lockZone.has i{border-color:rgba(255,207,90,.9)}
+  /* ramka namierzania RPG */
+  #lockBox{position:absolute;display:none;width:calc(46px * var(--k,1.5));height:calc(46px * var(--k,1.5));transform:translate(-50%,-50%);border:2px dashed #ffcf5a;border-radius:4px;pointer-events:none;transition:width .1s,height .1s}
+  #lockBox::after{content:attr(data-t);position:absolute;left:50%;top:100%;transform:translateX(-50%);margin-top:4px;font-size:10px;font-weight:700;letter-spacing:.12em;color:#ffcf5a;white-space:nowrap}
+  #lockBox.locked{border:2px solid #ff4a3d;box-shadow:0 0 12px rgba(255,74,61,.6)}
+  #lockBox.locked::after{color:#ff4a3d}
 
   /* ---- plama od ptaka na ekranie ---- */
   #birdSplat{position:fixed;z-index:30;width:260px;height:200px;margin:-100px 0 0 -130px;pointer-events:none;opacity:0;transition:opacity 1.2s ease;
@@ -240,7 +288,7 @@
 
   /* ---- broń ---- */
   #weaponhud{
-    bottom:16px;left:50%;transform:translateX(-50%);
+    bottom:84px;left:50%;transform:translateX(-50%);
     display:flex;align-items:center;gap:12px;opacity:0;transition:opacity .2s ease;
     padding:8px 16px;
   }
@@ -364,7 +412,7 @@
 
 <!-- ekran ładowania: pasek liczy wczytane skrypty (data-scripts = 2 biblioteki + pliki z loadorder.txt, sprawdza harness);
      main-loop.js woła LOADER.finish(), błąd podczas ładowania odsłania menu z komunikatem (#err) -->
-<div id="loader" data-scripts="40">
+<div id="loader" data-scripts="43">
   <div class="lsun"></div>
   <svg id="lcity" viewBox="0 0 1600 400" preserveAspectRatio="xMidYMax slice" aria-hidden="true"></svg>
   <div class="lbox">
@@ -475,6 +523,9 @@ var LOADER = (function(){
 
   <div id="toast"></div>
   <div id="prompt">Naciśnij <kbd>F</kbd> lub <kbd>E</kbd>, aby wsiąść</div>
+  <div id="lockZone"><i></i><i></i><i></i><i></i></div>
+  <div id="lockBox"></div>
+  <div id="hotbar"></div><div id="invName"></div><div id="invWarn"></div>
   <section class="panel" id="weaponhud"><span class="wname" id="wname">Pięści</span><span class="wammo" id="wammo"></span></section>
   <div id="crosshair"><i class="ct"></i><i class="cb"></i><i class="cl"></i><i class="cr"></i><i class="cd"></i></div>
   <div id="fps">— fps</div>
@@ -483,7 +534,8 @@ var LOADER = (function(){
 <div id="bigmap"><canvas id="bigmapCv"></canvas></div>
 <div id="hurtFlash"></div>
 <div id="birdSplat"></div>
-<div id="deadScreen"><span>ROZBITY</span></div>
+<div id="deadScreen"><div class="dsTitle" id="dsTitle">NIE ŻYJESZ</div><div class="dsCause" id="dsCause"></div><div class="dsBar"><i id="dsBar"></i></div><div class="dsTimer" id="dsTimer"></div></div>
+<div id="invPanel"><div class="invBox"><h3>EKWIPUNEK</h3><div class="sub">Kliknij przedmiot, potem pole docelowe (zamiana miejsc, ryby łączą się w stosy). Tab — zamknij.</div><div id="invGrid"></div><div id="invHot"></div><button id="invClose">ZAMKNIJ</button></div></div>
 
 <div id="wheelWrap"><canvas id="wheelCanvas" width="360" height="360"></canvas></div>
 
@@ -537,6 +589,8 @@ var LOADER = (function(){
         <div class="dctl"><span>Rowerzyści</span><input type="range" data-dbg="bikes" min="0" max="40" step="1"><output></output></div>
         <div class="dctl"><span>Piesi</span><input type="range" data-dbg="peds" min="0" max="200" step="1"><output></output></div>
         <div class="dctl"><span>Łodzie NPC</span><input type="range" data-dbg="boats" min="0" max="24" step="1"><output></output></div>
+        <div class="dctl"><span>Koty</span><input type="range" data-dbg="cats" min="0" max="80" step="1"><output></output></div>
+        <div class="drow"><span>Koty-przyjaciele: <b id="dbgCatFriends">0</b> / 6</span><span class="dbtnrow"><button class="dbtn" data-act="catFriend">+1 przyjaciel</button><button class="dbtn warn" data-act="catRelease">Puść wolno</button></span></div>
         <div class="dctl"><span>Samoloty NPC</span><input type="range" data-dbg="air" min="0" max="6" step="1"><output></output></div>
         <div class="hint">Na słabszym komputerze zmniejsz liczbę aut i pieszych — to one najbardziej obciążają fizykę.</div>
         <div class="dbtnrow"><button class="dbtn" data-act="popDefault">Domyślne</button><button class="dbtn warn" data-act="popClear">Puste ulice</button></div>
@@ -572,7 +626,7 @@ var LOADER = (function(){
         <label class="dtog"><span>Nieśmiertelność</span><input type="checkbox" data-dbg="god"><i></i></label>
         <label class="dtog"><span>Nieskończona amunicja</span><input type="checkbox" data-dbg="infAmmo"><i></i></label>
         <div class="dctl"><span>Moc auta</span><input type="range" data-dbg="carSpeed" min="0.2" max="3" step="0.1"><output></output></div>
-        <div class="dbtngrid"><button class="dbtn" data-act="heal">Ulecz</button><button class="dbtn" data-act="ammo">+200 amunicji</button><button class="dbtn" data-act="fixCar">Postaw auto</button><button class="dbtn warn" data-act="clearStolen">Usuń skradzione</button></div>
+        <div class="dbtngrid"><button class="dbtn" data-act="heal">Ulecz</button><button class="dbtn" data-act="ammo">Pełne magazynki</button><button class="dbtn" data-act="fixCar">Postaw auto</button><button class="dbtn warn" data-act="clearStolen">Usuń skradzione</button></div>
       </section>
 
       <section class="dsec">
@@ -637,6 +691,9 @@ var LOADER = (function(){
 <script src="js/vehicle-entry.js"></script>
 <script src="js/planes.js"></script>
 <script src="js/air-traffic.js"></script>
+<script src="js/destruction.js"></script>
+<script src="js/cats.js"></script>
+<script src="js/inventory.js"></script>
 <script src="js/boats.js"></script>
 <script src="js/birds.js"></script>
 <script src="js/daynight.js"></script>
