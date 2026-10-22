@@ -277,6 +277,30 @@ function pkSign(x, z, face, text, bg, fg, w){
   const a = [x - rx * w / 2 + fx * 0.07, 2.25, z - rz * w / 2 + fz * 0.07], b = [x + rx * w / 2 + fx * 0.07, 2.25, z + rz * w / 2 + fz * 0.07];
   wordSignQuad(text, bg, fg, a, b, [b[0], 3.25, b[2]], [a[0], 3.25, a[2]]);
 }
+/* bramka wejściowa atrakcji (stoi w poprzek alejki, przodem w stronę face): dwa słupy w paski z kulami i flagami,
+   belka z tablicą (napis z obu stron), żarówki, kolorowa posadzka z pasami pod łukiem, tabliczka z informacją */
+function pkEntrance(x, z, face, title, col, info){
+  const fx = Math.sin(face), fz = Math.cos(face), rx = Math.cos(face), rz = -Math.sin(face), hw = 2.7, hex = '#' + col.toString(16).padStart(6, '0');
+  const P = (a, b) => [x + rx * a + fx * b, z + rz * a + fz * b];
+  for (const sd of [-1, 1]){
+    const p = P(sd * hw, 0);
+    for (let k = 0; k < 4; k++) pkS(pkB(0.42, 0.9, 0.42), k % 2 ? 0xf2f0ea : col, p[0], 0.45 + k * 0.9, p[1], 0, face);
+    pkS(new THREE.SphereGeometry(0.32, 10, 8), 0xe0b020, p[0], 3.95, p[1]);
+    pkS(pkC(0.04, 0.04, 1.6, 6), 0x2a2c30, p[0], 4.9, p[1]); const fl = P(sd * hw + sd * 0.4, 0); pkS(pkB(0.8, 0.5, 0.04), col, fl[0], 5.4, fl[1], 0, face);
+    staticBox(p[0], 1.8, p[1], 0.45, 3.6, 0.45);
+  }
+  pkS(pkB(2 * hw + 0.4, 0.25, 0.3), 0x2a2c30, x, 3.65, z, 0, face);                               // belka
+  pkS(pkB(2 * hw - 0.4, 1.0, 0.16), col, x, 3.15, z, 0, face);                                     // tablica
+  for (let k = 0; k <= 10; k++){ const p = P(-hw + 0.25 + k * (2 * hw - 0.5) / 10, 0); pkS(pkB(0.1, 0.1, 0.2), 0xfff3b0, p[0], 3.82, p[1], 0, face); }
+  for (const sd of [1, -1]){                                                                    // napis od frontu i od tyłu
+    const a = P(-sd * (hw - 0.35), sd * 0.09), b = P(sd * (hw - 0.35), sd * 0.09);
+    wordSignQuad(title, hex, '#ffffff', [a[0], 2.72, a[1]], [b[0], 2.72, b[1]], [b[0], 3.58, b[1]], [a[0], 3.58, a[1]]);
+  }
+  /* posadzka pod łukiem: pasy w kolorze atrakcji */
+  for (let k = -3; k <= 3; k++){ const p = P(0, k * 0.6); pkS(pkB(2 * hw - 0.3, 0.012, 0.3), k % 2 ? col : 0xf2f0ea, p[0], 0.032, p[1], 0, face); }
+  if (info){ const p = P(hw + 1.2, 0.6); pkS(pkB(0.08, 1.3, 0.08), 0x2a2c30, p[0], 0.65, p[1]); pkS(pkB(1.1, 0.6, 0.06), 0x14161b, p[0], 1.45, p[1], 0, face);
+    const a = P(hw + 0.68, 0.64), b = P(hw + 1.72, 0.64); wordSignQuad(info, '#14161b', '#ffcf5a', [a[0], 1.2, a[1]], [b[0], 1.2, b[1]], [b[0], 1.7, b[1]], [a[0], 1.7, a[1]]); }
+}
 /* barierki kolejki do atrakcji: słupki i dwie poręcze wzdłuż odcinka (x0,z0)→(x1,z1) */
 function pkRail(x0, z0, x1, z1){
   const l = Math.hypot(x1 - x0, z1 - z0), rot = Math.atan2(x1 - x0, z1 - z0);
@@ -353,7 +377,7 @@ function buildPark(){
     const f = bx + sd * 0.135, z0 = sd < 0 ? -5.8 : 5.8;
     wordSignQuad('PARK ROZRYWKI', '#c0392b', '#fff3d0', [f, 7.4, z0], [f, 7.4, -z0], [f, 9.0, -z0], [f, 9.0, z0]);
   }
-  for (const tz of [-4.5, -1.5, 1.5, 4.5]){ pkS(pkB(0.5, 1.0, 0.5), 0x9aa0a8, gx + 0.5, 0.5, tz); pkS(pkB(0.06, 0.06, 1.1), 0xc8ccd2, gx + 0.5, 0.85, tz + 0.75); staticBox(gx + 0.5, 0.5, tz, 0.5, 1.0, 0.5); }
+  for (const tz of [-4.5, -1.5, 1.5, 4.5]){ pkS(pkB(0.5, 1.0, 0.5), 0x9aa0a8, gx + 0.5, 0.5, tz); pkS(pkB(0.9, 0.06, 0.06), 0xc8ccd2, gx + 1.15, 0.85, tz); staticBox(gx + 0.5, 0.5, tz, 0.5, 1.0, 0.5); }
   for (const tz of [-12.8, 12.8]) for (let x = CITY_EDGE + 4; x < gx - 9; x += 7){ pkS(pkC(0.06, 0.06, 6, 6), 0xd8d4cc, x, 3, tz); pkS(pkB(0.04, 1.4, 0.9), [0xc0392b, 0xe0a52c, 0x2a6cd8][((x / 7) | 0) % 3], x, 5.2, tz + 0.48); staticBox(x, 3, tz, 0.15, 6, 0.15); }
   pkFlowers(CITY_EDGE + 3, CITY_EDGE + 9, -11, -6); pkFlowers(CITY_EDGE + 3, CITY_EDGE + 9, 6, 11);
   /* --- ogrodzenie parku (przerwa na bramę) --- */
@@ -363,7 +387,7 @@ function buildPark(){
   const ST = [['LODY', 0xd35fa0], ['WATA', 0x8e44ad], ['HOT DOG', 0xc0392b], ['NAPOJE', 0x2a6cd8], ['POPCORN', 0xe0a52c], ['PAMIĄTKI', 0x2f8a4c], ['FRYTKI', 0xe67e22], ['BALONY', 0x16a085]];
   [[304, -9.6, 0], [314, -9.6, 0], [356, -9.6, 0], [366, -9.6, 0], [318, 9.6, Math.PI], [356, 9.6, Math.PI], [366, 9.6, Math.PI], [376, 9.6, Math.PI]]
     .forEach(([x, z, f], k) => pkStall(x, z, f, ST[k][0], ST[k][1]));
-  for (const [x, z] of [[328, -16], [344, -16], [376, -18]]){                // stoliki z parasolami
+  for (const [x, z] of [[328, -16], [329, -28], [376, -18]]){                // stoliki z parasolami
     pkS(pkC(0.6, 0.6, 0.06, 12), 0xf2f0ea, x, 0.75, z); pkS(pkC(0.06, 0.06, 0.75, 6), 0x2a2c30, x, 0.37, z); pkS(pkC(0.05, 0.05, 2.4, 6), 0xd8d4cc, x, 1.2, z); pkS(pkC(0.05, 1.5, 0.5, 12), 0xc0392b, x, 2.4, z);
     for (let k = 0; k < 4; k++){ const a = k * Math.PI / 2; pkS(pkB(0.4, 0.45, 0.4), 0x2a6cd8, x + Math.cos(a) * 1.0, 0.22, z + Math.sin(a) * 1.0); }
     staticCylinder(x, 0.4, z, 0.7, 0.8);
@@ -376,7 +400,7 @@ function buildPark(){
   for (let z = 20; z < 150; z += 16) lampSpots.push({ x: A.boulX + 3.9, z: z, rot: -Math.PI / 2, y: 0 });
   for (let z = -40; z < -16; z += 12) lampSpots.push({ x: A.boulX + 3.9, z: z, rot: -Math.PI / 2, y: 0 });
   for (const [x, z] of [[PL.x - 9.2, PL.z - 9.2], [PL.x + 9.2, PL.z - 9.2], [PL.x - 9.2, PL.z + 9.2], [PL.x + 9.2, PL.z + 9.2]]) lampSpots.push({ x: x, z: z, rot: Math.atan2(PL.x - x, PL.z - z), y: 0 });
-  pkFlowers(320, 326, 16, 22); pkFlowers(346, 352, 16, 22); pkFlowers(320, 326, -22, -16); pkFlowers(346, 352, -22, -16);
+  pkFlowers(320, 326, 16, 22); pkFlowers(346, 352, 16, 22); pkFlowers(320, 326, -22, -16); pkFlowers(351, 357, -24, -18);
   pkHedge(A.boulX + 3.5, A.boulX + 4.4, 72, 96); pkHedge(A.boulX - 4.4, A.boulX - 3.5, 72, 96);
   pkHedge(A.boulX + 3.5, A.boulX + 4.4, 106, 132); pkHedge(A.boulX - 4.4, A.boulX - 3.5, 112, 150);
   const tree = (x, z) => treeSpots.push({ x: x, z: z, y: 0, type: randInt(0, 1), scale: rand(0.8, 1.3), rot: rnd() * TAU });
@@ -423,8 +447,9 @@ function buildPark(){
     RIDES.push(c.ride);
   });
   /* dojścia do peronów z barierkami i tablicami */
-  { const b = COASTERS[0].board; pkPath(Math.min(b.x, A.boulX) - 3, Math.max(b.x, A.boulX) + 3, -44, -38); pkRail(b.x - 2.8, -37.5, b.x - 2.8, -25); pkRail(b.x + 2.8, -37.5, b.x + 2.8, -25); pkSign(b.x, -23.5, 0, 'SMOK · 42 m · 103 km/h', '#14161b', '#ffcf5a', 6.4); }
-  { const b = COASTERS[1].board; pkPath(b.x - 3, b.x + 3, 104, b.z + 1.5); pkSign(b.x + 6.8, 106, Math.PI, 'ŻABKA', '#2f8a4c', '#ffffff', 4); }
+  { const b = COASTERS[0].board; pkPath(Math.min(b.x, A.boulX) - 3, Math.max(b.x, A.boulX) + 3, -44, -38); pkPath(b.x - 3, b.x + 3, -38, -10);
+    pkEntrance(b.x, -13, 0, 'SMOK', 0xc0392b, '42 m · 103 km/h'); pkRail(b.x - 2.8, -15, b.x - 2.8, -37.5); pkRail(b.x + 2.8, -15, b.x + 2.8, -37.5); A.smokX = b.x; }
+  { const b = COASTERS[1].board; pkPath(b.x - 3, b.x + 3, 104, b.z + 1.5); pkEntrance(b.x, 106, Math.PI, 'ŻABKA', 0x2f8a4c, '12 m · rodzinna'); A.zabX = b.x; }
   /* minimapa */
   mapExtras.push({ t: 'disc', x: 305, z: 30, r: 8.5, c: '#d35fa0' }); mapExtras.push({ t: 'disc', x: 305, z: 86, r: 10, c: '#2a6cd8' });
   mapExtras.push({ t: 'rect', x0: 369, x1: 375, z0: 18, z1: 62, c: '#e9e2d0' }); mapExtras.push({ t: 'disc', x: 374, z: 84, r: 3, c: '#e0b020' });
@@ -448,7 +473,7 @@ function cycleRide(o, name, period, run, board, exit, extra){
 function buildCarousel(cx, cz){
   pkS(pkC(8.6, 8.8, 0.3, 32), 0x7a5a3a, cx, 0.15, cz); staticCylinder(cx, 0.4, cz, 8.2, 0.8);
   pkPath(cx - 3, cx + 3, 5, cz - 9.5);
-  pkSign(cx + 5.5, cz - 12, Math.PI, 'KARUZELA', '#c0392b', '#ffffff', 4);
+  pkEntrance(cx, 10, Math.PI, 'KARUZELA', 0xd35fa0);
   const g = new THREE.Group(); g.position.set(cx, 0, cz); scene.add(g);
   const parts = [{ geo: pkC(8, 8, 0.35, 28), color: 0xe9e2d0, y: 0.55 }, { geo: pkC(0.6, 0.6, 5.2, 12), color: 0xe0b020, y: 3.2 },
     { geo: pkC(8.6, 8.6, 0.6, 28), color: 0xc0392b, y: 5.3 }, { geo: pkC(0.3, 8.8, 2.2, 14), color: 0xc0392b, y: 6.7, colorFn: (x, y, z) => (Math.floor((Math.atan2(z, x) + Math.PI) / TAU * 14) % 2 ? 0xc0392b : 0xf2f0ea) },
@@ -483,8 +508,8 @@ function buildFerrisWheel(cx, cz){
   staticBox(cx + 3, 1.4, cz - 12, 5, 2.8, 4);
   pkS(pkB(7, 0.4, 22), 0x8a8c8f, cx, 0.2, cz);
   pkS(pkB(3, 0.5, 5), 0xb9b6ad, cx - 4.4, 0.25, cz); staticBox(cx - 4.4, 0.25, cz, 3, 0.5, 5);
-  pkPath(PARK.boulX + 3, cx - 5.9, cz - 3, cz + 3); pkRail(PARK.boulX + 6, cz - 3.2, cx - 6, cz - 3.2); pkRail(PARK.boulX + 6, cz + 3.2, cx - 6, cz + 3.2);
-  pkSign(PARK.boulX + 6, cz - 6.2, -Math.PI / 2, 'DIABELSKI MŁYN', '#2a6cd8', '#ffffff', 6);
+  pkPath(PARK.boulX + 3, cx - 5.9, cz - 3, cz + 3); pkRail(PARK.boulX + 8, cz - 2.8, cx - 6, cz - 2.8); pkRail(PARK.boulX + 8, cz + 2.8, cx - 6, cz + 2.8);
+  pkEntrance(PARK.boulX + 6, cz, -Math.PI / 2, 'DIABELSKI MŁYN', 0x2a6cd8, '42 m · 16 gondoli');
   const wheel = new THREE.Group(); wheel.position.set(cx, hy, cz); scene.add(wheel);
   const parts = [];
   for (const sx of [-1.3, 1.3]){
@@ -519,7 +544,7 @@ function buildSwingRide(cx, cz){
   pkS(pkC(11.5, 11.5, 0.12, 36), 0x8d8270, cx, 0.06, cz); pkS(pkC(2.2, 2.2, 0.4, 16), 0x8a8c8f, cx, 0.2, cz);
   pkS(pkC(0.6, 0.7, 12, 12), 0x2a6cd8, cx, 6, cz); staticCylinder(cx, 6, cz, 0.7, 12);
   pkPath(cx - 3, cx + 3, 70, cz - 11.5);
-  pkSign(cx + 7, cz - 13.5, Math.PI, 'KARUZELA ŁAŃCUCHOWA', '#2a6cd8', '#ffffff', 7);
+  pkEntrance(cx, 72.5, Math.PI, 'ŁAŃCUCHOWA', 0xe0a52c);
   const top = new THREE.Group(); top.position.set(cx, 11.5, cz); scene.add(top);
   top.add(pkMesh([{ geo: pkC(0.4, 6.5, 1.6, 24), color: 0xe0a52c, y: 0.6 }, { geo: pkC(6.5, 6.5, 0.4, 24), color: 0x2a6cd8, y: -0.3 }]));
   const chairs = [];
@@ -546,7 +571,7 @@ function buildDropTower(cx, cz){
   CB(0xc0392b).box(cx, H + 1, cz, 3, 2, 3, 1, true); CB(0xfff3b0).box(cx, H + 2.3, cz, 0.6, 0.6, 0.6, 1, true);
   for (let y = 6; y < H; y += 6) CB(0xc0392b).box(cx, y, cz, 2.5, 0.3, 2.5, 1, true);
   pkPath(cx - 3, cx + 3, 70, cz - 4);
-  pkSign(cx - 6.5, cz - 8, Math.PI, 'WIEŻA 52 m', '#e0a52c', '#14161b', 4.5);
+  pkEntrance(cx, 74, Math.PI, 'WIEŻA', 0x8e44ad, '52 m · spadek');
   const ring = new THREE.Group(); ring.position.set(cx, 2, cz); scene.add(ring);
   const parts = [{ geo: pkB(4.2, 1.0, 4.2), color: 0x2a6cd8 }];
   for (let k = 0; k < 8; k++){ const a = k / 8 * TAU; parts.push({ geo: pkB(0.8, 1.4, 0.7), color: 0xe0a52c, x: Math.cos(a) * 2.5, y: -0.6, z: Math.sin(a) * 2.5, ry: -a }); }
@@ -571,6 +596,7 @@ function buildBumperCars(cx, cz){
   pkS(pkB(0.15, 1.4, 12), 0x14161b, cx - w / 2 - 0.6, 7.3, cz);
   wordSignQuad('AUTODROM', '#14161b', '#ffcf5a', [cx - w / 2 - 0.7, 6.7, cz + 5.8], [cx - w / 2 - 0.7, 6.7, cz - 5.8], [cx - w / 2 - 0.7, 7.9, cz - 5.8], [cx - w / 2 - 0.7, 7.9, cz + 5.8]);
   pkPath(PARK.boulX + 3, cx - w / 2, cz - 3, cz + 3);
+  pkEntrance(PARK.boulX + 7, cz, -Math.PI / 2, 'AUTODROM', 0x6b3a8f);
   const CC = [0xc0392b, 0x2a6cd8, 0xe0a52c, 0x2f8a4c, 0xd35fa0, 0xf2f0ea];
   const B = PARK_RIDES.bumper = { cx: cx, cz: cz, hw: w / 2 - 1.3, hd: d / 2 - 1.3, cars: [], mine: -1 };
   for (let k = 0; k < 9; k++){
@@ -666,11 +692,35 @@ function updatePark(dt){
   updateParkVisitors(dt);
 }
 
-/* zwiedzający: proste postacie chodzące po alejkach od punktu do punktu (bez fizyki); omijają fontannę */
-const PARK_WP = [[290, 0], [302, 2], [316, -1], [356, 2], [372, -2], [384, 0], [PARK.plaza.x - 9, 6], [PARK.plaza.x + 9, -6], [PARK.plaza.x, 10], [PARK.plaza.x, -10],
-                 [336, 30], [336, 55], [336, 90], [336, 120], [336, 148], [300, 67], [320, 67], [360, 67], [374, 67], [300, 101], [360, 101], [376, 101],
-                 [336, -26], [342, -40], [305, 14], [354, 40], [350, 138]];
+/* zwiedzający: chodzą wyłącznie po krawędziach grafu alejek (węzły na osiach alejek, przy wejściach na atrakcje),
+   z małym przesunięciem bocznym — nie wchodzą w budki, atrakcje ani fontannę; na końcach (wejścia) postój */
+let PARK_GRAPH = null;
+function parkGraph(){
+  const A = PARK, PL = A.plaza, N = {}, E = [];
+  const n = (id, x, z, stop) => { N[id] = { id: id, x: x, z: z, nb: [], stop: !!stop }; };
+  const e = (a, b) => { N[a].nb.push(b); N[b].nb.push(a); };
+  n('G', 286, 0); n('P1', 305, 0); n('P2', 316, 0); n('P4', 360, 0); n('P5', 374, 0); n('P6', 386, 0, true);
+  for (let k = 0; k < 8; k++){ const a = k * Math.PI / 4; n('R' + k, PL.x + Math.cos(a) * 11.5, PL.z + Math.sin(a) * 11.5); }
+  for (let k = 0; k < 8; k++) e('R' + k, 'R' + ((k + 1) % 8));
+  e('G', 'P1'); e('P1', 'P2'); e('P2', 'R4'); e('R0', 'P4'); e('P4', 'P5'); e('P5', 'P6');
+  n('SM1', A.smokX || 344, -16); n('SM2', A.smokX || 344, -41, true); n('BN1', A.boulX, -26); n('BN2', A.boulX, -41);
+  e('R7', 'SM1'); e('SM1', 'SM2'); e('R6', 'BN1'); e('BN1', 'BN2'); e('BN2', 'SM2');
+  n('C1', 305, 9); n('C2', 305, 18, true); e('P1', 'C1'); e('C1', 'C2');
+  n('B1', A.boulX, 40); n('B2', A.boulX, 67); n('B3', A.boulX, 101); n('B4', A.boulX, 138); n('B5', A.boulX, 149, true);
+  e('R2', 'B1'); e('B1', 'B2'); e('B2', 'B3'); e('B3', 'B4'); e('B4', 'B5');
+  n('F1', A.boulX + 9, 40); n('F2', 364, 40, true); e('B1', 'F1'); e('F1', 'F2');
+  n('X1', 320, 67); n('X2', 305, 67); n('X3', 295, 67, true); n('X4', 352, 67); n('X5', 374, 67); n('X6', 378, 67, true);
+  e('B2', 'X1'); e('X1', 'X2'); e('X2', 'X3'); e('B2', 'X4'); e('X4', 'X5'); e('X5', 'X6');
+  n('SW', 305, 74.5, true); e('X2', 'SW'); n('TW', 374, 78, true); e('X5', 'TW');
+  n('Y1', 320, 101); n('Y2', A.zabX || 306, 101); n('Y3', 295, 101, true); n('Y4', 356, 101); n('Y5', 376, 101, true);
+  e('B3', 'Y1'); e('Y1', 'Y2'); e('Y2', 'Y3'); e('B3', 'Y4'); e('Y4', 'Y5');
+  n('ZB', A.zabX || 306, 109, true); e('Y2', 'ZB');
+  n('BU1', A.boulX + 9, 138); n('BU2', 351, 138, true); e('B4', 'BU1'); e('BU1', 'BU2');
+  return N;
+}
 function updateParkVisitors(dt){
+  if (!PARK_GRAPH) PARK_GRAPH = parkGraph();
+  const G = PARK_GRAPH, ids = Object.keys(G);
   if (!parkVisitors.length){
     const PAL = [0xc0392b, 0x2a6cd8, 0xe0a52c, 0x2f8a4c, 0xd35fa0, 0xf2f0ea, 0x6b3a8f, 0x1b1c1f];
     for (let k = 0; k < 40; k++){
@@ -678,27 +728,26 @@ function updateParkVisitors(dt){
       h.group.scale.setScalar(k % 5 === 0 ? 0.7 : rand(0.92, 1.05));
       if (k % 6 === 2){ const bl = pkMesh([{ geo: pkC(0.01, 0.01, 1.6, 4), color: 0xf2f0ea, y: 2.0 }, { geo: new THREE.SphereGeometry(0.3, 8, 6), color: PAL[(k + 2) % 5], y: 2.9 }]); bl.position.set(-0.36, 0, 0); h.group.add(bl); }   // balonik
       scene.add(h.group);
-      const w = PARK_WP[k % PARK_WP.length];
-      parkVisitors.push({ h: h, x: w[0] + rand(-1.5, 1.5), z: w[1] + rand(-1.5, 1.5), tx: w[0], tz: w[1], sp: rand(0.9, 1.4), ph: rnd() * TAU, wait: rand(0, 4) });
+      const a = G[ids[(k * 7) % ids.length]], b = G[a.nb[k % a.nb.length]];
+      parkVisitors.push({ h: h, from: a, to: b, t: rnd(), off: rand(-0.9, 0.9), sp: rand(0.9, 1.4), ph: rnd() * TAU, wait: 0 });
     }
   }
-  const PL = PARK.plaza;
   for (const v of parkVisitors){
-    let dx = v.tx - v.x, dz = v.tz - v.z; const d = Math.hypot(dx, dz);
-    if (d < 0.6){
-      v.wait -= dt;
-      if (v.wait <= 0){ const w = PARK_WP[randInt(0, PARK_WP.length - 1)]; v.tx = w[0] + rand(-1.8, 1.8); v.tz = w[1] + rand(-1.8, 1.8); v.wait = rand(1, 6); }
-      v.h.legL.rotation.x = v.h.legR.rotation.x = damp(v.h.legL.rotation.x, 0, 6, dt);
-    } else {
-      const fx = v.x - PL.x, fz = v.z - PL.z, fd = Math.hypot(fx, fz);          // fontanna na drodze: obejście po stycznej
-      if (fd < 7.5 && fd > 0.01){ const tx = -fz / fd, tz = fx / fd, sg = (tx * dx + tz * dz) > 0 ? 1 : -1; dx = tx * sg + fx / fd * 0.6; dz = tz * sg + fz / fd * 0.6; }
-      const l = Math.hypot(dx, dz) || 1, s = Math.min(d, v.sp * dt);
-      v.x += dx / l * s; v.z += dz / l * s;
-      v.h.group.rotation.y = angleDamp(v.h.group.rotation.y, Math.atan2(dx, dz), 6, dt);
-      v.ph += dt * 6 * v.sp;
-      v.h.legL.rotation.x = Math.sin(v.ph) * 0.5; v.h.legR.rotation.x = -Math.sin(v.ph) * 0.5;
-      v.h.armL.rotation.x = -Math.sin(v.ph) * 0.4; v.h.armR.rotation.x = Math.sin(v.ph) * 0.4;
+    if (v.wait > 0){ v.wait -= dt; v.h.legL.rotation.x = v.h.legR.rotation.x = damp(v.h.legL.rotation.x, 0, 6, dt); v.h.armL.rotation.x = v.h.armR.rotation.x = damp(v.h.armL.rotation.x, 0, 6, dt); continue; }
+    const a = v.from, b = v.to, dx = b.x - a.x, dz = b.z - a.z, L = Math.hypot(dx, dz) || 1;
+    v.t += v.sp * dt / L;
+    if (v.t >= 1){                                                                        // węzeł: dalej losową krawędzią (bez zawracania, chyba że ślepy koniec)
+      v.t = 0; const prev = v.from; v.from = b;
+      const opts = b.nb.filter(id => G[id] !== prev); v.to = G[opts.length ? opts[randInt(0, opts.length - 1)] : b.nb[0]];
+      if (b.stop) v.wait = rand(4, 12); else if (rnd() < 0.08) v.wait = rand(1, 4);
+      continue;
     }
-    v.h.group.position.set(v.x, 0.02, v.z);
+    const nx = -dz / L, nz = dx / L;                                                      // przesunięcie boczne (prawa strona)
+    const x = a.x + dx * v.t + nx * v.off, z = a.z + dz * v.t + nz * v.off;
+    v.h.group.position.set(x, 0.02, z);
+    v.h.group.rotation.y = angleDamp(v.h.group.rotation.y, Math.atan2(dx, dz), 6, dt);
+    v.ph += dt * 6 * v.sp;
+    v.h.legL.rotation.x = Math.sin(v.ph) * 0.5; v.h.legR.rotation.x = -Math.sin(v.ph) * 0.5;
+    v.h.armL.rotation.x = -Math.sin(v.ph) * 0.4; v.h.armR.rotation.x = Math.sin(v.ph) * 0.4;
   }
 }

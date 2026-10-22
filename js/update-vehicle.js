@@ -121,8 +121,8 @@ function updateCar(dt){
     const braking = (brake > 20) || handbrakeOn;
     carModel.tailMat.color.setRGB(braking ? 1.0 : 0.36, braking ? 0.18 : 0.08, braking ? 0.14 : 0.07);
   } else {
-    /* bez kierowcy: auto hamuje (siła hamulca ~45 % pełnej) aż stanie — po wysiadce w biegu toczy się i zwalnia */
-    const bf = spd > 0.6 ? BRAKE_F * 0.45 : 24 * Math.max(mScale, 0.2);
+    /* bez kierowcy: auto hamuje pełnym hamulcem aż stanie — po wysiadce w biegu toczy się i zwalnia */
+    const bf = spd > 0.6 ? BRAKE_F : 24 * Math.max(mScale, 0.2);
     for (let i = 0; i < 4; i++){ vehicle.applyEngineForce(0, i); vehicle.setBrake(bf, i); }
     handbrakeOn = false;
     engineRpm = damp(engineRpm, 0, 3, dt);

@@ -56,6 +56,7 @@ function frame(now){
   updateBirds(dt);
   updatePark(dt);
   updateDestruction(dt);
+  updateCats(dt);
   const vehKmh = mode === 'plane' ? planeKmh : mode === 'boat' ? boatKmh : carState.kmh;
   if (mode === 'foot' && pointerLocked){ if (!(parachute.on && parachute.t > 0.7)) updatePlayer(dt); }   // pod otwartą czaszą steruje updateParachute
   else if (mode === 'foot') {
