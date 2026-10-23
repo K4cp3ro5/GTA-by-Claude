@@ -44,14 +44,18 @@ function explodeAt(x, y, z, power, opts){
       const k = 14 * (1 - d / R) / (d || 1); player.body.velocity.x += (pb.x - x) * k; player.body.velocity.z += (pb.z - z) * k; player.body.velocity.y += 7 * (1 - d / R);
     }
   }
-  for (const n of Pedestrians.list){ if (n.state !== 'down' && Math.hypot(n.pos.x - x, n.pos.y - z) < R * 0.75) Pedestrians.hit(n, 100); }
+  const byP = !!opts.byPlayer;                                                       // wybuch wywołany przez gracza (rakieta, łańcuch) — przestępstwa
+  for (const n of Pedestrians.list){ if (n.state !== 'down' && Math.hypot(n.pos.x - x, n.pos.y - z) < R * 0.75){ if (byP) policeCrime('zabójstwo', n.pos.x, n.pos.y); Pedestrians.hit(n, 100); } }
+  if (typeof COPS !== 'undefined') for (const c of COPS){ if (c.state !== 'down' && Math.hypot(c.pos.x - x, c.y - y, c.pos.y - z) < R * 0.8) copHit(c, 200, byP ? 'wybuch' : 'npc'); }
+  if (typeof helis !== 'undefined') for (const h of helis){ if (!h.gone && h !== curHeli && Math.hypot(h.pos.x - x, h.pos.y - y, h.pos.z - z) < 7.5 * power && h !== opts.heli) _boomQueue.push(() => heliDamage(h, 200, byP)); }
+  if (byP) policeCrime('wybuch', x, z);
   if (Pedestrians.scare) Pedestrians.scare(x, z, 60);
   if (typeof npcPanicAt === 'function') npcPanicAt(x, z);
   for (const n of npcs.slice()){
     if (Math.abs((n.y || 0) - y) > 6) continue;
     const d = Math.hypot(n.pos.x - x, n.pos.y - z);
-    if (d < Rk + 1) _boomQueue.push(() => destroyNpcCar(n));
-    else if (d < R){ n.hp = (n.hp === undefined ? 100 : n.hp) - 70 * (1 - d / R); if (n.hp <= 0) _boomQueue.push(() => destroyNpcCar(n)); else npcHitByPlayer(n, 6); }
+    if (d < Rk + 1) _boomQueue.push(() => destroyNpcCar(n, byP));
+    else if (d < R){ n.hp = (n.hp === undefined ? 100 : n.hp) - 70 * (1 - d / R); if (n.hp <= 0) _boomQueue.push(() => destroyNpcCar(n, byP)); else npcHitByPlayer(n, 6); }
   }
   for (const p of parkedCars.slice()){
     if (p.owner === 'wreck' || Math.abs(p.y - y) > 6) continue;
@@ -68,14 +72,15 @@ function explodeAt(x, y, z, power, opts){
     }
   }
   for (const p of planes){ if (!(p.wreckT > 0) && !p.wreck && p !== curPlane && Math.hypot(p.pos.x - x, p.pos.y - y, p.pos.z - z) < 6 * power) _boomQueue.push(() => planeCrash(p)); }
-  for (const a of airPlanes.slice()){ if (Math.hypot(a.pos.x - x, a.pos.y - y, a.pos.z - z) < 9 * power) _boomQueue.push(() => destroyAirPlane(a)); }
+  for (const a of airPlanes.slice()){ if (Math.hypot(a.pos.x - x, a.pos.y - y, a.pos.z - z) < 9 * power) _boomQueue.push(() => destroyAirPlane(a, byP)); }
   /* koty w zasięgu: skrzywdzone przez gracza (cats.js) */
   if (!opts.noCats && typeof CATS !== 'undefined') for (const c of CATS){ if (!c.dead && Math.hypot(c.x - x, c.z - z) < R * 0.7) _boomQueue.push(() => catHarmed(c, 'wybuch')); }
 }
 /* samolot NPC trafiony: duża kula ognia w powietrzu i odłamki, samolot znika, wraca po 40 s */
-function destroyAirPlane(a){
+function destroyAirPlane(a, byPlayer){
   if (airPlanes.indexOf(a) < 0) return;
   const p = a.pos;
+  if (byPlayer) policeCrime('zestrzelenie samolotu', p.x, p.z, 30);
   explodeAt(p.x, p.y, p.z, 1.8, { debrisCol: 0xe9eaec, noCats: true });
   removeAirPlane(a);
   hudToast('Samolot zestrzelony', 2.5);
@@ -90,13 +95,14 @@ function addWreck(type, color, x, yGround, z, heading){
   wreckFx.push({ p: p, t: 0, smoke: 0, fire: 0 });
   return p;
 }
-function destroyNpcCar(n){
+function destroyNpcCar(n, byPlayer){
   if (npcs.indexOf(n) < 0) return;
-  const x = n.pos.x, z = n.pos.y, y = n.y || 0;
-  explodeAt(x, y + 0.8, z, 1, { debrisCol: n.color });
+  const x = n.pos.x, z = n.pos.y, y = n.y || 0, cop = !!n.cop;
+  if (byPlayer) policeCrime(cop ? 'radiowóz' : 'auto', x, z);
+  explodeAt(x, y + 0.8, z, 1, { debrisCol: n.color, byPlayer: byPlayer });
   removeNpcCar(n);
   addWreck(n.type || 'sedan', n.color, x, y, z, n.heading + Math.PI);
-  setTimeout(() => { if (npcs.length < 220) spawnRandomNpcCar(); }, 4000);                 // ruch się uzupełnia
+  if (!cop) setTimeout(() => { if (npcs.length < 220) spawnRandomNpcCar(); }, 4000);       // ruch się uzupełnia (radiowozy — police.js)
 }
 function destroyParked(p){
   if (parkedCars.indexOf(p) < 0 || p.owner === 'wreck') return;
@@ -127,7 +133,7 @@ function removeActiveCar(){
   activeCarGone = true;
   delBody(chassisBody);
   chassisBody.position.set(9000, -300, 9000); chassisBody.velocity.set(0, 0, 0); chassisBody.angularVelocity.set(0, 0, 0);
-  carModel.root.visible = false;
+  carModel.root.visible = false; carModel.wheels.forEach(w => { w.visible = false; });   // koła prowadzonego auta są osobno w scenie
   setDriving('none', carType, driving.color);
 }
 /* śmierć bez względu na nieśmiertelność (koty) — komunikat na ekranie śmierci */
@@ -141,7 +147,8 @@ function killPlayer(msg){
 /* trafienie pojazdu kulą (weapons.js): body — ciało trafione promieniem */
 function vehicleBulletHit(body, dmg){
   const k = 0.35;
-  if (body.npcRef){ const n = body.npcRef; n.hp = (n.hp === undefined ? 100 : n.hp) - dmg * k; if (n.hp <= 0) destroyNpcCar(n); else if ((n.shotHits = (n.shotHits || 0) + 1) >= 2) npcHitByPlayer(n, 6); return true; }
+  if (body.npcRef){ const n = body.npcRef; if (n.cop) policeCrime('atak na policję', n.pos.x, n.pos.y, 6); n.hp = (n.hp === undefined ? 100 : n.hp) - dmg * k; if (n.hp <= 0) destroyNpcCar(n, true); else if (!n.cop && (n.shotHits = (n.shotHits || 0) + 1) >= 2) npcHitByPlayer(n, 6); return true; }
+  if (body.heliRef){ heliDamage(body.heliRef, dmg * 0.22, true); return true; }
   if (body === chassisBody && !activeCarGone){ carHp -= dmg * k; if (carHp <= 0) destroyActiveCar('strzał'); return true; }
   const p = parkedCars.find(q => q.body === body);
   if (p && p.owner !== 'wreck'){ p.hp = (p.hp === undefined ? 100 : p.hp) - dmg * k; if (p.hp <= 0) destroyParked(p); return true; }
@@ -176,7 +183,7 @@ function updateRockets(dt){
       if (!tp) r.target = null;
       else {
         _rkA.set(tp.x - r.p.x, tp.y - r.p.y, tp.z - r.p.z); const dd = _rkA.length();
-        if (dd < 2.5 + step * 0.5){ scene.remove(r.m); rockets.splice(i, 1); explodeAt(r.p.x, r.p.y, r.p.z, 1.15, { cause: 'rakieta' }); continue; }
+        if (dd < 2.5 + step * 0.5){ scene.remove(r.m); rockets.splice(i, 1); explodeAt(r.p.x, r.p.y, r.p.z, 1.15, { cause: 'rakieta', byPlayer: true }); continue; }
         _rkA.divideScalar(dd); const ang = Math.acos(clamp(r.d.dot(_rkA), -1, 1)), mx = (dd < 60 ? 4.5 : 2.6) * dt;
         if (ang > 1e-4){ r.d.lerp(_rkA, Math.min(1, mx / ang)).normalize(); r.m.lookAt(r.p.x + r.d.x, r.p.y + r.d.y, r.p.z + r.d.z); }
       }
@@ -193,7 +200,7 @@ function updateRockets(dt){
     if (hit || r.dist > 1200){
       const at = hit ? new THREE.Vector3(hit.x, hit.y, hit.z).addScaledVector(r.d, -0.3) : _rkA;
       scene.remove(r.m); rockets.splice(i, 1);
-      explodeAt(at.x, at.y, at.z, 1.15, { cause: 'rakieta' });
+      explodeAt(at.x, at.y, at.z, 1.15, { cause: 'rakieta', byPlayer: true });
       continue;
     }
     r.p.copy(_rkA); r.m.position.copy(r.p);
@@ -209,6 +216,8 @@ function lockTargets(){
   for (const b of boats) if (b.npc) T.push({ kind: 'boat', o: b });
   for (const q of Pedestrians.list) if (q.state !== 'down') T.push({ kind: 'ped', o: q });
   for (const p of planes) if (!p.wreck && !(p.wreckT > 0) && p !== curPlane) T.push({ kind: 'plane', o: p });
+  if (typeof helis !== 'undefined') for (const h of helis) if (!h.gone && h !== curHeli) T.push({ kind: 'heli', o: h });
+  if (typeof COPS !== 'undefined') for (const c of COPS) if (c.state !== 'down') T.push({ kind: 'cop', o: c });
   return T;
 }
 const _ltp = { x: 0, y: 0, z: 0 };
@@ -218,6 +227,8 @@ function lockTargetPos(t){
   else if (t.kind === 'air'){ if (airPlanes.indexOf(o) < 0) return null; _ltp.x = o.pos.x; _ltp.y = o.pos.y; _ltp.z = o.pos.z; }
   else if (t.kind === 'boat'){ if (boats.indexOf(o) < 0) return null; _ltp.x = o.pos.x; _ltp.y = WATER_Y + 0.8; _ltp.z = o.pos.z; }
   else if (t.kind === 'ped'){ if (o.state === 'down' || Pedestrians.list.indexOf(o) < 0) return null; _ltp.x = o.pos.x; _ltp.y = (o.y || 0) + 1.1; _ltp.z = o.pos.y; }
+  else if (t.kind === 'heli'){ if (o.gone || o === curHeli) return null; _ltp.x = o.pos.x; _ltp.y = o.pos.y; _ltp.z = o.pos.z; }
+  else if (t.kind === 'cop'){ if (o.state === 'down' || COPS.indexOf(o) < 0) return null; _ltp.x = o.pos.x; _ltp.y = o.y + 1.1; _ltp.z = o.pos.y; }
   else { if (o.wreck || o.wreckT > 0) return null; _ltp.x = o.pos.x; _ltp.y = o.pos.y; _ltp.z = o.pos.z; }
   return _ltp;
 }

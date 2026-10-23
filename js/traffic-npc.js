@@ -240,7 +240,7 @@ function offsetLoop(P, off){
 }
 /* menu debug: istniejące auto staje się piratem (profil jak przy spawnie, nowy lakier i kierunkowskazy na nowym modelu) */
 function npcMakePirate(n){
-  if (n.type === 'bike' || n.profile === 'pirat') return false;
+  if (n.type === 'bike' || n.profile === 'pirat' || n.cop) return false;
   n.profile = 'pirat'; n.obey = rand(1.35, 1.6); n.target = Math.max(n.target * 1.25, 13); n.hwyF = 1.25;
   n.accel = CAR_TYPES[n.type].npc.accel * 2.0; n.gapX = -0.5; n.react = 0; n.color = PIRATE_COLOR;
   npcHazardOff(n);

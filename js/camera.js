@@ -49,6 +49,24 @@ function updateCamera(dt, kmh){
     return;
   }
 
+  if (mode === 'heli' && curHeli){
+    /* helikopter: za ogonem i nad wirnikiem, patrzy przed nos; mysz obraca (wraca za ogon) */
+    const h = curHeli;
+    if (clock - lastMouseMove > 1.2) planeCamYaw = angleDamp(planeCamYaw, 0, 1.5, dt);
+    const yw = h.yaw + planeCamYaw;
+    _cpW.set(h.pos.x - Math.sin(yw) * HELI_T.camDist, h.pos.y + HELI_T.camH, h.pos.z - Math.cos(yw) * HELI_T.camDist);
+    const gy = heightAt(_cpW.x, _cpW.z) + 1.5; if (_cpW.y < gy) _cpW.y = gy;
+    camCur.x = damp(camCur.x, _cpW.x, 6, dt); camCur.y = damp(camCur.y, _cpW.y, 6, dt); camCur.z = damp(camCur.z, _cpW.z, 6, dt);
+    camera.position.copy(camCur);
+    camera.lookAt(h.pos.x + Math.sin(h.yaw) * (planeCamYaw ? 0 : 10), h.pos.y - 1, h.pos.z + Math.cos(h.yaw) * (planeCamYaw ? 0 : 10));
+    camFov = damp(camFov, 68 + clamp(kmh / 160, 0, 1) * 8, 2, dt);
+    if (Math.abs(camera.fov - camFov - fovAdd) > 0.01){ camera.fov = camFov + fovAdd; camera.updateProjectionMatrix(); }
+    sun.target.position.set(h.pos.x, 0, h.pos.z);
+    sun.position.set(h.pos.x + lightDir.x * 95, lightDir.y * 95 + 2, h.pos.z + lightDir.z * 95);
+    camYaw = yw + Math.PI;
+    return;
+  }
+
   camKmh = damp(camKmh, kmh, 3, dt);                 // prędkość dla kamery bez drgań z fizyki
   if (mode === 'car'){
     /* cel = interpolowany model auta (syncCar), nie ciało fizyczne skaczące co krok 1/60 s */

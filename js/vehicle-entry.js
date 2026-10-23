@@ -91,7 +91,7 @@ function parkActive(){
 }
 /* prowadzalne auto przyjmuje typ, kolor, właściciela i pozycję (yGround = podłoże) */
 function takeOver(type, color, owner, x, yGround, z, heading, hp){
-  if (activeCarGone){ activeCarGone = false; addBody(chassisBody); carModel.root.visible = true; }
+  if (activeCarGone){ activeCarGone = false; addBody(chassisBody); carModel.root.visible = true; carModel.wheels.forEach(w => { w.visible = true; }); }
   carHp = hp === undefined ? CAR_HP_MAX : hp;
   applyCarType(type, color);
   chassisBody.position.set(x, yGround + CAR_TYPES[type].restY + 0.13, z);
@@ -118,6 +118,13 @@ function nearestVehicle(){
     const d = Math.hypot(p.x - d0.x, p.z - d0.z) * 0.8;                       // drzwi samolotu: trochę większy zasięg
     if (d < best.dist) best = { kind: 'plane', dist: d, plane: q };
   }
+  if (typeof helis !== 'undefined') for (const h of helis){             // helikopter: drzwi pilota (na ziemi albo na dachu)
+    if (h.gone || h.free || h === curHeli || (h.ai && !h.onGround)) continue;
+    const d0 = heliDoorPoint(h, { x: 0, y: 0, z: 0 });
+    if (Math.abs(d0.y - (p.y - 0.9)) > 2) continue;
+    const d = Math.hypot(p.x - d0.x, p.z - d0.z) * 0.85;
+    if (d < best.dist) best = { kind: 'heli', dist: d, heli: h };
+  }
   if (typeof boats !== 'undefined') for (const b of boats){            // łódź: z pomostu / nabrzeża (gracz nisko, nie na estakadzie)
     if (b === curBoat || p.y > 3) continue;
     const d = Math.max(0, Math.hypot(p.x - b.pos.x, p.z - b.pos.z) - 2.6);          // z dowolnej burty (pomost po lewej albo prawej)
@@ -142,9 +149,11 @@ function nearestVehicle(){
    dotychczasowe auto (twoje albo inne skradzione) zostaje zaparkowane tam, gdzie stało */
 function jackCar(n){
   parkActive();
-  const x = n.pos.x, z = n.pos.y, y = n.y || 0, h = n.heading, color = n.color, type = n.type || 'sedan';
+  const x = n.pos.x, z = n.pos.y, y = n.y || 0, h = n.heading, color = n.color, type = n.type || 'sedan', cop = !!n.cop;
+  if (cop) policeCrime('kradzież radiowozu', x, z);
+  else if (policeNear(x, z, 35)) policeCrime('kradzież', x, z, 8);                // kradzież na oczach policji
   removeNpcCar(n);
-  spawnRandomNpcCar();
+  if (!cop) spawnRandomNpcCar();                                                  // radiowozy uzupełnia police.js
   takeOver(type, color, 'stolen', x, y, z, h);
 }
 /* wejście do zaparkowanego auta (twojego albo skradzionego) */
@@ -245,12 +254,17 @@ function toggleVehicle(){
   if (!pointerLocked) return;
   fishCancel();
   if (mode === 'plane'){ exitPlane(false); return; }
+  if (mode === 'heli'){ exitHeli(false); return; }
   if (mode === 'boat'){ exitBoat(false); return; }
+  if (player.hiding){ hideExit(); return; }
   if (mode === 'ride'){ if (curRide && curRide.canExit) rideEnd(curRide); else hudToast('Nie wysiadaj w trakcie jazdy — poczekaj do końca przejażdżki'); return; }
   if (mode === 'foot' && invTryFeed()) return;                                    // ryba w ręce przy kocie
   if (mode === 'foot'){
-    const nv = nearestVehicle();
+    const nv = nearestVehicle(), bin = hideBinNear(1.9), lift = liftNear(), pb = player.body.position;
+    if (lift && nv.dist > 1.5){ liftUse(lift); return; }                           // winda na dach / na dół
+    if (bin && Math.hypot(bin.x - pb.x, bin.z - pb.z) < nv.dist){ hideEnter(bin); return; }   // kontener: kryjówka
     if (nv.dist > 3.5) return;
+    if (nv.kind === 'heli'){ enterHeli(nv.heli); return; }
     if (nv.kind === 'ride'){ rideStart(nv.ride); return; }
     if (nv.kind === 'plane'){ enterPlane(nv.plane); return; }
     if (nv.kind === 'boat'){ enterBoat(nv.boat); return; }

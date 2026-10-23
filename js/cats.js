@@ -174,6 +174,9 @@ function catRideFrame(){
         if (jet){ const x = Math.min(10.5, 3.6 + r * 1.6); return { x: s * x, z: -4.5 * x / 12.5 }; }       // środek cięciwy skośnego skrzydła
         return { x: s * Math.min(5, 1.9 + r * 1.05), z: 0.95 }; } };                                        // górnopłat awionetki
   }
+  if (mode === 'heli' && curHeli){                                                  // helikopter: podłoga kabiny (za fotelami)
+    return { obj: curHeli.group, yaw: false, fy: -0.88, noRay: true, slot: k => ({ x: (k % 2 ? -1 : 1) * 0.45, z: -0.55 - Math.floor(k / 2) * 0.5 }) };
+  }
   if (mode === 'boat' && curBoat){
     return { obj: curBoat.group, yaw: false, fy: 0.9,
       slot: k => ({ x: 0.35 - (k % 3 - 1) * 0.32, z: -1.4 + Math.floor(k / 3) * 0.5 }) };
@@ -181,6 +184,7 @@ function catRideFrame(){
   return null;
 }
 function catSurfaceY(F, x, z){
+  if (F.noRay) return F.fy;
   const key = F.obj.uuid + ':' + x.toFixed(2) + ':' + z.toFixed(2);
   let y = _rideY.get(key);
   if (y !== undefined) return y;
@@ -290,6 +294,11 @@ function catHarmed(c, how){
   if (c.dead || c.riding) return;
   c.dead = true; c.t = 25; c.m.g.visible = false; c.friend = false;
   if (player.dead) return;
+  if (!catDeathMode){                                                                 // domyślnie: policja (3 gwiazdki od zera)
+    hudToast('Skrzywdziłeś kota — świadkowie wezwali policję!', 3.5);
+    policeCrime('kot', c.x, c.z, WANTED_T[3]);
+    return;
+  }
   hudToast('Jak mogłeś?! To był kot…', 4);
   if (mode === 'car' && !activeCarGone){ destroyActiveCar('kot', 'JAK MOGŁEŚ?!'); return; }
   const p = playerWorldPos();

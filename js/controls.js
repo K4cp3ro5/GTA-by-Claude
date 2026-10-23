@@ -126,7 +126,7 @@ document.addEventListener('pointerlockchange', () => {
   if (!pointerLocked){
     goBtn.textContent = 'WRÓĆ DO GRY';
     if (gameStarted){                                                       // pauza: stan gry w jednym wierszu
-      const md = mode === 'car' ? 'w aucie' : mode === 'plane' ? 'w samolocie' : mode === 'boat' ? 'na łodzi' : 'pieszo';
+      const md = mode === 'car' ? 'w aucie' : mode === 'plane' ? 'w samolocie' : mode === 'heli' ? 'w helikopterze' : mode === 'boat' ? 'na łodzi' : 'pieszo';
       document.getElementById('gatetxt').textContent = document.getElementById('clock').textContent + ' · ' + document.getElementById('phase').textContent + ' · ' + md + ' · zdrowie ' + Math.round(player.health) + ' — miasto czeka, dźwięk wyciszony.';
     }
     for (const k in keys) keys[k] = false;
@@ -153,7 +153,7 @@ document.addEventListener('mousemove', e => {
     wheelVY += e.movementY;
     return;
   }
-  if (mode === 'plane' || mode === 'boat' || mode === 'ride'){               // samolot / łódź / przejażdżka: mysz obraca kamerę
+  if (mode === 'plane' || mode === 'boat' || mode === 'ride' || mode === 'heli'){   // samolot / łódź / helikopter / przejażdżka: mysz obraca kamerę
     planeCamYaw = clamp(planeCamYaw - e.movementX * 0.003, -2.6, 2.6);
     if (mode === 'ride') rideLookPitch = clamp(rideLookPitch - e.movementY * 0.003, -1.2, 1.0);
     if (Math.abs(e.movementX) > 1.5) lastMouseMove = clock;
@@ -265,8 +265,17 @@ const DBG_CTL = {
   hud:       { get: () => document.getElementById('hud').style.display !== 'none', set: v => { document.getElementById('hud').style.display = v ? '' : 'none'; } },
   god:       { get: () => godMode,                               set: v => { godMode = v; } },
   infAmmo:   { get: () => infAmmo,                               set: v => { infAmmo = v; } },
-  carSpeed:  { get: () => carSpeedMult,                          set: v => { carSpeedMult = v; }, fmt: v => v.toFixed(1) + '×' }
+  carSpeed:  { get: () => carSpeedMult,                          set: v => { carSpeedMult = v; }, fmt: v => v.toFixed(1) + '×' },
+  police:    { get: () => policeOn,                              set: v => { policeOn = v; if (!v) wantedClear(null); } },
+  stars:     { get: () => WANTED.stars,                          set: v => dbgSetStars(v), fmt: v => v ? '★'.repeat(v) : '—' },
+  catDeath:  { get: () => catDeathMode,                          set: v => { catDeathMode = v; } }
 };
+/* menu deweloperskie: poziom poszukiwania wprost (agro = próg gwiazdek, zgłoszenie z bieżącej pozycji gracza) */
+function dbgSetStars(v){
+  if (!v){ wantedClear(null); return; }
+  WANTED.agro = WANTED_T[v] + 1; WANTED.stars = v; WANTED.flashT = 1.2;
+  const t = policeTarget(); WANTED.last.x = t.x; WANTED.last.y = t.y; WANTED.last.z = t.z; WANTED.reportT = 2.5; WANTED.phase = 'chase'; POLICE.dispatchT = 0;
+}
 function timeLabel(v){
   const h = Math.floor(v / 60), m = v % 60;
   return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
@@ -312,24 +321,29 @@ function refreshDebugInfo(){
   dbgEl('dbgCars').textContent = (npcs.length - nb) + ' / ' + nb;
   dbgEl('dbgPeds').textContent = String(Pedestrians.list.length);
   dbgEl('dbgSeaAir').textContent = boats.filter(b => b.npc).length + ' / ' + airPlanes.length;
-  dbgEl('dbgMode').textContent = mode === 'car' ? CAR_TYPES[carType].name + (driving.owner === 'stolen' ? ' (kradzione)' : '') : mode === 'plane' && curPlane ? curPlane.T.name : mode === 'boat' ? BOAT_T.name : mode === 'ride' && curRide ? curRide.name : 'pieszo';
+  dbgEl('dbgMode').textContent = mode === 'car' ? CAR_TYPES[carType].name + (driving.owner === 'stolen' ? ' (kradzione)' : '') : mode === 'plane' && curPlane ? curPlane.T.name : mode === 'heli' && curHeli ? curHeli.L.name : mode === 'boat' ? BOAT_T.name : mode === 'ride' && curRide ? curRide.name : 'pieszo';
   dbgEl('dbgPirCount').textContent = String(npcs.filter(n => n.profile === 'pirat').length);
   dbgEl('dbgCatFriends').textContent = String(catFriendCount());
+  dbgEl('dbgCops').textContent = String(npcs.filter(n => n.cop).length); dbgEl('dbgCopsFoot').textContent = String(COPS.filter(c => c.state !== 'down').length);
 }
 debugEl.addEventListener('click', ev => { if (ev.target === debugEl) toggleDebugMenu(); });
 dbgEl('closeDebug').addEventListener('click', ev => { ev.stopPropagation(); toggleDebugMenu(); });
 
 /* --- akcje --- */
-function dbgOnFoot(){                                    // samolot / łódź: wysiadka; auto: trzeba wysiąść samemu (F)
+function dbgOnFoot(){                                    // samolot / łódź / helikopter: wysiadka; auto: trzeba wysiąść samemu (F)
+  if (player.hiding) hideExit(true);
   if (mode === 'ride') rideEnd(curRide, true);
   if (mode === 'plane') exitPlane(true);
+  if (mode === 'heli') exitHeli(true);
   if (mode === 'boat') exitBoat(true);
   if (mode === 'car'){ hudToast('Najpierw wysiądź z auta (F)'); return false; }
   return true;
 }
 function dbgTeleport(x, z, heading, yTop){
+  if (player.hiding) hideExit(true);
   if (mode === 'ride') rideEnd(curRide, true);
   if (mode === 'plane') exitPlane(true);
+  if (mode === 'heli') exitHeli(true);
   if (mode === 'boat') exitBoat(true);
   const g = groundAt(x, z, yTop === undefined ? 30 : yTop); const y = g === null ? 0 : g;
   if (mode === 'car') takeOver(carType, driving.color, driving.owner, x, y, z, heading);
@@ -345,6 +359,11 @@ const DBG_ACT = {
   popClear:   () => { setNpcCars(0); setNpcBikes(0); setPeds(0); },
   catFriend:  () => { if (!catAddFriend()) hudToast(catFriendCount() >= CAT_FRIEND_MAX ? 'Masz już ' + CAT_FRIEND_MAX + ' kotów-przyjaciół' : 'Brak wolnego kota', 2.5); },
   catRelease: () => catReleaseFriends(),
+  wantedUp:   () => dbgSetStars(Math.min(6, WANTED.stars + 1)),
+  wantedClear:() => wantedClear('Zgubiłeś policję'),
+  heli:       () => { if (!dbgOnFoot()) return; const h = helis.find(q => !q.gone && !q.ai && q.spot.y < 1 && q !== curHeli); if (!h) return; heliReset(h); enterHeli(h); camCur.set(h.pos.x - 14, h.pos.y + 6, h.pos.z); },
+  heliRoof:   () => { if (!dbgOnFoot()) return; const h = helis.find(q => !q.gone && !q.ai && q.spot.y > 20 && q.kind !== 'medic'); if (!h) return; heliReset(h); enterHeli(h); camCur.set(h.pos.x - 14, h.pos.y + 6, h.pos.z); },
+  heliAir:    () => { if (!dbgOnFoot()) return; const h = helis.find(q => !q.gone && !q.ai && q.spot.y < 1); if (!h) return; heliReset(h); h.pos.set(0, 140, 60); h.onGround = false; h.rpm = 1; syncHeli(h); enterHeli(h); camCur.set(h.pos.x, h.pos.y + 6, h.pos.z - 14); },
   addPirate:  () => { for (let t = 0; t < 12; t++){ const n = spawnRandomNpcCar(); if (n.type !== 'bike' && !n.path.hwyRoute){ npcMakePirate(n); break; } removeNpcCar(n); } },
   nearPirate: () => {
     const p = playerWorldPos();
@@ -357,6 +376,7 @@ const DBG_ACT = {
   clearStolen: () => parkedCars.filter(q => q.owner === 'stolen').forEach(removeParked),
   boat:        () => {
     if (mode === 'plane') exitPlane(true);
+    if (mode === 'heli') exitHeli(true);
     if (mode === 'car'){ hudToast('Najpierw wysiądź z auta (F)'); return; }
     if (mode === 'boat') return;
     const b = boats.find(q => !q.npc); b.v = 0; enterBoat(b); camCur.set(b.pos.x, 6, b.pos.z + 12);
@@ -372,6 +392,8 @@ debugEl.querySelectorAll('[data-car]').forEach(b => b.addEventListener('click', 
   ev.stopPropagation();
   const type = b.dataset.car;
   if (mode === 'plane') exitPlane(true);
+  if (mode === 'heli') exitHeli(true);
+  if (player.hiding) hideExit(true);
   if (mode === 'boat') exitBoat(true);
   if (mode === 'car'){                                   // w aucie: zmiana typu w miejscu
     const T = CAR_TYPES[carType], p = chassisBody.position;
@@ -402,6 +424,9 @@ debugEl.querySelectorAll('[data-tp]').forEach(b => b.addEventListener('click', e
   else if (k === 'airportW') dbgTeleport(AIRPORT_W.front.x + 2, 30, Math.PI);
   else if (k === 'ring') dbgTeleport(L(12) + 3.5, 60, Math.PI);           // wschodnia obwodnica, pas na północ
   else if (k === 'park') dbgTeleport(PARK.gateX - 12, 0, Math.PI / 2);
+  else if (k === 'police') dbgTeleport(POLICE_STATION.spawn.x, POLICE_STATION.spawn.z, POLICE_STATION.spawn.facing);
+  else if (k === 'hangar'){ const z = HIDE_ZONES.find(q => q.name === 'hangar') || HIDE_ZONES[0]; if (z) dbgTeleport(z.door.x + z.door.nx * 8, z.door.z + z.door.nz * 8, Math.atan2(-z.door.nx, -z.door.nz)); }
+  else if (k === 'bin'){ const p = playerWorldPos(), b = HIDE_BINS.slice().sort((a, c) => Math.hypot(a.x - p.x, a.z - p.z) - Math.hypot(c.x - p.x, c.z - p.z))[0]; if (b) dbgTeleport(b.x + Math.sin(b.rot) * 1.8, b.z + Math.cos(b.rot) * 1.8, b.rot + Math.PI); }
   else if (k === 'clover') dbgTeleport(L(6) + 30, L(6) + 9, -Math.PI / 2, 3);   // ulica pod węzłem
   else if (k === 'exit'){ const q = wayAt(HWY_TERM[0].exit, HWY_TERM[0].exit.len - 160); dbgTeleport(q.x, q.z, Math.atan2(q.hx, q.hz), q.y + 3); }
   else {                                                 // pomost A1 przed węzłem (punkt trasy NPC na jezdni)

@@ -111,7 +111,7 @@ const Weapons = {
   /* broń palna w dłoni, pieszo: kamera zza ramienia i postać zwrócona w stronę celownika; pod otwartą czaszą tylko przy PPM
      (bez celowania kamera zostaje za czaszą), w swobodnym spadku — nie */
   aiming(){
-    if (mode !== 'foot' || this.def().kind !== 'ranged' || player.dead) return false;
+    if (mode !== 'foot' || this.def().kind !== 'ranged' || player.dead || player.hiding) return false;
     if (typeof parachute !== 'undefined' && parachute.on) return parachute.t > 0.7 && !!mouseDownR;
     return true;
   },
@@ -148,6 +148,7 @@ const Weapons = {
     Sound.shoot(d.id !== 'pistol');
     Pedestrians.scare(player.body.position.x, player.body.position.z, 40);
     npcPanicAt(player.body.position.x, player.body.position.z);
+    policeCrime('strzały', player.body.position.x, player.body.position.z);       // strzały przy policji: co najmniej 1 gwiazdka
     this._fire(d);
     /* odrzut: kamera w górę (przy przycelowaniu słabiej), lekko na boki; rozrzut rośnie przy serii */
     const kk = d.kick * (this.ads ? 0.6 : 1);
@@ -243,7 +244,11 @@ const Weapons = {
       let diff = ang - player.facing;
       while (diff >  Math.PI) diff -= TAU;
       while (diff < -Math.PI) diff += TAU;
-      if (Math.abs(diff) < 0.9) Pedestrians.hit(n, d.dmg, true);
+      if (Math.abs(diff) < 0.9){ policeCrime('potrącenie', n.pos.x, n.pos.y); Pedestrians.hit(n, d.dmg, true); }
+    }
+    for (const c of COPS){                                                       // cios w policjanta
+      if (c.state === 'down' || Math.hypot(c.pos.x - p.x, c.pos.y - p.z) > d.range + 0.2) continue;
+      if (Math.abs(wrapAngle(Math.atan2(c.pos.x - p.x, c.pos.y - p.z) - player.facing)) < 0.9) copHit(c, d.dmg, 'cios');
     }
     if (typeof CATS !== 'undefined') for (const c of CATS){                      // cios w kota
       if (c.dead || Math.hypot(c.x - p.x, c.z - p.z) > d.range + 0.3) continue;

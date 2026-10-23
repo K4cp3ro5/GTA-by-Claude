@@ -68,6 +68,25 @@
     display:flex;align-items:center;justify-content:flex-end;gap:6px;margin-top:4px}
   #mode .dot{width:5px;height:5px;border-radius:50%;background:var(--sodium)}
 
+  /* ---- poszukiwanie: 5 gwiazdek + szósta duża; jaskrawe — widzą cię, szare i mrugające — szukają; pasek zatrzymania ---- */
+  #wanted{position:absolute;top:84px;right:14px;text-align:right;opacity:0;transition:opacity .25s;pointer-events:none}
+  #wanted.on{opacity:1}
+  #wanted .stars{display:flex;align-items:flex-end;justify-content:flex-end;gap:2px}
+  #wanted .st{font-style:normal;font-size:22px;line-height:1;color:rgba(20,22,26,.55);-webkit-text-stroke:1px rgba(255,255,255,.35);transition:color .2s,transform .2s}
+  #wanted .st.big{font-size:34px;margin-left:4px}
+  #wanted .st.lit{color:#f2f0ea;-webkit-text-stroke:1px #111;text-shadow:0 0 6px rgba(255,255,255,.35)}
+  #wanted.lost .st.lit{color:#8d8b86;text-shadow:none;animation:wBlink 1s steps(2) infinite}
+  #wanted.pulse .st.lit{transform:scale(1.25)}
+  @keyframes wBlink{50%{opacity:.35}}
+  #wantedTxt{font-size:10px;font-weight:600;letter-spacing:.14em;margin-top:3px;color:#ff6a5a;text-shadow:0 1px 2px rgba(0,0,0,.8)}
+  #wanted.lost #wantedTxt{color:#a9a7a1}
+  #wanted .bustBar{width:150px;height:4px;margin:5px 0 0 auto;background:rgba(0,0,0,.45);border-radius:2px;overflow:hidden;opacity:0}
+  #wanted .bustBar.on{opacity:1}
+  #wanted .bustBar i{display:block;height:100%;width:0;background:#3d8bff}
+  /* winieta pościgu (widzą cię): krawędzie ekranu migają czerwono-niebiesko */
+  #chaseVig{position:fixed;inset:0;z-index:19;pointer-events:none;opacity:0;transition:opacity .4s;background:radial-gradient(ellipse at 50% 50%,transparent 58%,rgba(220,30,30,.28) 100%)}
+  #chaseVig.blue{background:radial-gradient(ellipse at 50% 50%,transparent 58%,rgba(40,80,255,.28) 100%)}
+  #chaseVig.on{opacity:1}
   /* ---- minimapa ---- */
   #map{bottom:14px;left:14px;padding:8px}
   /* zdrowie i kondycja nad minimapą */
@@ -144,6 +163,11 @@
   #deadScreen .dsTimer{margin-top:10px;font-size:12px;letter-spacing:.24em;color:#c9a9a4;text-transform:uppercase}
   #deadScreen .dsBar{width:min(320px,60vw);height:3px;border-radius:2px;background:rgba(255,255,255,.12);overflow:hidden}
   #deadScreen .dsBar i{display:block;height:100%;width:0;background:#ff4a3d}
+  /* zatrzymanie przez policję: granatowe tło i niebieski napis */
+  #deadScreen.busted{background:radial-gradient(circle at 50% 50%,#04081a 0%,#000 75%)}
+  #deadScreen.busted .dsTitle{color:#4d8dff;text-shadow:0 0 40px rgba(40,100,255,.55),0 4px 0 #030a2a}
+  #deadScreen.busted .dsCause{color:#d4dcf2}
+  #deadScreen.busted .dsBar i{background:#4d8dff}
   /* pasek ekwipunku (jak w Minecrafcie) i plecak (Tab) */
   #hotbar{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);display:flex;gap:4px;padding:5px;background:rgba(16,18,22,.62);border:1px solid rgba(200,198,191,.14);border-radius:8px;opacity:0;transition:opacity .2s}
   #hotbar.on{opacity:1}
@@ -412,7 +436,7 @@
 
 <!-- ekran ładowania: pasek liczy wczytane skrypty (data-scripts = 2 biblioteki + pliki z loadorder.txt, sprawdza harness);
      main-loop.js woła LOADER.finish(), błąd podczas ładowania odsłania menu z komunikatem (#err) -->
-<div id="loader" data-scripts="43">
+<div id="loader" data-scripts="46">
   <div class="lsun"></div>
   <svg id="lcity" viewBox="0 0 1600 400" preserveAspectRatio="xMidYMax slice" aria-hidden="true"></svg>
   <div class="lbox">
@@ -502,6 +526,7 @@ var LOADER = (function(){
     <div id="phase">poranek</div>
     <div id="mode"><span class="dot"></span><span id="modetxt">Pieszo</span></div>
   </section>
+  <div id="wanted"><div class="stars"><i class="st">★</i><i class="st">★</i><i class="st">★</i><i class="st">★</i><i class="st">★</i><i class="st big">★</i></div><div id="wantedTxt"></div><div class="bustBar"><i id="wantedBust"></i></div></div>
 
   <section class="panel" id="map">
     <div id="vitals2">
@@ -533,6 +558,7 @@ var LOADER = (function(){
 
 <div id="bigmap"><canvas id="bigmapCv"></canvas></div>
 <div id="hurtFlash"></div>
+<div id="chaseVig"></div>
 <div id="birdSplat"></div>
 <div id="deadScreen"><div class="dsTitle" id="dsTitle">NIE ŻYJESZ</div><div class="dsCause" id="dsCause"></div><div class="dsBar"><i id="dsBar"></i></div><div class="dsTimer" id="dsTimer"></div></div>
 <div id="invPanel"><div class="invBox"><h3>EKWIPUNEK</h3><div class="sub">Kliknij przedmiot, potem pole docelowe (zamiana miejsc, ryby łączą się w stosy). Tab — zamknij.</div><div id="invGrid"></div><div id="invHot"></div><button id="invClose">ZAMKNIJ</button></div></div>
@@ -630,6 +656,14 @@ var LOADER = (function(){
       </section>
 
       <section class="dsec">
+        <h3><i>★</i>Policja</h3>
+        <label class="dtog"><span>Policja włączona</span><input type="checkbox" data-dbg="police"><i></i></label>
+        <div class="dctl"><span>Gwiazdki</span><input type="range" data-dbg="stars" min="0" max="6" step="1"><output></output></div>
+        <label class="dtog"><span>Skrzywdzony kot = śmierć gracza (wybuch)</span><input type="checkbox" data-dbg="catDeath"><i></i></label>
+        <div class="drow"><span>Radiowozy: <b id="dbgCops">0</b> · policjanci: <b id="dbgCopsFoot">0</b></span><span class="dbtnrow"><button class="dbtn" data-act="wantedUp">+1 gwiazdka</button><button class="dbtn warn" data-act="wantedClear">Zgub policję</button></span></div>
+      </section>
+
+      <section class="dsec">
         <h3><i>➜</i>Pojazdy</h3>
         <div class="dlabel">Twoje auto</div>
         <div class="dseg"><button class="dbtn" data-car="sedan">Zwykły</button><button class="dbtn" data-car="pickup">Pickup</button><button class="dbtn" data-car="sport">Sportowy</button><button class="dbtn" data-car="bike">Rower</button></div>
@@ -639,6 +673,8 @@ var LOADER = (function(){
         <div class="dseg"><button class="dbtn" data-plane="jet" data-air="1">Odrzutowiec</button><button class="dbtn" data-plane="prop" data-air="1">Awionetka</button></div>
         <div class="dlabel">Woda i park</div>
         <div class="dseg"><button class="dbtn" data-act="boat">Łódź w porcie</button><button class="dbtn" data-tp="park">Park rozrywki</button></div>
+        <div class="dlabel">Helikopter</div>
+        <div class="dseg"><button class="dbtn" data-act="heli">Na lotnisku</button><button class="dbtn" data-act="heliRoof">Na dachu wieżowca</button><button class="dbtn" data-act="heliAir">W powietrzu</button></div>
       </section>
 
       <section class="dsec">
@@ -647,6 +683,7 @@ var LOADER = (function(){
           <button class="dbtn" data-tp="start">Start</button><button class="dbtn" data-tp="hospital">Szpital</button><button class="dbtn" data-tp="port">Port</button>
           <button class="dbtn" data-tp="airportW">Lotnisko miejskie</button><button class="dbtn" data-tp="airport">Wysepka</button><button class="dbtn" data-tp="hwy">Autostrada</button>
           <button class="dbtn" data-tp="clover">Pod koniczyną</button><button class="dbtn" data-tp="exit">Zjazd SE</button><button class="dbtn" data-tp="ring">Obwodnica</button><button class="dbtn" data-tp="park">Park rozrywki</button>
+          <button class="dbtn" data-tp="police">Komisariat</button><button class="dbtn" data-tp="hangar">Hangar (kryjówka)</button><button class="dbtn" data-tp="bin">Kontener</button>
         </div>
       </section>
 
@@ -695,6 +732,9 @@ var LOADER = (function(){
 <script src="js/cats.js"></script>
 <script src="js/inventory.js"></script>
 <script src="js/boats.js"></script>
+<script src="js/hideouts.js"></script>
+<script src="js/heli.js"></script>
+<script src="js/police.js"></script>
 <script src="js/birds.js"></script>
 <script src="js/daynight.js"></script>
 <script src="js/update-player.js"></script>

@@ -194,7 +194,7 @@ function addBuilding(cx, cz, w, d, h, pool, yBase, shops){
   roofBuf.quad([cx-w/2,y0+h,cz-d/2],[cx-w/2,y0+h,cz+d/2],[cx-w/2,y0+h+par,cz+d/2],[cx-w/2,y0+h+par,cz-d/2],[0,0],[d/6,0],[d/6,.1],[0,.1]);
 
   staticBox(cx, y0 + h/2, cz, w, h, d);
-  buildings.push({ x:cx, z:cz, w:w, d:d });
+  buildings.push({ x:cx, z:cz, w:w, d:d, top: y0 + h });
 }
 
 /* narożniki mapy: zamiast zwykłej zabudowy — plac trójkątny lub rondo,
@@ -591,6 +591,7 @@ buildGasStation();
 buildAirport();
 buildAirportWest();
 buildHospital();
+buildPoliceStation();
 buildLandmarks();
 buildPark();
 

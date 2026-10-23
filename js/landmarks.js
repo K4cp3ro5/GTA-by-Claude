@@ -84,8 +84,15 @@ function buildLandmarks(){
     for (const hz of [92, 126]){
       const hx = -333, r = 13, len = 30;
       lmAdd(lmHalfCyl(r, len, 0.8, true, true), 0x7d8a72, hx, 0, hz);
-      for (const e of [-1, 1]){ const cap = new THREE.CircleGeometry(r, 20, 0, Math.PI); cap.scale(1, 0.8, 1); if (e < 0) cap.rotateY(Math.PI); lmAdd(cap, 0x6f7a66, hx, 0, hz + e * len / 2); }
-      lmAdd(lmBox(14, 7.5, 0.2), 0x3a3f44, hx, 3.75, hz - len / 2 - 0.12);
+      const back = new THREE.CircleGeometry(r, 20, 0, Math.PI); back.scale(1, 0.8, 1); lmAdd(back, 0x6f7a66, hx, 0, hz + len / 2);
+      /* czoło: półelipsa z wycięciem wrót 14 × 7.5 m (otwarte — kryjówka) */
+      const sh = new THREE.Shape(), dw = 7, dh = 7.5; sh.moveTo(r, 0);
+      for (let k = 1; k <= 24; k++){ const a = k / 24 * Math.PI; sh.lineTo(Math.cos(a) * r, Math.sin(a) * r * 0.8); }
+      sh.lineTo(-dw, 0); sh.lineTo(-dw, dh); sh.lineTo(dw, dh); sh.lineTo(dw, 0); sh.closePath();
+      const front = new THREE.ShapeGeometry(sh); front.rotateY(Math.PI); lmAdd(front, 0x6f7a66, hx, 0, hz - len / 2);
+      for (const s of [-1, 1]) lmAdd(lmBox(0.3, dh, 0.4), 0xd8b23a, hx + s * (dw + 0.15), dh / 2, hz - len / 2);
+      lmAdd(lmBox(dw * 2 + 0.6, 0.3, 0.4), 0xd8b23a, hx, dh + 0.15, hz - len / 2);
+      lmAdd(lmCyl(0.45, 0.45, dw * 2, 12), 0x55595f, hx, dh - 0.5, hz - len / 2 + 0.7, 0, 0, Math.PI / 2);   // zwinięta brama
     }
     /* zbiorniki paliwa (biało-czerwone), rękaw wiatrowy przy północnym końcu pasa */
     for (const z of [76, 84]){ lmAdd(lmCyl(2.4, 2.4, 4.2, 16), 0xf2f0ea, -300, 2.1, z); lmAdd(lmCyl(2.45, 2.45, 0.6, 16), 0xc0392b, -300, 3.4, z); staticCylinder(-300, 2.1, z, 2.4, 4.2); }

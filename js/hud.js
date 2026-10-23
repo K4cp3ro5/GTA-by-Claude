@@ -30,7 +30,8 @@ const el = {
 };
 /* przyczyny śmierci (damagePlayer(…, cause), killPlayer) — podtytuł ekranu śmierci */
 const DEATH_CAUSES = { upadek: 'Upadek z wysokości.', kraksa: 'Wypadek samochodowy.', wybuch: 'Wybuch — za blisko ognia.', rakieta: 'Trafienie rakietą.', katastrofa: 'Katastrofa lotnicza.',
-  'wyskok': 'Wyskok z pędzącego auta.', strzał: 'Postrzał.', kot: 'Skrzywdziłeś kota. Karma wraca natychmiast.' };
+  'wyskok': 'Wyskok z pędzącego auta.', strzał: 'Postrzał.', kot: 'Skrzywdziłeś kota. Karma wraca natychmiast.', policja: 'Zastrzelony przez policję.',
+  zatrzymanie: 'Policja cię zatrzymała. Gwiazdki skasowane — tym razem skończyło się na przesłuchaniu.' };
 /* krótki komunikat na środku ekranu */
 let _toastT = 0;
 function hudToast(text, secs){ el.toast.textContent = text; el.toast.classList.add('on'); _toastT = secs || 2.2; }
@@ -88,8 +89,9 @@ function drawMinimap(){
   const wp0 = playerWorldPos(), px = wp0.x, pz = wp0.z;
   const cx = (px - MAP_X0) * MAP_SCALE;
   const cz = (pz - MAP_Z0) * MAP_SCALE;
-  /* przybliżenie minimapy wg trybu (pieszo bliżej, autem / łodzią dalej, samolotem najdalej) — płynnie */
-  const zt = mode === 'plane' ? 0.28 : (mode === 'car' || mode === 'boat') ? 0.5 : 0.62;
+  /* przybliżenie minimapy wg środka transportu (płynnie): pieszo i rowerem najbliżej, autem i łodzią średnio, samolotem i helikopterem najdalej */
+  const bike = mode === 'car' && CAR_TYPES[carType].bike;
+  const zt = (mode === 'plane' || mode === 'heli') ? 0.22 : ((mode === 'car' && !bike) || mode === 'boat') ? 0.5 : 0.88;
   mmZoom += (zt - mmZoom) * 0.08;
   const zs = MAP_SCALE * mmZoom;
 
@@ -140,6 +142,15 @@ function drawMinimap(){
   for (const c of CATS){ if (c.dead) continue; const q = toMap(c.x, c.z); if (q[0] < -4 || q[0] > MM + 4 || q[1] < -4 || q[1] > MM + 4) continue; mg.fillStyle = c.fedT > clock ? '#ff7aa2' : '#ff9d2e'; mg.beginPath(); mg.arc(q[0], q[1], 2.2, 0, TAU); mg.fill(); }
   /* samoloty NPC (ruch lotniczy) — małe sylwetki */
   for (const a of airPlanes){ const q = toMap(a.pos.x, a.pos.z); if (q[0] < -8 || q[0] > MM + 8 || q[1] < -8 || q[1] > MM + 8) continue; mg.save(); mg.translate(q[0], q[1]); mg.rotate(-a.heading + Math.PI); mg.fillStyle = '#cfe3ee'; mg.fillRect(-0.9, -4.5, 1.8, 9); mg.fillRect(-4.5, -1, 9, 2); mg.fillRect(-2, 3, 4, 1.4); mg.restore(); }
+  /* helikoptery (cywilne) i policja: radiowozy, policjanci, helikopter — stożki widzenia, migające znaczniki (police.js) */
+  for (const h of helis){ if (h.gone || h.ai || h === curHeli) continue; const q = toMap(h.pos.x, h.pos.z); if (q[0] < -8 || q[0] > MM + 8 || q[1] < -8 || q[1] > MM + 8) continue; mg.strokeStyle = '#f2f0ea'; mg.lineWidth = 1; mg.beginPath(); mg.arc(q[0], q[1], 4.5, 0, TAU); mg.stroke(); mg.fillStyle = '#f2f0ea'; mg.fillRect(q[0] - 1, q[1] - 3, 2, 6); }
+  policeDrawMap(mg, toMap, zs, false);
+  if (mode === 'heli' && curHeli){
+    mg.save(); mg.translate(MM / 2, MM / 2); mg.rotate(-curHeli.yaw + Math.PI);
+    mg.strokeStyle = '#f2f0ea'; mg.lineWidth = 1.5; mg.beginPath(); mg.arc(0, 0, 7.5, 0, TAU); mg.stroke();
+    mg.fillStyle = '#f2f0ea'; mg.beginPath(); mg.moveTo(0, -6); mg.lineTo(2.6, 0); mg.lineTo(1, 2); mg.lineTo(1, 8); mg.lineTo(-1, 8); mg.lineTo(-1, 2); mg.lineTo(-2.6, 0); mg.closePath(); mg.fill();
+    mg.restore();
+  }
   /* samolot gracza */
   if (mode === 'plane' && curPlane){
     _cpF.set(0, 0, 1).applyQuaternion(curPlane.quat);
@@ -175,6 +186,11 @@ function drawMinimap(){
 
   mg.strokeStyle = 'rgba(200,198,191,.14)';
   mg.strokeRect(0.5, 0.5, MM-1, MM-1);
+  /* poszukiwanie: widzą cię — ramka miga czerwono-niebiesko; nie widzą — mapa wyszarzona */
+  if (WANTED.stars > 0){
+    if (WANTED.seen){ mg.lineWidth = 4; mg.strokeStyle = Math.floor(clock * 4) % 2 ? 'rgba(255,48,48,.9)' : 'rgba(58,108,255,.9)'; mg.strokeRect(2, 2, MM - 4, MM - 4); }
+    else { mg.save(); mg.globalCompositeOperation = 'saturation'; mg.fillStyle = '#808080'; mg.fillRect(0, 0, MM, MM); mg.restore(); mg.fillStyle = 'rgba(40,40,44,.25)'; mg.fillRect(0, 0, MM, MM); }
+  }
 }
 
 const PHASES = [
@@ -257,8 +273,14 @@ let hudAcc = 0, fpsAcc = 0, fpsCount = 0;
 function updateHud(dt, kmh){
   hudAcc += dt; fpsAcc += dt; fpsCount++;
 
-  el.speedo.classList.toggle('on', mode === 'car' || mode === 'plane' || mode === 'boat' || mode === 'ride');
-  if (mode === 'plane' && curPlane){
+  el.speedo.classList.toggle('on', mode === 'car' || mode === 'plane' || mode === 'boat' || mode === 'ride' || mode === 'heli');
+  if (mode === 'heli' && curHeli){
+    const h = curHeli, lbl = 'Helikopter · ' + h.L.name;
+    if (el.carlblTxt.textContent !== lbl){ el.carlblTxt.textContent = lbl; el.carlbl.classList.remove('stolen'); }
+    drawSpeedo(kmh, HELI_T.gauge, h.rpm);
+    el.gval.textContent = (h.onGround ? 'NA ZIEMI' : 'WYS ' + Math.max(0, Math.round(h.agl)) + ' m') + (h.vel.y > 0.5 ? ' ▲' : h.vel.y < -0.5 ? ' ▼' : '');
+    el.ghand.textContent = 'WIRNIK'; el.ghand.className = '';
+  } else if (mode === 'plane' && curPlane){
     const p = curPlane, lbl = 'Samolot · ' + p.T.name;
     if (el.carlblTxt.textContent !== lbl){ el.carlblTxt.textContent = lbl; el.carlbl.classList.remove('stolen'); }
     drawSpeedo(kmh, p.T.gauge, p.thr);
@@ -295,6 +317,7 @@ function updateHud(dt, kmh){
   Weapons.updateHud();
   el.hurtFlash.style.opacity = (player.hurtFlash * 0.7).toFixed(2);
   el.deadScreen.classList.toggle('on', player.dead);
+  el.deadScreen.classList.toggle('busted', !!player.busted);
   if (player.dead) player.mesh.visible = false;                                    // martwy gracz znika (ekran gaśnie do czerni)
   if (player.dead){
     const t = player.deathMsg || 'NIE ŻYJESZ', why = DEATH_CAUSES[player.deathCause] || 'Tym razem się nie udało.';
@@ -302,13 +325,13 @@ function updateHud(dt, kmh){
     if (dsT.textContent !== t) dsT.textContent = t;
     if (dsC.textContent !== why) dsC.textContent = why;
     const left = Math.max(0, ((player.respawnAt || 0) - performance.now()) / 1000);
-    document.getElementById('dsTimer').textContent = 'Odrodzenie w szpitalu za ' + Math.ceil(left) + ' s';
+    document.getElementById('dsTimer').textContent = (player.busted ? 'Zwolnienie z komisariatu za ' : 'Odrodzenie w szpitalu za ') + Math.ceil(left) + ' s';
     document.getElementById('dsBar').style.width = Math.round(100 - left / (RESPAWN_MS / 1000) * 100) + '%';
   }
 
   if (hudAcc > 0.12){
     hudAcc = 0;
-    el.modetxt.textContent = mode === 'car' ? 'W pojeździe' : mode === 'plane' ? 'W powietrzu' : mode === 'boat' ? 'Na wodzie' : mode === 'ride' ? 'Przejażdżka' : 'Pieszo';
+    el.modetxt.textContent = mode === 'car' ? 'W pojeździe' : mode === 'plane' || mode === 'heli' ? 'W powietrzu' : player.hiding ? 'W ukryciu' : mode === 'boat' ? 'Na wodzie' : mode === 'ride' ? 'Przejażdżka' : 'Pieszo';
     const hours = timeOfDay * 24;
     const hh = Math.floor(hours), mmn = Math.floor((hours - hh) * 60);
     el.clock.textContent = (hh < 10 ? '0' : '') + hh + ':' + (mmn < 10 ? '0' : '') + mmn;
@@ -324,14 +347,25 @@ function updateHud(dt, kmh){
     if (debugOpen) refreshDebugInfo();
   }
 
-  let nv = null;
-  if (mode === 'foot') nv = nearestVehicle();
-  const near = !!nv && nv.dist < 3.5;
-  promptEl.classList.toggle('on', near || mode === 'car' || mode === 'boat' || (mode === 'ride' && curRide && curRide.canExit) || (mode === 'plane' && curPlane && ((curPlane.onGround && curPlane.v < 3) || (!curPlane.onGround && curPlane.agl > 15))));
-  const want = mode === 'ride' ? 'outRide' : mode === 'car' ? 'out' : mode === 'boat' ? 'outBoat' : mode === 'plane' ? (curPlane && !curPlane.onGround ? 'bail' : 'outPlane') : (near ? (nv.kind === 'npc' ? 'jack' : nv.kind === 'plane' ? 'plane' : nv.kind === 'boat' ? 'boat' : nv.kind === 'ride' ? (nv.ride.ready() ? 'ride:' : 'rideWait:') + nv.ride.name : 'in') : lastPrompt);
+  let nv = null, bin = null, lift = null;
+  if (mode === 'foot' && !player.hiding){ nv = nearestVehicle(); bin = hideBinNear(1.9); lift = liftNear(); }
+  const near = !!nv && nv.dist < 3.5, pb = player.body.position;
+  const binOn = !!bin && Math.hypot(bin.x - pb.x, bin.z - pb.z) < (nv ? nv.dist : Infinity), liftOn = !!lift && (!nv || nv.dist > 1.5);
+  const heliOut = mode === 'heli' && curHeli && ((curHeli.onGround && Math.hypot(curHeli.vel.x, curHeli.vel.z) < 2) || (!curHeli.onGround && curHeli.agl > 12));
+  promptEl.classList.toggle('on', near || binOn || liftOn || !!player.hiding || !!player.canChute || heliOut || mode === 'car' || mode === 'boat' || (mode === 'ride' && curRide && curRide.canExit) || (mode === 'plane' && curPlane && ((curPlane.onGround && curPlane.v < 3) || (!curPlane.onGround && curPlane.agl > 15))));
+  const want = player.hiding ? 'unhide' : player.canChute ? 'chute' : mode === 'heli' ? (curHeli && !curHeli.onGround ? 'bailHeli' : 'outHeli') : liftOn ? (lift.up ? 'liftUp' : 'liftDown') : binOn ? 'hide'
+             : mode === 'ride' ? 'outRide' : mode === 'car' ? 'out' : mode === 'boat' ? 'outBoat' : mode === 'plane' ? (curPlane && !curPlane.onGround ? 'bail' : 'outPlane') : (near ? (nv.kind === 'npc' ? 'jack' : nv.kind === 'heli' ? 'heli' : nv.kind === 'plane' ? 'plane' : nv.kind === 'boat' ? 'boat' : nv.kind === 'ride' ? (nv.ride.ready() ? 'ride:' : 'rideWait:') + nv.ride.name : 'in') : lastPrompt);
   if (want !== lastPrompt){
     lastPrompt = want;
-    promptEl.innerHTML = want === 'out' || want === 'outRide' ? 'Naciśnij <kbd>F</kbd>, aby wysiąść'
+    promptEl.innerHTML = want === 'unhide' ? 'Naciśnij <kbd>F</kbd>, aby wyjść z kontenera'
+                        : want === 'hide' ? 'Naciśnij <kbd>F</kbd>, aby schować się w kontenerze'
+                        : want === 'chute' ? 'Naciśnij <kbd>Spacja</kbd>, aby otworzyć spadochron'
+                        : want === 'liftUp' ? 'Naciśnij <kbd>F</kbd> — winda na dach (lądowisko)'
+                        : want === 'liftDown' ? 'Naciśnij <kbd>F</kbd> — winda na dół'
+                        : want === 'outHeli' ? 'Naciśnij <kbd>F</kbd>, aby wysiąść z helikoptera'
+                        : want === 'bailHeli' ? 'Naciśnij <kbd>F</kbd>, aby wyskoczyć ze spadochronem'
+                        : want === 'heli' ? 'Naciśnij <kbd>F</kbd> lub <kbd>E</kbd>, aby wsiąść do helikoptera'
+                        : want === 'out' || want === 'outRide' ? 'Naciśnij <kbd>F</kbd>, aby wysiąść'
                         : want === 'outPlane' ? 'Naciśnij <kbd>F</kbd>, aby wysiąść z samolotu'
                         : want === 'bail' ? 'Naciśnij <kbd>F</kbd>, aby wyskoczyć ze spadochronem'
                         : want === 'outBoat' ? 'Naciśnij <kbd>F</kbd> przy brzegu, aby wysiąść'
