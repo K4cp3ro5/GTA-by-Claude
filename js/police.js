@@ -7,7 +7,9 @@
    - Jednostki: radiowozy (mały — sedan, duży — pickup) jako auta NPC z polem `cop` (patrol: zwykła jazda po pętli;
      pościg / szukanie / odjazd: policeCarStep — trasa po grafie ulic NAV, na końcu wprost, omijanie aut, próby PIT),
      policjanci pieszo (COPS — wysiadają, gdy gracz pieszo albo stoi; przy 1–2 gwiazdkach tylko zatrzymują, od 3 strzelają,
-     zawsze poza autem), helikopter (patroluje; przy 6 gwiazdkach ściga, zniża lot i spuszcza policjantów na linach, strzela).
+     zawsze poza autem), helikoptery tylko w pościgu (od 4 gwiazdek: 1, 5: 2, 6: 3 — najwyżej 3; strzelec od 5, zrzut policjantów na linach przy 6).
+   - Poziomy: radiowozy jeżdżą po grafie z poziomami (ulice + rampy i jezdnie autostrad, PGRAPH), policjant zatrzymuje i ściga pieszo
+     tylko gracza na swoim poziomie (gracz na wiadukcie nad nim — wraca do radiowozu, który dojedzie rampą).
    - Wzrok: stożki (radiowóz z załogą, policjant, helikopter — krąg pod sobą) + promień widoczności (ściany, dachy, pomosty
      zasłaniają); w kontenerze gracza nie widać, chyba że policjant go sprawdzi (albo widział, jak wchodził).
    - Fazy: pościg (widzą) → szukanie (nie widzą > 3 s: wszyscy jadą w ostatnie znane miejsce, policjanci wysiadają i
@@ -16,7 +18,7 @@
      wyjście przed komisariatem; śmierć — szpital (jak zawsze).
    --------------------------------------------------------------- */
 const WANTED_T = [0, 8, 24, 48, 85, 135, 200];
-const WANTED = { agro: 0, stars: 0, seen: false, phase: 'none', unseenT: 0, searchT: 0, searchMax: 0, last: { x: 0, y: 0, z: 0 }, reportT: 0, flashT: 0, bust: 0 };
+const WANTED = { agro: 0, stars: 0, seen: false, phase: 'none', unseenT: 0, searchT: 0, searchMax: 0, last: { x: 0, y: 0, z: 0, gy: 0 }, reportT: 0, flashT: 0, bust: 0 };
 let policeOn = true, catDeathMode = false;
 const POLICE_PATROL_N = 5, POLICE_CAR_MAX = 10, WANT_CARS = [0, 2, 3, 4, 5, 6, 7];
 const CRIME_PTS = { 'zabójstwo': 10, 'potrącenie': 3, 'atak na policję': 14, 'zabicie policjanta': 25, 'radiowóz': 35, 'helikopter': 60, 'wybuch': 6, 'auto': 8, 'kradzież radiowozu': 15, 'kradzież helikoptera': 30 };
@@ -28,11 +30,12 @@ function wantedStarsOf(a){ let s = 0; for (let k = 1; k < WANTED_T.length; k++) 
 /* gdzie jest gracz (pieszo, w pojeździe, w kontenerze) i jak szybko się porusza */
 function policeTarget(){
   const o = _pv;
-  if (player.hiding){ o.x = player.hiding.x; o.y = player.hiding.y + 0.7; o.z = player.hiding.z; o.vx = 0; o.vz = 0; o.car = false; return o; }
-  if (mode === 'car' && !activeCarGone){ const p = chassisBody.position, v = chassisBody.velocity; o.x = p.x; o.y = p.y + 0.3; o.z = p.z; o.vx = v.x; o.vz = v.z; o.car = true; return o; }
-  if (mode === 'heli' && curHeli){ o.x = curHeli.pos.x; o.y = curHeli.pos.y; o.z = curHeli.pos.z; o.vx = curHeli.vel.x; o.vz = curHeli.vel.z; o.car = false; return o; }
-  if (mode === 'plane' || mode === 'boat' || mode === 'ride'){ const p = playerWorldPos(); o.x = p.x; o.y = (p.y || 0) + 1; o.z = p.z; o.vx = 0; o.vz = 0; o.car = false; return o; }
-  const p = player.body.position, v = player.body.velocity; o.x = p.x; o.y = p.y + 0.4; o.z = p.z; o.vx = v.x; o.vz = v.z; o.car = false; return o;
+  /* gy — poziom (podłoże pod graczem): ulica ≈ 0, wiadukt ≈ 7–14 m; policja porównuje go ze swoim poziomem */
+  if (player.hiding){ o.x = player.hiding.x; o.y = player.hiding.y + 0.7; o.z = player.hiding.z; o.gy = player.hiding.y; o.vx = 0; o.vz = 0; o.car = false; return o; }
+  if (mode === 'car' && !activeCarGone){ const p = chassisBody.position, v = chassisBody.velocity; o.x = p.x; o.y = p.y + 0.3; o.z = p.z; o.gy = p.y - CAR_TYPES[carType].restY; o.vx = v.x; o.vz = v.z; o.car = true; return o; }
+  if (mode === 'heli' && curHeli){ o.x = curHeli.pos.x; o.y = curHeli.pos.y; o.z = curHeli.pos.z; o.gy = curHeli.pos.y - HELI_T.skid; o.vx = curHeli.vel.x; o.vz = curHeli.vel.z; o.car = false; return o; }
+  if (mode === 'plane' || mode === 'boat' || mode === 'ride'){ const p = playerWorldPos(); o.x = p.x; o.y = (p.y || 0) + 1; o.z = p.z; o.gy = mode === 'boat' ? WATER_Y : (p.y || 0); o.vx = 0; o.vz = 0; o.car = false; return o; }
+  const p = player.body.position, v = player.body.velocity; o.x = p.x; o.y = p.y + 0.4; o.z = p.z; o.gy = p.y - 0.9; o.vx = v.x; o.vz = v.z; o.car = false; return o;
 }
 
 /* --- przestępstwa --- */
@@ -45,7 +48,7 @@ function policeCrime(kind, x, z, pts){
   if (s > WANTED.stars){ WANTED.stars = s; WANTED.flashT = 1.6; if (s === 6) hudToast('SZEŚĆ GWIAZDEK — helikopter policji rusza w pościg!', 3.5); }
   if (WANTED.stars > 0){
     const t = policeTarget();
-    WANTED.reportT = 2.5; WANTED.last.x = t.x; WANTED.last.y = t.y; WANTED.last.z = t.z;   // zgłoszenie: policja wie, gdzie jesteś
+    WANTED.reportT = 2.5; WANTED.last.x = t.x; WANTED.last.y = t.y; WANTED.last.z = t.z; WANTED.last.gy = t.gy;   // zgłoszenie: policja wie, gdzie jesteś
     if (WANTED.phase === 'none') WANTED.phase = 'chase';
     POLICE.dispatchT = 0;
   }
@@ -61,7 +64,7 @@ function wantedClear(msg){
   for (const b of HIDE_BINS) b.suspect = false;
   for (const n of npcs){ const C = n.cop; if (!C || C.role === 'patrol' || C.role === 'empty') continue; if (COPS.some(c => c.car === n && c.state !== 'down')) C.role = 'wait'; else if (C.crew > 0) policeCarLeave(n); else C.role = 'empty'; }
   for (const c of COPS) if (c.state !== 'down') c.state = 'return';
-  for (const h of POLICE.heli) if (h.ai) h.ai.role = 'patrol';
+  for (const h of POLICE.heli) if (h.ai) h.ai.role = 'leave';
   if (had && msg) hudToast(msg, 3);
 }
 
@@ -148,13 +151,72 @@ function policeDriveClear(x0, z0, x1, z1){
   for (let s = 0; s <= L; s += 6){ const px = x0 + ux * s, pz = z0 + uz * s; if (!isLand(px, pz)) return false; const g = heightAt(px, pz); if (g > 0.7) return false; }
   return true;
 }
-/* trasa radiowozu: blisko i wolna droga — wprost; inaczej po grafie ulic (bez kierunków jednokierunkowych), cel rzutowany na wyspę główną */
-function policeRoute(x0, z0, x1, z1){
-  navBuild();
+/* --- graf tras policji z POZIOMAMI: ulice wyspy głównej (graf NAV, y = 0, w obie strony — policja nie patrzy na jednokierunkowe)
+   + jezdnie, rampy i łącznice autostrad (punkty tras NPC z HWY_LOOPS, z wysokością, kierunkowe). Połączenia: punkty tras
+   autostradowych na poziomie ulicy (y < 0.4) rzutowane na najbliższą krawędź NAV (≤ 6 m). Rzut startu i celu tylko na
+   krawędzie na tym samym poziomie (|Δy| < 2.5) — radiowóz pod wiaduktem nie „dojeżdża” do gracza nad sobą, tylko rampą. --- */
+const PGRAPH = { nodes: [], adj: [], edges: [], built: false };
+function pgBuild(){
+  if (PGRAPH.built) return; PGRAPH.built = true; navBuild();
+  const N = PGRAPH.nodes, A = PGRAPH.adj, E = PGRAPH.edges, keys = new Map();
+  const node = (x, y, z) => { const k = Math.round(x * 2) + ',' + Math.round(z * 2) + ',' + Math.round(y); let i = keys.get(k); if (i === undefined){ i = N.length; N.push({ x: x, y: y, z: z }); A.push([]); keys.set(k, i); } return i; };
+  const link = (a, b, both) => { if (a === b) return; const p = N[a], q = N[b], l = Math.hypot(q.x - p.x, q.y - p.y, q.z - p.z); A[a].push({ to: b, l: l }); if (both) A[b].push({ to: a, l: l }); E.push({ a: a, b: b, both: both, l: l }); };
+  const navIdx = NAV.nodes.map(q => q.isl === 'main' ? node(q.x, 0, q.z) : -1);
+  for (const e of NAV.edges) if (navIdx[e.a] >= 0 && navIdx[e.b] >= 0) link(navIdx[e.a], navIdx[e.b], true);
+  const low = [];
+  for (const L of HWY_LOOPS){
+    const P = L[0]; let prev = -1, first = -1;
+    for (const p of P){ const i = node(p.x, p.y || 0, p.z); if ((p.y || 0) < 0.4) low.push(i); if (prev >= 0) link(prev, i, false); else first = i; prev = i; }
+    if (first >= 0) link(prev, first, false);
+  }
+  for (const i of low){
+    const p = N[i], pr = navProject(p.x, p.z, 'main');
+    if (!pr || pr.d > 6 || navIdx[pr.e.a] < 0 || navIdx[pr.e.b] < 0) continue;
+    const j = node(pr.x, 0, pr.z); link(j, navIdx[pr.e.a], true); link(j, navIdx[pr.e.b], true); link(i, j, true);
+  }
+}
+/* najbliższy punkt grafu na tym samym poziomie co (x, y, z) */
+function pgProject(x, y, z){
+  const N = PGRAPH.nodes; let best = null;
+  for (const e of PGRAPH.edges){
+    const a = N[e.a], b = N[e.b], vx = b.x - a.x, vz = b.z - a.z, l2 = vx * vx + vz * vz || 1, u = clamp(((x - a.x) * vx + (z - a.z) * vz) / l2, 0, 1);
+    const yE = lerp(a.y, b.y, u); if (Math.abs(yE - y) > 2.5) continue;
+    const px = a.x + vx * u, pz = a.z + vz * u, d = Math.hypot(x - px, z - pz) + Math.abs(yE - y) * 0.5;
+    if (!best || d < best.d) best = { e: e, u: u, x: px, y: yE, z: pz, d: d };
+  }
+  return best;
+}
+/* Dijkstra (kopiec binarny) od rzutu startu do rzutu celu; punkty trasy [x, z, y] */
+function pgRoute(sx, sy, sz, tx, ty, tz){
+  pgBuild();
+  const s = pgProject(sx, sy, sz), t = pgProject(tx, ty, tz);
+  if (!s || !t || s.d > 40 || t.d > 60) return null;
+  const N = PGRAPH.nodes, A = PGRAPH.adj, n = N.length, dist = new Float64Array(n).fill(Infinity), prev = new Int32Array(n).fill(-1);
+  const head = [[sx, sz, sy], [s.x, s.z, s.y]], tail = [[t.x, t.z, t.y], [tx, tz, ty]];
+  if (s.e === t.e && (t.u >= s.u || s.e.both)) return head.concat(tail);
+  const heap = [], push = (d, i) => { heap.push([d, i]); let k = heap.length - 1; while (k){ const p = (k - 1) >> 1; if (heap[p][0] <= heap[k][0]) break; [heap[p], heap[k]] = [heap[k], heap[p]]; k = p; } };
+  const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length){ heap[0] = last; let k = 0; for (;;){ const l = 2 * k + 1, r = l + 1; let m = k; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === k) break; [heap[m], heap[k]] = [heap[k], heap[m]]; k = m; } } return top; };
+  dist[s.e.b] = (1 - s.u) * s.e.l; push(dist[s.e.b], s.e.b);
+  if (s.e.both){ dist[s.e.a] = Math.min(dist[s.e.a], s.u * s.e.l); push(dist[s.e.a], s.e.a); }
+  while (heap.length){
+    const [d, u] = pop(); if (d > dist[u]) continue;
+    for (const r of A[u]){ const nd = d + r.l; if (nd < dist[r.to]){ dist[r.to] = nd; prev[r.to] = u; push(nd, r.to); } }
+  }
+  const ca = dist[t.e.a] + t.u * t.e.l, cb = t.e.both ? dist[t.e.b] + (1 - t.u) * t.e.l : Infinity;
+  if (!isFinite(Math.min(ca, cb))) return null;
+  const chain = []; for (let u = ca <= cb ? t.e.a : t.e.b; u >= 0; u = prev[u]) chain.unshift([N[u].x, N[u].z, N[u].y]);
+  return head.concat(chain, tail);
+}
+/* trasa radiowozu: oba punkty na ulicy, blisko i wolna droga — wprost; inaczej graf z poziomami (rampy na wiadukty);
+   awaryjnie — sam graf ulic. Cel poza wyspą główną — najbliższy punkt ulicy (brzeg). */
+function policeRoute(x0, y0, z0, x1, y1, z1){
   const isl = islandAt(x1, z1);
-  if (!isl || isl.name !== 'main' || hwyCovered(x1, z1, 0) && heightAt(x1, z1) > 1){ const pr = navProject(x1, z1, 'main'); if (pr){ x1 = pr.x; z1 = pr.z; } }
-  if (Math.hypot(x1 - x0, z1 - z0) < 75 && policeDriveClear(x0, z0, x1, z1)) return [[x0, z0], [x1, z1]];
-  return navRoadRoute(x0, z0, x1, z1, 'main', false);
+  if (!isl || isl.name !== 'main'){ navBuild(); const pr = navProject(x1, z1, 'main'); if (pr){ x1 = pr.x; z1 = pr.z; y1 = 0; } }
+  if (y0 < 0.8 && y1 < 0.8 && Math.hypot(x1 - x0, z1 - z0) < 75 && policeDriveClear(x0, z0, x1, z1)) return [[x0, z0, 0], [x1, z1, 0]];
+  const r = pgRoute(x0, y0, z0, x1, y1, z1);
+  if (r) return r;
+  navBuild();
+  return navRoadRoute(x0, z0, x1, z1, 'main', false).map(p => [p[0], p[1], 0]);
 }
 function policeCarStep(n, dt){
   const C = n.cop, T = CAR_TYPES[n.type];
@@ -167,13 +229,14 @@ function policeCarStep(n, dt){
   }
   const t = policeTarget(), seen = WANTED.seen;
   /* cel: pościg — gracz (z wyprzedzeniem), szukanie — ostatnie znane miejsce, odjazd — daleki węzeł */
-  let gx, gz;
-  if (C.role === 'leave'){ gx = C.leaveTo.x; gz = C.leaveTo.z; }
-  else if (C.role === 'chase' && seen){ gx = t.x + (t.vx || 0) * 0.6; gz = t.z + (t.vz || 0) * 0.6; }
-  else { gx = WANTED.last.x; gz = WANTED.last.z; }
-  const dP = Math.hypot(t.x - n.pos.x, t.z - n.pos.y), dG = Math.hypot(gx - n.pos.x, gz - n.pos.y);
+  let gx, gz, gy;
+  if (C.role === 'leave'){ gx = C.leaveTo.x; gz = C.leaveTo.z; gy = 0; }
+  else if (C.role === 'chase' && seen){ gx = t.x + (t.vx || 0) * 0.6; gz = t.z + (t.vz || 0) * 0.6; gy = t.gy || 0; }
+  else { gx = WANTED.last.x; gz = WANTED.last.z; gy = WANTED.last.gy || 0; }
+  const lvl = Math.abs((t.gy || 0) - n.y) < 2.5;                                  // gracz na tym samym poziomie (nie na wiadukcie nad / pod)
+  const dP = Math.hypot(t.x - n.pos.x, t.z - n.pos.y), dG = Math.hypot(gx - n.pos.x, gz - n.pos.y) + (Math.abs(gy - n.y) > 2.5 ? 1e3 : 0);
   C.routeT -= dt;
-  if (!C.route || C.routeT <= 0 || Math.hypot(gx - C.goal.x, gz - C.goal.z) > 14){ C.route = policeRoute(n.pos.x, n.pos.y, gx, gz); C.ri = 1; C.routeT = 1.0; C.goal = { x: gx, z: gz }; }
+  if (!C.route || C.routeT <= 0 || Math.hypot(gx - C.goal.x, gz - C.goal.z) > 14 || Math.abs(gy - C.goal.y) > 2.5){ C.route = policeRoute(n.pos.x, n.y, n.pos.y, gx, gy, gz); C.ri = 1; C.routeT = 1.0; C.goal = { x: gx, z: gz, y: gy }; }
   const R = C.route;
   while (C.ri < R.length - 1 && Math.hypot(R[C.ri][0] - n.pos.x, R[C.ri][1] - n.pos.y) < 7) C.ri++;
   let ax = R[Math.min(C.ri, R.length - 1)][0], az = R[Math.min(C.ri, R.length - 1)][1];
@@ -186,10 +249,10 @@ function policeCarStep(n, dt){
     if (n.speed > vc && (n.speed * n.speed - vc * vc) / 18 > dA - 3) vTop = Math.min(vTop, vc);
   }
   /* przy graczu: pieszo / stojące auto — zatrzymanie kilka metrów przed i wysiadka załogi; jadące auto — PIT */
-  if ((C.role === 'chase' || C.role === 'search') && (C.role === 'search' ? dG < 22 : (seen && dP < 10 + n.speed * 0.7 && (!t.car || Math.hypot(t.vx, t.vz) < 2.5)))){ stop = true; }
+  if ((C.role === 'chase' || C.role === 'search') && (C.role === 'search' ? dG < 22 : (seen && lvl && dP < 10 + n.speed * 0.7 && (!t.car || Math.hypot(t.vx, t.vz) < 2.5)))){ stop = true; }
   if (C.role === 'stopped') stop = true;
   let pit = false;
-  if (C.role === 'chase' && seen && t.car && Math.hypot(t.vx, t.vz) > 7 && Math.hypot(t.vx, t.vz) < 38 && dP < 32 && C.pitCool <= 0){   // PIT do ~135 km/h
+  if (C.role === 'chase' && seen && lvl && t.car && Math.hypot(t.vx, t.vz) > 7 && Math.hypot(t.vx, t.vz) < 38 && dP < 32 && C.pitCool <= 0){   // PIT do ~135 km/h
     const hP = carYaw(), fx = Math.sin(hP), fz = Math.cos(hP), rx = -Math.cos(hP), rz = Math.sin(hP);
     const ox = n.pos.x - t.x, oz = n.pos.y - t.z, lat = ox * rx + oz * rz, lon = ox * fx + oz * fz, side = lat >= 0 ? 1 : -1, PT = CAR_TYPES[carType];
     ax = t.x - fx * (PT.half[2] + 0.4) + rx * side * 2.5 + t.vx * 0.3; az = t.z - fz * (PT.half[2] + 0.4) + rz * side * 2.5 + t.vz * 0.3;
@@ -215,16 +278,16 @@ function policeCarStep(n, dt){
     const l = ox * dz - oz * dx;
     if (Math.abs(l) < 2.6){ latT = l > 0 ? -1 : 1; if (a < 7) vTop = Math.min(vTop, m.speed < 0.5 && a < 6.5 ? 0 : Math.max(m.speed, 4)); }   // przed stojącym autem (też radiowozem) staje
   }
-  if (t.car && !pit){                                                              // wolne / stojące auto gracza przed maską: staje obok (nie wjeżdża na nie)
+  if (t.car && !pit && lvl){                                                       // wolne / stojące auto gracza przed maską: staje obok (nie wjeżdża na nie)
     const ox = t.x - n.pos.x, oz = t.z - n.pos.y, a = ox * dx + oz * dz;
     if (a > 0 && a < 12 && Math.abs(ox * dz - oz * dx) < 3.2 && Math.hypot(t.vx, t.vz) < 6) vTop = Math.min(vTop, Math.max(0, (a - 6) * 1.5));
   }
-  if (!t.car && mode === 'foot' && !player.hiding){                              // pieszy gracz przed maską: hamuje (nie rozjeżdża)
+  if (!t.car && mode === 'foot' && !player.hiding && lvl){                       // pieszy gracz przed maską: hamuje (nie rozjeżdża)
     const ox = t.x - n.pos.x, oz = t.z - n.pos.y, a = ox * dx + oz * dz;
     if (a > 0 && a < 10 && Math.abs(ox * dz - oz * dx) < 2.4) vTop = Math.min(vTop, Math.max(0, (a - 4) * 1.5));
   }
   /* nie wjeżdża w obrys auta gracza (ciało kinematyczne w aucie przy dużej prędkości wyrzucało je pod ziemię): z tyłu — prędkość auta gracza, z boku — odbicie w bok */
-  if (t.car){
+  if (t.car && lvl){
     const hP = carYaw(), fx = Math.sin(hP), fz = Math.cos(hP), rx = -Math.cos(hP), rz = Math.sin(hP), PT = CAR_TYPES[carType];
     const ox = n.pos.x - t.x, oz = n.pos.y - t.z, lon = ox * fx + oz * fz, lat = ox * rx + oz * rz, Ls = PT.half[2] + (n.halfL || 2.05) + 0.8, Ws = PT.half[0] + (n.halfW || 0.93) + 0.35;
     if (Math.abs(lon) < Ls && Math.abs(lat) < Ws){
@@ -241,14 +304,21 @@ function policeCarStep(n, dt){
   let vx = Math.sin(n.heading) * n.speed, vz = Math.cos(n.heading) * n.speed;
   if (C.pitT > 0) C.pitT -= dt;
   /* wysokość: podłoże pod autem (chodnik, parking) co 0.25 s */
-  C.gyT -= dt;
-  if (C.gyT <= 0){ C.gyT = 0.25; const g = rayHit(n.pos.x, n.y + 1.5, n.pos.y, n.pos.x, n.y - 2, n.pos.y, G_WORLD); n.yT = g && g.hitNormalWorld.y > 0.7 ? g.hitPointWorld.y : 0; }
-  n.y = damp(n.y, Math.min(n.yT || 0, 1.0), 8, dt);
+  /* wysokość: odcinek trasy na rampie / wiadukcie — z trasy (jak auta NPC); na ulicy — podłoże pod autem (chodnik, parking) co 0.25 s */
+  const ra = R[Math.max(0, Math.min(C.ri, R.length - 1) - 1)], rb = R[Math.min(C.ri, R.length - 1)], ya = ra[2] || 0, yb = rb[2] || 0;
+  if (Math.max(ya, yb) > 0.4){
+    const sx = rb[0] - ra[0], sz = rb[1] - ra[1], sl2 = sx * sx + sz * sz || 1, u = clamp(((n.pos.x - ra[0]) * sx + (n.pos.y - ra[1]) * sz) / sl2, 0, 1);
+    n.y = lerp(ya, yb, u); n.slope = (yb - ya) / Math.sqrt(sl2); C.gyT = 0;
+  } else {
+    n.slope = 0; C.gyT -= dt;
+    if (C.gyT <= 0){ C.gyT = 0.25; const g = rayHit(n.pos.x, n.y + 1.5, n.pos.y, n.pos.x, n.y - 2, n.pos.y, G_WORLD); n.yT = g && g.hitNormalWorld.y > 0.7 ? g.hitPointWorld.y : 0; }
+    n.y = damp(n.y, Math.min(n.yT || 0, 1.0), 8, dt);
+  }
   n.body.position.y = n.y + n.halfH + 0.1;
   n.dirX = Math.sin(n.heading); n.dirZ = Math.cos(n.heading);
   n.body.velocity.set(vx, 0, vz); n.body.angularVelocity.set(0, 0, 0);
   n.body.quaternion.setFromAxisAngle(_npAxis, n.heading);
-  n.mesh.position.set(n.pos.x, n.y, n.pos.y); n.mesh.rotation.order = 'YXZ'; n.mesh.rotation.set(0, n.heading, 0);
+  n.mesh.position.set(n.pos.x, n.y, n.pos.y); n.mesh.rotation.order = 'YXZ'; n.mesh.rotation.set(-Math.atan(n.slope || 0), n.heading, 0);
   n.blocked = n.speed < 0.3; n.why = 'policja';
   /* zatrzymany przy graczu: załoga wysiada */
   if (stop && n.speed < 0.6 && C.crew > 0 && (C.role === 'chase' || C.role === 'search' || C.role === 'stopped')){ C.role = 'stopped'; policeDeploy(n); }
@@ -342,9 +412,10 @@ function copMoveTo(c, tx, tz, spd, dt){
 }
 /* strzał (policjant / helikopter) do gracza: trafienie z prawdopodobieństwem wg odległości i prędkości; smugacz z lufy */
 const _copFrom = new THREE.Vector3(), _copTo = new THREE.Vector3();
-function policeShoot(fx, fy, fz, acc){
+/* strzał do gracza: trafienie z prawdopodobieństwem acc·(1 − d/range) minus poprawka na ruch (dalej niż range — tylko pudła) */
+function policeShoot(fx, fy, fz, acc, range){
   const t = policeTarget(), d = Math.hypot(t.x - fx, t.y - fy, t.z - fz), sp = Math.hypot(t.vx || 0, t.vz || 0);
-  const hit = Math.random() < clamp(acc - d / 90 - sp * 0.02, 0.05, 0.6) && !player.hiding;
+  const hit = Math.random() < clamp(acc * (1 - d / (range || 32)) - sp * 0.02, 0, 0.5) && !player.hiding;
   _copFrom.set(fx, fy, fz); _copTo.set(t.x + (hit ? 0 : rand(-2.5, 2.5)), t.y + (hit ? 0 : rand(-1, 1.5)), t.z + (hit ? 0 : rand(-2.5, 2.5)));
   const len = _copFrom.distanceTo(_copTo);
   const tr = new THREE.Mesh(_tracerGeo, _tracerMat); tr.position.copy(_copFrom).lerp(_copTo, 0.5); tr.scale.set(1, 1, len); tr.lookAt(_copTo); shotFxAdd(tr, 0.05);
@@ -353,9 +424,9 @@ function policeShoot(fx, fy, fz, acc){
   if (dc < 140) Sound.shoot(false);
   if (Pedestrians.scare) Pedestrians.scare(fx, fz, 30);
   if (!hit) return;
-  if (mode === 'car' && !activeCarGone){ vehicleBulletHit(chassisBody, 10); damagePlayer(rand(2, 4), 'policja'); }
-  else if (mode === 'heli' && curHeli){ heliDamage(curHeli, 3); damagePlayer(rand(1.5, 3), 'policja'); }
-  else damagePlayer(rand(7, 11), 'policja');
+  if (mode === 'car' && !activeCarGone){ vehicleBulletHit(chassisBody, 8); damagePlayer(rand(2, 3.5), 'policja'); }
+  else if (mode === 'heli' && curHeli){ heliDamage(curHeli, 2.5); damagePlayer(rand(1.5, 2.5), 'policja'); }
+  else damagePlayer(rand(5, 8), 'policja');
 }
 /* zatrzymanie: ekran ZATRZYMANY, wyjście przed komisariatem (update-player.js: respawnPlayer) */
 function policeBust(){
@@ -367,6 +438,7 @@ function policeBust(){
   Sound.hurt();
   wantedClear(null);
 }
+const COP_SHOOT_RANGE = 22, COP_SHOOTERS = 4;                                       // policjant strzela z najwyżej 22 m; naraz strzela najwyżej 4 (najbliżsi)
 function updateCop(c, dt){
   c.t += dt;
   if (c.state === 'down'){ c.t -= 2 * dt; if (c.t <= 0) removeCop(c); return; }
@@ -403,22 +475,34 @@ function updateCop(c, dt){
       if (!moving || Math.hypot(c.dest.x - c.pos.x, c.dest.z - c.pos.y) < 0.6){ c.dest = null; c.waitT = c.bin ? 1.4 : rand(1.2, 2.4); c.phase = rand(0, TAU); }
     }
   } else {
-    /* pościg: do 2 gwiazdek — biegnie i zatrzymuje; od 3 — strzela z miejsca (widząc gracza), podchodzi, gdy daleko */
+    /* pościg. Gracz na innym poziomie (wiadukt nad / pod policjantem): nie zatrzyma go — po 3 s wraca do radiowozu, który
+       dojedzie rampą; widząc go z bliska przy 3+ gwiazdkach — strzela. Na tym samym poziomie każdy policjant ma swoje miejsce
+       (c.slot): zatrzymujący — dwaj najbliżsi tuż przy graczu, reszta w pierścieniu 3–5 m; strzelający — w pierścieniu 12–18 m. */
     c.state = 'chase';
-    const tx = c.sees ? t.x : WANTED.last.x, tz = c.sees ? t.z : WANTED.last.z;
-    const shooter = WANTED.stars >= 3 && c.sees && dP < 40;
-    if (shooter && dP < 24){ aimP = true; c.heading = angleDamp(c.heading, Math.atan2(t.x - c.pos.x, t.z - c.pos.y), 10, dt); }
-    else if (dP > 1.25 || !c.sees){ moving = copMoveTo(c, tx, tz, dP > 6 ? 6.2 : 4.5, dt); spd = dP > 6 ? 6.2 : 4.5; if (shooter) aimP = true; }
-    else c.heading = angleDamp(c.heading, Math.atan2(t.x - c.pos.x, t.z - c.pos.y), 10, dt);   // tuż przy graczu: stoi (nie spycha go ciałem)
-    if (aimP){ c.shootT -= dt; if (c.shootT <= 0 && !player.dead){ c.shootT = rand(0.7, 1.15); _copFrom.set(0, -0.66, 0.2); c.armR.updateWorldMatrix(true, false); _copFrom.applyMatrix4(c.armR.matrixWorld); policeShoot(_copFrom.x, _copFrom.y, _copFrom.z, 0.42 + WANTED.stars * 0.04); } }
-    /* zatrzymanie: tuż przy graczu, który stoi albo idzie (pieszo), albo przy drzwiach stojącego auta */
+    const sameLvl = Math.abs((t.gy || 0) - c.y) < 1.8;
+    c.offT = sameLvl ? 0 : (c.offT || 0) + dt;
+    if (c.offT > 3 && c.car && npcs.indexOf(c.car) >= 0){ c.state = 'board'; return; }
+    const k = c.slot || 0, shooter = WANTED.stars >= 3 && c.sees && dP < COP_SHOOT_RANGE && k < COP_SHOOTERS, face = () => { c.heading = angleDamp(c.heading, Math.atan2(t.x - c.pos.x, t.z - c.pos.y), 10, dt); };
+    const rr = shooter ? 12 + (k % 3) * 3 : (k < 2 ? 1.1 : 3 + (k - 2) * 0.7);
+    const tx = c.sees ? t.x : WANTED.last.x, tz = c.sees ? t.z : WANTED.last.z, dT = Math.hypot(tx - c.pos.x, tz - c.pos.y);
+    if (!sameLvl){ if (shooter) aimP = true; face(); }
+    else if (dT > rr + 0.3){
+      const bx = c.pos.x - tx, bz = c.pos.y - tz, bl = Math.hypot(bx, bz) || 1;
+      spd = dT > 6 ? 6.2 : 4.5; moving = copMoveTo(c, tx + bx / bl * rr, tz + bz / bl * rr, spd, dt);
+      if (shooter) aimP = true;
+    } else { face(); if (shooter) aimP = true; }
+    if (aimP){ c.shootT -= dt; if (c.shootT <= 0 && !player.dead){ c.shootT = rand(1.2, 2.0); _copFrom.set(0, -0.66, 0.2); c.armR.updateWorldMatrix(true, false); _copFrom.applyMatrix4(c.armR.matrixWorld); policeShoot(_copFrom.x, _copFrom.y, _copFrom.z, 0.16 + WANTED.stars * 0.02, COP_SHOOT_RANGE + 6); } }
+    /* zatrzymanie: na tym samym poziomie, tuż przy graczu, który stoi albo idzie (pieszo), albo przy drzwiach stojącego auta */
     const pv = Math.hypot(t.vx || 0, t.vz || 0);
-    if (!player.dead && !player.hiding && ((mode === 'foot' && dP < 1.6 && pv < 3) || (mode === 'car' && t.car && pv < 1 && dP < (CAR_TYPES[carType].half[0] + 1.6)))){ WANTED.bust += dt; if (WANTED.bust > (mode === 'car' ? 1.4 : 1.1)) policeBust(); }
+    if (sameLvl && !player.dead && !player.hiding && ((mode === 'foot' && dP < 1.6 && pv < 3) || (mode === 'car' && t.car && pv < 1 && dP < (CAR_TYPES[carType].half[0] + 1.6)))){ WANTED.bust += dt; if (WANTED.bust > (mode === 'car' ? 1.4 : 1.1)) policeBust(); }
   }
   /* wysokość podłoża, ciało, model, animacja */
   c.gyT -= dt;
   if (c.state !== 'rope' && c.gyT <= 0){ c.gyT = 0.3; const g = rayHit(c.pos.x, c.y + 1.6, c.pos.y, c.pos.x, c.y - 3, c.pos.y, G_WORLD); if (g && g.hitNormalWorld.y > 0.6) c.yT = g.hitPointWorld.y; }
   if (c.state !== 'rope' && c.yT !== undefined) c.y = damp(c.y, c.yT, 10, dt);
+  copPose(c, dt, moving, spd, aimP);
+}
+function copPose(c, dt, moving, spd, aimP){
   c.body.position.set(c.pos.x, c.y + 0.85, c.pos.y);
   c.group.position.set(c.pos.x, c.y, c.pos.y); c.group.rotation.y = c.heading;
   if (moving){ c.phase += dt * (3 + spd * 1.1); const s = Math.sin(c.phase), q = Math.sin(c.phase + Math.PI); c.legL.rotation.x = s * 0.6; c.legR.rotation.x = q * 0.6; c.armL.rotation.x = q * 0.5; }
@@ -427,37 +511,64 @@ function updateCop(c, dt){
   c.armR.rotation.x = c.aim > 0.05 ? -1.45 * c.aim : (moving ? Math.sin(c.phase) * 0.5 : 0);
   if (c.aim > 0.5) c.armL.rotation.x = -1.3 * c.aim;
 }
+/* policjanci nie stoją w jednym miejscu: rozpychanie (≥ 1.1 m, strzelający ≥ 2 m), tylko na tym samym poziomie */
+function copSeparate(){
+  const L = COPS.filter(c => c.state !== 'down' && c.state !== 'rope');
+  for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++){
+    const a = L[i], b = L[j]; if (Math.abs(a.y - b.y) > 1.5) continue;
+    let dx = b.pos.x - a.pos.x, dz = b.pos.y - a.pos.y, d = Math.hypot(dx, dz);
+    const m = a.aim > 0.5 && b.aim > 0.5 ? 2.0 : 1.1;
+    if (d >= m) continue;
+    if (d < 1e-3){ const r = rnd() * TAU; dx = Math.cos(r); dz = Math.sin(r); d = 1; }
+    const p = (m - d) / 2; dx /= d; dz /= d;
+    a.pos.x -= dx * p; a.pos.y -= dz * p; b.pos.x += dx * p; b.pos.y += dz * p;
+  }
+}
 
-/* --- helikopter policyjny: patrol nad miastem, przy 6 gwiazdkach pościg (krąży nad graczem, strzela, spuszcza policjantów) --- */
-const HELI_PATROL = [[-170, -170], [170, -170], [170, 170], [-170, 170], [0, -60], [60, 120], [-120, 40]];
+/* --- helikoptery policji: tylko w pościgu — od 4 gwiazdek jeden, od 5 dwa, przy 6 trzy (najwyżej 3). Nadlatują spoza kadru,
+   zestrzelony zastępuje następny po 3 s. Krążą nad graczem na różnych wysokościach i kątach, nie wlatują w siebie;
+   strzelec od 5 gwiazdek, zrzut policjantów na linach przy 6. Po zgubieniu policji odlatują i znikają. --- */
+const POLICE_HELI_MAX = 3;
+function policeHeliWant(){ return WANTED.phase === 'none' ? 0 : Math.min(POLICE_HELI_MAX, Math.max(0, WANTED.stars - 3)); }
 function policeHeliLaunch(){
-  const pad = HELIPADS.find(p => p.kind === 'police') || { x: POLICE_STATION.pad.x, y: POLICE_STATION.main.h, z: POLICE_STATION.pad.z };
-  const h = makeHeli('police', pad.x, pad.y, pad.z, Math.PI);
-  h.policeOwned = true; h.ai = { role: 'patrol', wp: randInt(0, HELI_PATROL.length - 1), flash: false, beam: false, cool: 8, shootT: 2, drop: null, takeoff: 4 };
+  const t = policeTarget(), cam = camera.position; camera.getWorldDirection(_copDir);
+  let x = t.x, z = t.z;
+  for (let k = 0; k < 16; k++){
+    const a = rnd() * TAU, r = rand(200, 260); x = t.x + Math.cos(a) * r; z = t.z + Math.sin(a) * r;
+    const vx = x - cam.x, vz = z - cam.z, vl = Math.hypot(vx, vz) || 1;
+    if ((vx * _copDir.x + vz * _copDir.z) / vl < 0.3) break;                         // poza kadrem
+  }
+  const alt = Math.max(heightAt(x, z) + 30, (t.y || 0) + 60, 80);
+  const h = makeHeli('police', x, alt - HELI_T.skid, z, Math.atan2(t.x - x, t.z - z));
+  h.policeOwned = true; h.onGround = false; h.rpm = 1;
+  h.ai = { role: 'pursuit', flash: true, beam: true, cool: 12, shootT: 3, drop: null, takeoff: 0, ang: rnd() * TAU };
   POLICE.heli.push(h);
   return h;
 }
-function policeHeliStolen(h){ policeCrime('kradzież helikoptera', h.pos.x, h.pos.z); h.policeOwned = false; const i = POLICE.heli.indexOf(h); if (i >= 0) POLICE.heli.splice(i, 1); POLICE.heliT = 120; }
-function policeHeliDown(h){ const i = POLICE.heli.indexOf(h); if (i >= 0) POLICE.heli.splice(i, 1); POLICE.heliT = 90; policeCrime('helikopter', h.pos.x, h.pos.z); }
-function updatePoliceHeli(h, dt){
+function policeHeliRemove(h){
+  const i = POLICE.heli.indexOf(h); if (i >= 0) POLICE.heli.splice(i, 1);
+  const j = helis.indexOf(h); if (j >= 0) helis.splice(j, 1);
+  if (h.bodyIn){ delBody(h.body); h.bodyIn = false; }
+  scene.remove(h.group);
+}
+function policeHeliStolen(h){ policeCrime('kradzież helikoptera', h.pos.x, h.pos.z); h.policeOwned = false; const i = POLICE.heli.indexOf(h); if (i >= 0) POLICE.heli.splice(i, 1); }
+function policeHeliDown(h){ const i = POLICE.heli.indexOf(h); if (i >= 0) POLICE.heli.splice(i, 1); POLICE.heliT = 3; policeCrime('helikopter', h.pos.x, h.pos.z); }
+function updatePoliceHeli(h, dt, slot, count){
   const A = h.ai; if (!A || h.gone) return;
-  if (A.takeoff > 0){ A.takeoff -= dt; h.rpm = Math.min(1, h.rpm + dt * 0.4); syncHeli(h); return; }
-  const t = policeTarget(), chase = WANTED.stars >= 6 && WANTED.phase !== 'none';
-  A.flash = chase || (WANTED.stars > 0 && Math.hypot(t.x - h.pos.x, t.z - h.pos.z) < 300);
-  A.beam = chase;
-  if (A.cool > 0) A.cool -= dt;
-  if (!chase){
-    A.role = 'patrol'; A.drop = null;
-    const w = HELI_PATROL[A.wp];
-    heliAiStep(h, dt, { x: w[0], y: 70, z: w[1] }, { vMax: 20 });
-    if (Math.hypot(w[0] - h.pos.x, w[1] - h.pos.z) < 25) A.wp = (A.wp + 1 + randInt(0, 2)) % HELI_PATROL.length;
+  const t = policeTarget();
+  if (A.role === 'leave'){                                                          // odlot: w górę i od gracza, poza kadrem znika
+    A.flash = false; A.beam = false;
+    const dx = h.pos.x - t.x, dz = h.pos.z - t.z, dl = Math.hypot(dx, dz) || 1;
+    heliAiStep(h, dt, { x: h.pos.x + dx / dl * 120, y: Math.max(h.pos.y, 90), z: h.pos.z + dz / dl * 120 }, { vMax: 36 });
+    if (dl > 320) policeHeliRemove(h);
     return;
   }
+  A.flash = true; A.beam = true;
+  if (A.cool > 0) A.cool -= dt;
   const tgt = WANTED.seen ? t : WANTED.last;
   A.role = A.drop ? 'drop' : 'pursuit';
-  /* zrzut policjantów: gracz pieszo (albo stoi), wolne miejsce z czystym niebem i bez zabudowy w promieniu wirnika */
-  if (!A.drop && A.cool <= 0 && WANTED.seen && (mode === 'foot' || (t.car && Math.hypot(t.vx, t.vz) < 2)) && COPS.filter(c => c.heli === h && c.state !== 'down').length < 4){
-    /* miejsce: wolny grunt 6–40 m od gracza, czyste niebo i prześwit na wirnik (promienie z góry wokół punktu) */
+  /* zrzut policjantów (6 gwiazdek, jeden helikopter naraz): gracz pieszo albo stoi; wolne miejsce z czystym niebem i prześwitem na wirnik */
+  if (!A.drop && WANTED.stars >= 6 && A.cool <= 0 && WANTED.seen && !POLICE.heli.some(q => q !== h && q.ai && q.ai.drop) && (mode === 'foot' || (t.car && Math.hypot(t.vx, t.vz) < 2)) && COPS.filter(c => c.heli === h && c.state !== 'down').length < 4){
     let s = null;
     for (let r = 6; r <= 40 && !s; r += 5) for (let k = 0; k < 10 && !s; k++){
       const a = k / 10 * TAU + r, q = safeSpot(t.x + Math.cos(a) * r, t.z + Math.sin(a) * r, 0, 1);
@@ -467,7 +578,7 @@ function updatePoliceHeli(h, dt){
   }
   if (A.drop){
     const D = A.drop;
-    heliAiStep(h, dt, { x: D.x, y: D.y + 7.5, z: D.z }, { vMax: 16, low: true, face: t });
+    heliAiStep(h, dt, heliAvoid(h, { x: D.x, y: D.y + 7.5, z: D.z }), { vMax: 16, low: true, face: t });
     const near = Math.hypot(D.x - h.pos.x, D.z - h.pos.z) < 1.8 && Math.abs(h.pos.y - (D.y + 7.5)) < 1.2;
     if (near && !D.done){
       D.done = true;
@@ -481,14 +592,24 @@ function updatePoliceHeli(h, dt){
     else if ((D.tt = (D.tt || 0) + dt) > 40){ A.drop = null; A.cool = 10; }
     return;
   }
-  /* krążenie nad graczem / ostatnim znanym miejscem; strzelec z drzwi */
+  /* krążenie nad graczem / ostatnim znanym miejscem: każdy na swoim kącie (co 2π / liczba) i wysokości (+9 m na kolejny) */
   A.ang = (A.ang || 0) + dt * 0.25;
-  heliAiStep(h, dt, { x: tgt.x + Math.cos(A.ang) * 32, y: (tgt.y || 0) + 26, z: tgt.z + Math.sin(A.ang) * 32 }, { vMax: 34, face: tgt });
+  const a = A.ang + slot * TAU / Math.max(1, count);
+  heliAiStep(h, dt, heliAvoid(h, { x: tgt.x + Math.cos(a) * 34, y: (tgt.y || 0) + 26 + slot * 9, z: tgt.z + Math.sin(a) * 34 }), { vMax: 34, face: tgt });
   A.shootT -= dt;
-  if (WANTED.seen && A.shootT <= 0 && Math.hypot(t.x - h.pos.x, t.y - h.pos.y, t.z - h.pos.z) < 95 && !player.dead){
-    A.shootT = rand(1.2, 1.9);
-    if (!rayHit(h.pos.x, h.pos.y - 1.6, h.pos.z, t.x, t.y, t.z, G_WORLD)) policeShoot(h.pos.x, h.pos.y - 1.2, h.pos.z, 0.42);
+  if (WANTED.stars >= 5 && WANTED.seen && A.shootT <= 0 && Math.hypot(t.x - h.pos.x, t.y - h.pos.y, t.z - h.pos.z) < 60 && !player.dead){
+    A.shootT = rand(1.6, 2.4);
+    if (!rayHit(h.pos.x, h.pos.y - 1.6, h.pos.z, t.x, t.y, t.z, G_WORLD)) policeShoot(h.pos.x, h.pos.y - 1.2, h.pos.z, 0.26, 70);
   }
+}
+/* helikoptery nie wlatują w siebie: punkt docelowy odpychany od innych helikopterów bliżej niż 26 m (w poziomie i w pionie) */
+function heliAvoid(h, p){
+  for (const q of helis){
+    if (q === h || q.gone) continue;
+    const dx = h.pos.x - q.pos.x, dy = h.pos.y - q.pos.y, dz = h.pos.z - q.pos.z, d = Math.hypot(dx, dy * 1.5, dz);
+    if (d < 26){ const k = (26 - d) * 1.4 / (d || 1); p.x += dx * k; p.z += dz * k; p.y += (dy >= 0 ? 1 : -1) * (26 - d) * 0.6; }
+  }
+  return p;
 }
 
 /* --- wzrok: stożki radiowozów (z załogą) i policjantów, krąg pod helikopterem; promień widoczności --- */
@@ -535,7 +656,9 @@ function updatePolice(dt){
     for (const n of npcs.slice()){ const C = n.cop; if (C && C.role === 'empty' && WANTED.stars === 0){ const pp = playerWorldPos(); if (Math.hypot(n.pos.x - pp.x, n.pos.y - pp.z) > 150) removeNpcCar(n); } }
   }
   POLICE.heliT -= dt;
-  if (!POLICE.heli.length && POLICE.heliT <= 0) policeHeliLaunch();
+  const hw = policeHeliWant(), act = POLICE.heli.filter(h => h.ai && h.ai.role !== 'leave');
+  if (act.length < hw && POLICE.heliT <= 0){ policeHeliLaunch(); POLICE.heliT = 3; }
+  for (let k = hw; k < act.length; k++) act[k].ai.role = 'leave';                    // za dużo (gwiazdki spadły / zgubiony) — odlatuje
   /* wzrok co 0.2 s; zgłoszenie (przestępstwo) liczy się jak widzenie */
   POLICE.visT -= dt;
   if (POLICE.visT <= 0){ POLICE.visT = 0.2; WANTED.vis = WANTED.stars > 0 ? policeVision() : false; }
@@ -544,7 +667,7 @@ function updatePolice(dt){
   if (WANTED.flashT > 0) WANTED.flashT -= dt;
   if (WANTED.stars > 0){
     const t = policeTarget();
-    if (WANTED.seen){ WANTED.last.x = t.x; WANTED.last.y = t.y; WANTED.last.z = t.z; WANTED.unseenT = 0; if (WANTED.phase !== 'chase'){ WANTED.phase = 'chase'; for (const n of npcs) if (n.cop && n.cop.role === 'search') n.cop.role = 'chase'; } }
+    if (WANTED.seen){ WANTED.last.x = t.x; WANTED.last.y = t.y; WANTED.last.z = t.z; WANTED.last.gy = t.gy; WANTED.unseenT = 0; if (WANTED.phase !== 'chase'){ WANTED.phase = 'chase'; for (const n of npcs) if (n.cop && n.cop.role === 'search') n.cop.role = 'chase'; } }
     else {
       WANTED.unseenT += dt;
       if (WANTED.phase === 'chase' && WANTED.unseenT > 3){ WANTED.phase = 'search'; WANTED.searchT = 0; WANTED.searchMax = 14 + WANTED.stars * 4; for (const n of npcs) if (n.cop && (n.cop.role === 'chase' || n.cop.role === 'stopped') && n.cop.crew > 0) n.cop.role = 'search'; }
@@ -566,6 +689,8 @@ function updatePolice(dt){
     /* gracz odjeżdża: policjanci wracają do radiowozu, który znowu rusza w pościg */
     if (t.car && Math.hypot(t.vx, t.vz) > 6) for (const c of COPS) if (c.car && c.state === 'chase' && npcs.indexOf(c.car) >= 0 && Math.hypot(c.pos.x - t.x, c.pos.y - t.z) > 16) c.state = 'board';
   }
+  POLICE.slotT = (POLICE.slotT || 0) - dt;
+  if (POLICE.slotT <= 0){ POLICE.slotT = 0.5; const t = policeTarget(); COPS.filter(c => c.state === 'chase').sort((a, b) => Math.hypot(a.pos.x - t.x, a.pos.y - t.z) - Math.hypot(b.pos.x - t.x, b.pos.y - t.z)).forEach((c, k) => { c.slot = k; }); }
   for (const c of COPS.slice()){
     if (c.state === 'board'){                                                       // powrót do auta w trakcie pościgu
       const car = c.car; if (!car || npcs.indexOf(car) < 0){ c.state = 'chase'; continue; }
@@ -576,7 +701,8 @@ function updatePolice(dt){
     }
     updateCop(c, dt);
   }
-  for (const h of POLICE.heli) updatePoliceHeli(h, dt);
+  { const act2 = POLICE.heli.filter(h => h.ai && h.ai.role !== 'leave'); for (const h of POLICE.heli.slice()) updatePoliceHeli(h, dt, Math.max(0, act2.indexOf(h)), act2.length); }
+  copSeparate();
   /* koguty i syrena */
   const blink = Math.floor(clock * 6) % 2, pp = playerWorldPos();
   let sd = 1e9;
@@ -608,8 +734,9 @@ function policeHud(dt){
 }
 
 /* --- znaczniki na mapach: stożki widzenia, migające czerwono-niebiesko w pościgu, helikopter z wirnikiem --- */
-function policeDrawMap(g, toMap, zs, big){
+function policeDrawMap(g, toMap, zs, big, lvlY){
   const chase = WANTED.stars > 0, blink = Math.floor(clock * 4) % 2;
+  const dimAt = y => lvlY !== null && lvlY !== undefined && Math.abs(y - lvlY) > 2.5;      // inny poziom (wiadukt nad / pod) — przygaszony
   const cone = (x, z, h, fov, range, sees) => {
     const p = toMap(x, z), r = range * zs, a = -h + Math.PI;                        // ten sam wzór obrotu co strzałka gracza (-kurs + PI)
     g.save(); g.translate(p[0], p[1]); g.rotate(a);
@@ -620,8 +747,9 @@ function policeDrawMap(g, toMap, zs, big){
   for (const n of npcs){ const C = n.cop; if (!C) continue; if (C.crew > 0 && C.role !== 'leave' && C.role !== 'empty') cone(n.pos.x, n.pos.y, n.heading, 2.2, 70, C.sees); }
   for (const c of COPS){ if (c.state === 'down' || c.state === 'rope') continue; cone(c.pos.x, c.pos.y, c.heading, 2.1, WANTED.phase === 'search' ? 40 : 50, c.sees); }
   for (const h of POLICE.heli){ if (h.gone || !h.ai) continue; const p = toMap(h.pos.x, h.pos.z), r = (22 + Math.max(0, h.pos.y) * 0.55) * zs; g.fillStyle = h.ai.sees ? 'rgba(255,70,60,.22)' : 'rgba(120,160,255,.12)'; g.beginPath(); g.arc(p[0], p[1], r, 0, TAU); g.fill(); }
-  for (const n of npcs) if (n.cop) blip(n.pos.x, n.pos.y, big ? 4.5 : 3.6);
-  for (const c of COPS) if (c.state !== 'down') blip(c.pos.x, c.pos.y, big ? 2.6 : 2.1);
+  for (const n of npcs) if (n.cop){ g.globalAlpha = dimAt(n.y || 0) ? 0.35 : 1; blip(n.pos.x, n.pos.y, big ? 4.5 : 3.6); }
+  for (const c of COPS) if (c.state !== 'down'){ g.globalAlpha = dimAt(c.y) ? 0.35 : 1; blip(c.pos.x, c.pos.y, big ? 2.6 : 2.1); }
+  g.globalAlpha = 1;
   for (const h of POLICE.heli){
     if (h.gone) continue; const p = toMap(h.pos.x, h.pos.z);
     g.save(); g.translate(p[0], p[1]); g.rotate(-h.yaw + Math.PI);

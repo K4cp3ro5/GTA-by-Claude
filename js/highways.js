@@ -375,7 +375,8 @@ HWY_GORES.forEach(g => {
 HWY_WAYS.forEach(w => {
   const pts = w.pts.filter((p, i) => i % 3 === 0 || i === w.pts.length - 1).map(p => [p.x, p.z]);
   const hw = w.pts.reduce((s, p) => s + p.hw, 0) / w.pts.length;
-  mapExtras.push({ t: 'line', pts: pts, w: 2 * hw, c: w.pts.some(p => p.y > 1) ? '#4a5060' : '#2b2e35' });
+  const up = w.pts.some(p => p.y > 1);
+  mapExtras.push({ t: 'line', pts: pts, w: 2 * hw, c: up ? '#5a6274' : '#2b2e35', hwy: up });            // hwy: warstwa wiaduktów (hud.js)
 });
 
 /* --- scalenie; nawierzchnie i beton zasłaniają kamerę (nie przechodzi przez płytę) --- */

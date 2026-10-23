@@ -162,7 +162,7 @@ function drawBigMap(){
   const g = bigG;
   g.fillStyle = '#16384b'; g.fillRect(0, 0, W, H);
   const o = bigToScreen(MAP_X0, MAP_Z0);
-  g.imageSmoothingEnabled = true; g.drawImage(mapStatic, o[0], o[1], MAP_W * BIG.s, MAP_H * BIG.s);
+  g.imageSmoothingEnabled = true; drawMapLayers(g, null, o[0], o[1], MAP_W * BIG.s, MAP_H * BIG.s, playerLevel());
   /* trasa */
   if (waypoint && navRoute.length > 1){
     const line = (w, c) => { g.lineWidth = w; g.strokeStyle = c; g.lineJoin = 'round'; g.lineCap = 'round'; g.beginPath(); navRoute.forEach((q, k) => { const m = bigToScreen(q[0], q[1]); k ? g.lineTo(m[0], m[1]) : g.moveTo(m[0], m[1]); }); g.stroke(); };
@@ -177,7 +177,7 @@ function drawBigMap(){
   for (const a of airPlanes){ const m = bigToScreen(a.pos.x, a.pos.z); g.save(); g.translate(m[0], m[1]); g.rotate(-a.heading + Math.PI); g.fillStyle = '#cfe3ee'; g.fillRect(-1.3, -6, 2.6, 12); g.fillRect(-6, -1.4, 12, 2.8); g.restore(); }
   for (const q of planes){ if (q.wreckT > 0 || q === curPlane) continue; const m = bigToScreen(q.pos.x, q.pos.z); g.fillStyle = '#f2f0ea'; g.beginPath(); g.arc(m[0], m[1], 3, 0, TAU); g.fill(); }
   for (const h of helis){ if (h.gone || h.ai || h === curHeli) continue; const m = bigToScreen(h.pos.x, h.pos.z); g.strokeStyle = '#f2f0ea'; g.lineWidth = 1.5; g.beginPath(); g.arc(m[0], m[1], 5, 0, TAU); g.stroke(); g.fillStyle = '#f2f0ea'; g.font = '700 8px Helvetica, Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('H', m[0], m[1] + 0.5); }
-  policeDrawMap(g, bigToScreen, BIG.s, true);
+  policeDrawMap(g, bigToScreen, BIG.s, true, playerLevel() === 'air' ? null : (playerLevel() === 'hwy' ? (policeTarget().gy || 0) : 0));
   const own = driving.owner === 'player' && mode !== 'car' ? chassisBody.position : (parkedCars.find(q => q.owner === 'player') || null);
   if (own){ const m = bigToScreen(own.x, own.z); g.fillStyle = '#4aa3ff'; g.strokeStyle = '#fff'; g.lineWidth = 1.5; g.fillRect(m[0] - 4, m[1] - 4, 8, 8); g.strokeRect(m[0] - 4, m[1] - 4, 8, 8); }
   /* gracz (strzałka wg kierunku) */

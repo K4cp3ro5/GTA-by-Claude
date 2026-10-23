@@ -154,15 +154,15 @@ document.addEventListener('mousemove', e => {
     return;
   }
   if (mode === 'plane' || mode === 'boat' || mode === 'ride' || mode === 'heli'){   // samolot / łódź / helikopter / przejażdżka: mysz obraca kamerę
-    planeCamYaw = clamp(planeCamYaw - e.movementX * 0.003, -2.6, 2.6);
-    if (mode === 'ride') rideLookPitch = clamp(rideLookPitch - e.movementY * 0.003, -1.2, 1.0);
-    if (Math.abs(e.movementX) > 1.5) lastMouseMove = clock;
+    if (mode === 'ride'){ planeCamYaw = clamp(planeCamYaw - e.movementX * 0.003, -2.6, 2.6); rideLookPitch = clamp(rideLookPitch - e.movementY * 0.003, -1.2, 1.0); }
+    else { planeCamYaw = wrapAngle(planeCamYaw - e.movementX * 0.003); planeCamPitch = clamp(planeCamPitch - e.movementY * 0.003, -1.35, 1.25); }   // pełny obrót wokół pojazdu, z góry i z dołu
+    if (Math.abs(e.movementX) + Math.abs(e.movementY) > 1.5) lastMouseMove = clock;
     return;
   }
   const s = 0.0022;
   camYaw   -= e.movementX * s;
   camPitch -= e.movementY * s;
-  camPitch = clamp(camPitch, -0.95, 0.62);
+  camPitch = clamp(camPitch, CAM_PITCH_MIN, CAM_PITCH_MAX);                       // prawie pionowo w dół i w górę
   if (Math.abs(e.movementX) + Math.abs(e.movementY) > 1.5) lastMouseMove = clock;
 });
 

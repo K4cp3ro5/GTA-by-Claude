@@ -9,7 +9,7 @@
    (heightAt: siatka 8 m, promień w dół, pamięć podręczna) + promień w kierunku lotu; pochylenie i przechył
    z przyspieszenia (naturalny lot), obrót w stronę lotu albo celu.
    --------------------------------------------------------------- */
-const HELI_T = { vMax: 44, climb: 9, sink: 7, yawRate: 1.35, gauge: 220, camDist: 15, camH: 5, skid: 1.55, rotorR: 5.2 };
+const HELI_T = { vMax: 44, climb: 9, sink: 7, yawRate: 1.9, gauge: 220, camDist: 15, camH: 5, skid: 1.55, rotorR: 5.2 };
 const HELI_LIVERY = {
   civ:    { body: 0x2a6cb8, trim: 0xf2f0ea, name: 'Helikopter' },
   news:   { body: 0xe0a52c, trim: 0x22262b, name: 'Helikopter' },
@@ -187,7 +187,7 @@ function heliPhysics(h, dt, inp){
   const T = HELI_T, g = 9.81, lift = h.rpm > 0.85;
   _hF.set(Math.sin(h.yaw), 0, Math.cos(h.yaw)); _hR.set(-Math.cos(h.yaw), 0, Math.sin(h.yaw));
   const vF = h.vel.x * _hF.x + h.vel.z * _hF.z, vR = h.vel.x * _hR.x + h.vel.z * _hR.z;
-  let tp = inp.fw * 0.3, tr = inp.sd * 0.24;
+  let tp = inp.fw * 0.3, tr = inp.sd * 0.3;
   if (inp.brake){ tp = clamp(vF * 0.03, -0.3, 0.3); tr = clamp(vR * 0.04, -0.25, 0.25); tp = -tp; tr = -tr; }
   if (h.onGround){ tp = 0; tr = 0; }
   h.pitch = approach(h.pitch, tp, 1.2 * dt); h.roll = approach(h.roll, tr, 1.4 * dt);
