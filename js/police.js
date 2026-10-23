@@ -154,15 +154,21 @@ function policeDriveClear(x0, z0, x1, z1){
 /* --- graf tras policji z POZIOMAMI: ulice wyspy głównej (graf NAV, y = 0, w obie strony — policja nie patrzy na jednokierunkowe)
    + jezdnie, rampy i łącznice autostrad (punkty tras NPC z HWY_LOOPS, z wysokością, kierunkowe). Połączenia: punkty tras
    autostradowych na poziomie ulicy (y < 0.4) rzutowane na najbliższą krawędź NAV (≤ 6 m). Rzut startu i celu tylko na
-   krawędzie na tym samym poziomie (|Δy| < 2.5) — radiowóz pod wiaduktem nie „dojeżdża” do gracza nad sobą, tylko rampą. --- */
-const PGRAPH = { nodes: [], adj: [], edges: [], built: false };
+   krawędzie na tym samym poziomie (|Δy| < 2.5) — radiowóz pod wiaduktem nie „dojeżdża” do gracza nad sobą, tylko rampą.
+   Graf służy też nawigacji gracza (navigation.js): `ow` — kierunek pod prąd jednokierunkowej ulicy (autem nie),
+   `radj` — krawędzie kierunkowe wstecz (pieszo po wiadukcie można iść w obie strony). --- */
+const PGRAPH = { nodes: [], adj: [], radj: [], edges: [], built: false };
 function pgBuild(){
   if (PGRAPH.built) return; PGRAPH.built = true; navBuild();
-  const N = PGRAPH.nodes, A = PGRAPH.adj, E = PGRAPH.edges, keys = new Map();
-  const node = (x, y, z) => { const k = Math.round(x * 2) + ',' + Math.round(z * 2) + ',' + Math.round(y); let i = keys.get(k); if (i === undefined){ i = N.length; N.push({ x: x, y: y, z: z }); A.push([]); keys.set(k, i); } return i; };
-  const link = (a, b, both) => { if (a === b) return; const p = N[a], q = N[b], l = Math.hypot(q.x - p.x, q.y - p.y, q.z - p.z); A[a].push({ to: b, l: l }); if (both) A[b].push({ to: a, l: l }); E.push({ a: a, b: b, both: both, l: l }); };
+  const N = PGRAPH.nodes, A = PGRAPH.adj, RA = PGRAPH.radj, E = PGRAPH.edges, keys = new Map();
+  const node = (x, y, z) => { const k = Math.round(x * 2) + ',' + Math.round(z * 2) + ',' + Math.round(y); let i = keys.get(k); if (i === undefined){ i = N.length; N.push({ x: x, y: y, z: z }); A.push([]); RA.push([]); keys.set(k, i); } return i; };
+  const link = (a, b, both, ow) => {
+    if (a === b) return; const p = N[a], q = N[b], l = Math.hypot(q.x - p.x, q.y - p.y, q.z - p.z);
+    A[a].push({ to: b, l: l }); if (both) A[b].push({ to: a, l: l, ow: !!ow }); else RA[b].push({ to: a, l: l });
+    E.push({ a: a, b: b, both: both, ow: !!ow, l: l });
+  };
   const navIdx = NAV.nodes.map(q => q.isl === 'main' ? node(q.x, 0, q.z) : -1);
-  for (const e of NAV.edges) if (navIdx[e.a] >= 0 && navIdx[e.b] >= 0) link(navIdx[e.a], navIdx[e.b], true);
+  for (const e of NAV.edges) if (navIdx[e.a] >= 0 && navIdx[e.b] >= 0) link(navIdx[e.a], navIdx[e.b], true, e.oneway);
   const low = [];
   for (const L of HWY_LOOPS){
     const P = L[0]; let prev = -1, first = -1;
@@ -186,23 +192,27 @@ function pgProject(x, y, z){
   }
   return best;
 }
-/* Dijkstra (kopiec binarny) od rzutu startu do rzutu celu; punkty trasy [x, z, y] */
-function pgRoute(sx, sy, sz, tx, ty, tz){
+/* Dijkstra (kopiec binarny) od rzutu startu do rzutu celu; punkty trasy [x, z, y].
+   how: brak — policja (ulice w obie strony), 'car' — z jednokierunkowymi ulicami, 'foot' — wszystko w obie strony */
+function pgRoute(sx, sy, sz, tx, ty, tz, how){
   pgBuild();
   const s = pgProject(sx, sy, sz), t = pgProject(tx, ty, tz);
   if (!s || !t || s.d > 40 || t.d > 60) return null;
-  const N = PGRAPH.nodes, A = PGRAPH.adj, n = N.length, dist = new Float64Array(n).fill(Infinity), prev = new Int32Array(n).fill(-1);
+  const N = PGRAPH.nodes, A = PGRAPH.adj, RA = PGRAPH.radj, n = N.length, dist = new Float64Array(n).fill(Infinity), prev = new Int32Array(n).fill(-1);
+  const car = how === 'car', foot = how === 'foot', back = e => foot || (e.both && !(car && e.ow));   // czy wolno jechać b → a
   const head = [[sx, sz, sy], [s.x, s.z, s.y]], tail = [[t.x, t.z, t.y], [tx, tz, ty]];
-  if (s.e === t.e && (t.u >= s.u || s.e.both)) return head.concat(tail);
+  if (s.e === t.e && (t.u >= s.u || back(s.e))) return head.concat(tail);
   const heap = [], push = (d, i) => { heap.push([d, i]); let k = heap.length - 1; while (k){ const p = (k - 1) >> 1; if (heap[p][0] <= heap[k][0]) break; [heap[p], heap[k]] = [heap[k], heap[p]]; k = p; } };
   const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length){ heap[0] = last; let k = 0; for (;;){ const l = 2 * k + 1, r = l + 1; let m = k; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === k) break; [heap[m], heap[k]] = [heap[k], heap[m]]; k = m; } } return top; };
   dist[s.e.b] = (1 - s.u) * s.e.l; push(dist[s.e.b], s.e.b);
-  if (s.e.both){ dist[s.e.a] = Math.min(dist[s.e.a], s.u * s.e.l); push(dist[s.e.a], s.e.a); }
+  if (back(s.e)){ dist[s.e.a] = Math.min(dist[s.e.a], s.u * s.e.l); push(dist[s.e.a], s.e.a); }
+  const relax = (d, u, r) => { const nd = d + r.l; if (nd < dist[r.to]){ dist[r.to] = nd; prev[r.to] = u; push(nd, r.to); } };
   while (heap.length){
     const [d, u] = pop(); if (d > dist[u]) continue;
-    for (const r of A[u]){ const nd = d + r.l; if (nd < dist[r.to]){ dist[r.to] = nd; prev[r.to] = u; push(nd, r.to); } }
+    for (const r of A[u]) if (!(car && r.ow)) relax(d, u, r);
+    if (foot) for (const r of RA[u]) relax(d, u, r);
   }
-  const ca = dist[t.e.a] + t.u * t.e.l, cb = t.e.both ? dist[t.e.b] + (1 - t.u) * t.e.l : Infinity;
+  const ca = dist[t.e.a] + t.u * t.e.l, cb = back(t.e) ? dist[t.e.b] + (1 - t.u) * t.e.l : Infinity;
   if (!isFinite(Math.min(ca, cb))) return null;
   const chain = []; for (let u = ca <= cb ? t.e.a : t.e.b; u >= 0; u = prev[u]) chain.unshift([N[u].x, N[u].z, N[u].y]);
   return head.concat(chain, tail);

@@ -149,7 +149,7 @@ Jak wystartować: ustaw samolot na pasie, trzymaj `W`, a gdy prędkościomierz p
 - **Poziomy na mapie**: minimapa i mapa mają osobną warstwę wiaduktów. Na ulicy wiadukty są półprzezroczyste (widać ulice pod nimi), na wiadukcie ulice przygasają, a wiadukty są wyraźne; plakietka w rogu minimapy mówi, gdzie jesteś (ULICA / WIADUKT / W POWIETRZU), a auta i policja z innego poziomu są przygaszone.
 - **Przybliżenie zależy od środka transportu** (minimapa i mapa `M`): pieszo i rowerem — najbliżej, autem i łodzią — średnio, samolotem i helikopterem — cały świat.
 - `M` otwiera mapę (gra stoi): kółko przybliża, przeciąganie przesuwa, **prawy klik ustawia fioletowy znacznik celu** (drugi klik na znaczniku go usuwa).
-- Trasa prowadzi pieszo i autem **po drogach** (autem z poszanowaniem jednokierunkowej obwodnicy), na drugą wyspę — przez przystanie, a samolotem i łodzią — w linii prostej. Widać ją na minimapie i mapie, a w świecie stoi fioletowy słup celu.
+- Trasa prowadzi pieszo i autem **po drogach** (autem z poszanowaniem jednokierunkowej obwodnicy), na drugą wyspę — przez przystanie, a samolotem i łodzią — w linii prostej. Trasa zna **poziomy**: autem (nie rowerem) może prowadzić autostradą, a gdy jesteś na wiadukcie (autem albo pieszo), biegnie jezdnią autostrady do zjazdu, a nie ulicami pod spodem. Widać ją na minimapie i mapie, a w świecie stoi fioletowy słup celu.
 - W samolocie nad oboma pasami startowymi unoszą się żółte strzałki widoczne z daleka, a nad progami — strzałki kierunku podejścia.
 
 ### Miasto
@@ -274,7 +274,7 @@ Symulacja (`node test/sim.js <sekundy>`, `SEED=…`) sprawdza m.in. nakładanie 
 
 ## Ograniczenia
 
-- Ulice to siatka ortogonalna, a trasy NPC to stałe pętle, nie graf dróg. Nawigacja gracza nie prowadzi przez autostrady (tylko ulice i dojazdy).
+- Ulice to siatka ortogonalna, a trasy NPC to stałe pętle, nie graf dróg. Zjazdy z autostrad są tylko w narożnikach miasta, więc trasa z wiaduktu do celu w centrum bywa kilka razy dłuższa niż w linii prostej.
 - Kolejki w parku jeżdżą po wyliczonym profilu prędkości (energia z wyciągu minus tarcie), a nie fizyką; z atrakcji (poza autodromem) nie można wysiąść w trakcie jazdy. Zwiedzający chodzą między punktami alejek bez kolizji; wagoniki i samochodziki nie zderzają się z pieszym graczem.
 - Wyspy są prostokątne (sztuczne nabrzeża), łodzie to prosty model zręcznościowy (bez fal i fizyki wody); łodzie NPC pływają po losowych celach, nie po trasach.
 - Policja: radiowozy jeżdżą po ulicach i autostradach wyspy głównej (nie na wysepkę — tam ściga cię helikopter), policjanci nie wchodzą na dachy ani na wiadukty pieszo; PIT to zdarzenie skryptowe (obrót auta), a radiowozy są ciałami kinematycznymi jak inne auta NPC. Helikopter omija zabudowę według siatki wysokości 8 m i promienia przed sobą.

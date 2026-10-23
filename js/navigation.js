@@ -1,7 +1,9 @@
 /* ---------------------------------------------------------------
    19b. NAWIGACJA I MAPA — pełna mapa (M): przesuwanie (LPM), przybliżanie (kółko), prawy klik = znacznik
    celu (fioletowy, jak w GTA V); trasa: autem i pieszo po drogach (graf ulic siatki + dojazdy do szpitala,
-   portu i dróg wysepki; autem z poszanowaniem jednokierunkowej obwodnicy), między wyspami przez przystanie
+   portu i dróg wysepki; autem z poszanowaniem jednokierunkowej obwodnicy), na wyspie głównej autem (nie rowerem) i z wiaduktu
+   po grafie z poziomami PGRAPH (police.js: ulice + rampy i jezdnie autostrad) — na wiadukcie trasa biegnie jezdnią i zjazdem,
+   a nie ulicami pod spodem; między wyspami przez przystanie
    (odcinek wodny), samolotem i łodzią w linii prostej. Trasa na minimapie i dużej mapie, słup znacznika w świecie.
    --------------------------------------------------------------- */
 const NAV = { nodes: [], adj: [], edges: [], built: false };
@@ -78,12 +80,18 @@ function navCompute(){
   if (mode === 'plane' || mode === 'boat' || mode === 'heli'){ navRoute = [[p.x, p.z], [wx, wz]]; return; }
   const car = mode === 'car', si = islandAt(p.x, p.z), di = islandAt(wx, wz);
   if (!si){ navRoute = [[p.x, p.z], [wx, wz]]; return; }
-  if (di && di.name === si.name){ navRoute = navRoadRoute(p.x, p.z, wx, wz, si.name, car); return; }
+  /* poziom: autem (nie rowerem — zakaz wjazdu na autostrady) zawsze z wiaduktami; pieszo tylko gdy jesteś na wiadukcie */
+  const gy = policeTarget().gy || 0, lv = (car && carType !== 'bike') || gy > 2.5;
+  const road = (x0, y0, z0, x1, z1, isl) => {
+    if (lv && isl === 'main'){ const r = pgRoute(x0, y0, z0, x1, 0, z1, car ? 'car' : 'foot'); if (r) return r; }
+    return navRoadRoute(x0, z0, x1, z1, isl, car);
+  };
+  if (di && di.name === si.name){ navRoute = road(p.x, gy, p.z, wx, wz, si.name); return; }
   /* inna wyspa (albo cel na wodzie): drogą do przystani, łodzią do przystani celu, dalej drogą */
-  const ps = NAV.nodes[NAV.port[si.name]], r1 = navRoadRoute(p.x, p.z, ps.x, ps.z, si.name, car);
+  const ps = NAV.nodes[NAV.port[si.name]], r1 = road(p.x, gy, p.z, ps.x, ps.z, si.name);
   if (!di){ navRoute = r1.concat([[wx, wz]]); return; }
   const pd = NAV.nodes[NAV.port[di.name]];
-  navRoute = r1.concat(navRoadRoute(pd.x, pd.z, wx, wz, di.name, car));
+  navRoute = r1.concat(road(pd.x, 0, pd.z, wx, wz, di.name));
 }
 /* słup znacznika celu w świecie (widoczny z daleka) */
 const navBeam = new THREE.Group();
