@@ -110,13 +110,18 @@ function updateCamera(dt, kmh){
   }
 
   camTarget.set(tx, ty, tz);
-  /* patrzenie w górę (camPitch > 0.32): kamera zostaje nisko za postacią (nie schodzi pod nią), obraca się już tylko spojrzenie */
+  /* patrzenie w górę (camPitch > 0.32, ku 0…1): kamera podjeżdża blisko i nisko za plecy, a spojrzenie unosi się najwyżej do ~45°
+     (w aucie ~29°) — postać / auto zostaje w dolnej części kadru, nad nią niebo (jak w GTA); kamera nie schodzi pod postać */
+  const kUp = clamp((camPitch - 0.32) / (CAM_PITCH_MAX - 0.32), 0, 1), ku = kUp * kUp * (3 - 2 * kUp);
+  const footY = mode === 'car' ? carModel.root.position.y - 0.45 : player.mesh.position.y;
+  dist = lerp(dist, mode === 'car' ? CAR_TYPES[carType].half[2] + 3.5 : 2.0, ku);
   const posPitch = Math.min(camPitch, 0.32), cp = Math.cos(posPitch), sp = Math.sin(posPitch);
   camWish.set(
     camTarget.x + Math.sin(camYaw) * cp * dist,
     camTarget.y + height - sp * dist,
     camTarget.z + Math.cos(camYaw) * cp * dist
   );
+  camWish.y = lerp(camWish.y, footY + (mode === 'car' ? 0.95 : 0.5), ku);
 
   /* wysięgnik sprężynowy: przy przeszkodzie skraca się od razu, a wydłuża płynnie (bez pompowania) */
   const dir = camWish.clone().sub(camTarget);
@@ -125,7 +130,7 @@ function updateCamera(dt, kmh){
   const free = camBoomFree(camTarget, dir, len);
   camDist = free < camDist ? free : damp(camDist, free, 2.5, dt);
   camWish.copy(camTarget).addScaledVector(dir, camDist);
-  if (camWish.y < 0.6) camWish.y = 0.6;
+  if (camWish.y < footY + 0.3) camWish.y = footY + 0.3;
 
   /* w aucie: kamera sztywno na wysięgniku za interpolowanym celem (wygładzony jest kąt camYaw),
      bo ściganie celu z opóźnieniem dawało drgania przy nierównym kroku klatek */
@@ -139,14 +144,15 @@ function updateCamera(dt, kmh){
 
   lookAt.copy(camTarget);
   lookAt.y += mode === 'car' ? 0.35 : 0.30;
-  if (camPitch > 0.32){
-    const k = clamp((camPitch - 0.32) / 0.45, 0, 1), up = camPitch;
-    lookAt.lerp(_cpL.set(camCur.x - Math.sin(camYaw) * Math.cos(up) * 12, camCur.y + Math.sin(up) * 12, camCur.z - Math.cos(camYaw) * Math.cos(up) * 12), k);
+  if (ku > 0){
+    const el = lerp(0.32, mode === 'car' ? 0.5 : 0.78, ku);
+    lookAt.lerp(_cpL.set(camCur.x - Math.sin(camYaw) * Math.cos(el) * 12, camCur.y + Math.sin(el) * 12, camCur.z - Math.cos(camYaw) * Math.cos(el) * 12), ku);
   }
   camera.lookAt(lookAt);
 
-  if (Math.abs(camera.fov - camFov - fovAdd) > 0.01){
-    camera.fov = camFov + fovAdd;
+  const fovW = camFov + fovAdd + ku * 8;                                            // patrząc w górę — trochę szerzej
+  if (Math.abs(camera.fov - fovW) > 0.01){
+    camera.fov = fovW;
     camera.updateProjectionMatrix();
   }
 

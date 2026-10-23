@@ -26,7 +26,7 @@ Klawisze można zmienić w menu (**STEROWANIE**). `Esc` w trakcie gry to pauza �
 
 | Klawisz | Akcja |
 |---|---|
-| `W` `A` `S` `D` / strzałki, mysz | ruch, kamera (mysz w pionie — aż do patrzenia prosto w górę i prosto w dół; przed ścianą czy drzewem kamera sama się przybliża, żeby postać była widoczna) |
+| `W` `A` `S` `D` / strzałki, mysz | ruch, kamera (mysz w pionie — aż do patrzenia prosto w dół i w górę: wtedy kamera podjeżdża blisko i nisko za plecy, postać zostaje na dole kadru, a nad nią widać niebo; przed ścianą czy drzewem kamera sama się przybliża, żeby postać była widoczna) |
 | `Shift` / `Spacja` | bieg / skok |
 | `F` (albo `E`) | wsiądź do auta, samolotu albo helikoptera, ukradnij auto NPC, przejażdżka w parku rozrywki (przy wejściu na atrakcję), schowaj się w kontenerze na śmieci / wyjdź, winda na dach wieżowca z lądowiskiem (drzwi „WINDA”) |
 | `Spacja` w swobodnym spadku (≥ ok. 22 m nad ziemią) | otwórz spadochron (skok z dachu, helikoptera) |
