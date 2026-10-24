@@ -19,7 +19,8 @@
    --------------------------------------------------------------- */
 const WANTED_T = [0, 8, 24, 48, 85, 135, 200];
 const WANTED = { agro: 0, stars: 0, seen: false, phase: 'none', unseenT: 0, searchT: 0, searchMax: 0, last: { x: 0, y: 0, z: 0, gy: 0 }, reportT: 0, flashT: 0, bust: 0 };
-let policeOn = true, catDeathMode = false;
+/* policja włączona / wyłączona (menu pauzy i menu deweloperskie, zapamiętane w localStorage) */
+let policeOn = (() => { try { return localStorage.getItem('gta_police') !== '0'; } catch(e){ return true; } })(), catDeathMode = false;
 const POLICE_PATROL_N = 5, POLICE_CAR_MAX = 10, WANT_CARS = [0, 2, 3, 4, 5, 6, 7];
 const CRIME_PTS = { 'zabójstwo': 10, 'potrącenie': 3, 'atak na policję': 14, 'zabicie policjanta': 25, 'radiowóz': 35, 'helikopter': 60, 'wybuch': 6, 'auto': 8, 'kradzież radiowozu': 15, 'kradzież helikoptera': 30 };
 const COPS = [];
@@ -57,6 +58,21 @@ function policeNear(x, z, r){
   for (const n of npcs) if (n.cop && n.cop.crew > 0 && Math.hypot(n.pos.x - x, n.pos.y - z) < r) return true;
   for (const c of COPS) if (c.state !== 'down' && Math.hypot(c.pos.x - x, c.pos.y - z) < r) return true;
   return false;
+}
+/* wyłączona policja znika od razu: poszukiwanie skasowane, radiowozy, policjanci i helikoptery usunięci, nowe się nie pojawiają;
+   po włączeniu patrole wracają (dojeżdżają spoza kadru) */
+function setPoliceOn(v){
+  v = !!v; if (v === policeOn) return;
+  policeOn = v;
+  try { localStorage.setItem('gta_police', v ? '1' : '0'); } catch(e){}
+  if (!v){
+    wantedClear(null);
+    for (const c of COPS.slice()) removeCop(c);
+    for (const n of npcs.slice()) if (n.cop) removeNpcCar(n);
+    for (const h of POLICE.heli.slice()) if (h !== curHeli) policeHeliRemove(h);
+    WANTED.flashT = 0; Sound.siren(0);
+  } else { POLICE.patrolT = 0; POLICE.heliT = 0; }
+  hudToast(v ? 'Policja włączona' : 'Policja wyłączona', 2.5);
 }
 function wantedClear(msg){
   const had = WANTED.stars > 0;
@@ -768,3 +784,4 @@ function policeDrawMap(g, toMap, zs, big, lvlY){
     g.restore();
   }
 }
+syncPoliceBtn();                                         // menu pauzy: stan zapamiętany z poprzedniej gry

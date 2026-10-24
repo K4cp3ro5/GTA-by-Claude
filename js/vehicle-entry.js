@@ -44,7 +44,20 @@ const _npcDoor = { x: 0, z: 0 };
    autem gracza. Menu kołowe V (pieszo): nowe auto gracza wybranego typu przed graczem
    (poprzednie auto gracza znika) albo przywołanie obecnego. */
 const MAIN_CAR_COLOR = 0xb3272b, PARKED_STOLEN_MAX = 4;
-const driving = { owner: 'player', type: 'sedan', color: MAIN_CAR_COLOR };
+/* kolor twojego auta (menu deweloperskie, zapamiętany w localStorage); nowe auto z menu V dostaje ten kolor */
+let playerCarColor = (() => { try { const v = parseInt(localStorage.getItem('gta_car_color'), 16); return isFinite(v) ? v : MAIN_CAR_COLOR; } catch(e){ return MAIN_CAR_COLOR; } })();
+const driving = { owner: 'player', type: 'sedan', color: playerCarColor };
+if (playerCarColor !== MAIN_CAR_COLOR) carModel.paintMat.color.setHex(playerCarColor);
+/* zmiana koloru: prowadzone auto (także skradzione) od razu; pieszo — twoje auto (stojące albo zaparkowane) i kolejne z menu V */
+function setCarColor(hex){
+  const ownActive = driving.owner === 'player';
+  if ((mode === 'car' || ownActive) && !activeCarGone){ driving.color = hex; carModel.paintMat.color.setHex(hex); }
+  if (ownActive || mode !== 'car'){
+    playerCarColor = hex;
+    try { localStorage.setItem('gta_car_color', hex.toString(16)); } catch(e){}
+    const p = parkedCars.find(q => q.owner === 'player'); if (p){ p.color = hex; if (p.mesh.paintMat) p.mesh.paintMat.color.setHex(hex); }
+  }
+}
 let drivingIdentity = 'main';
 let activeCarGone = false;              // prowadzalne auto zniszczone (destruction.js) — ciało poza światem do następnego takeOver           // zgodność: 'main' = auto gracza, 'jacked' = skradzione
 const parkedCars = [];                  // { id, owner, type, color, mesh, body, x, y (podłoże), z, heading, t }
@@ -236,10 +249,10 @@ function spawnOwnCar(type){
   const spot = findCarSpot(type);
   if (!spot){ hudToast('Brak miejsca na auto'); return false; }
   lastCarSpawn = clock;
-  if (driving.owner === 'player' || activeCarGone){ const own = parkedCars.find(q => q.owner === 'player'); if (own && activeCarGone) removeParked(own); takeOver(type, MAIN_CAR_COLOR, 'player', spot.x, spot.y, spot.z, spot.heading); }   // twoje auto stoi puste (albo nie ma prowadzalnego) — przenosi się
+  if (driving.owner === 'player' || activeCarGone){ const own = parkedCars.find(q => q.owner === 'player'); if (own && activeCarGone) removeParked(own); takeOver(type, playerCarColor, 'player', spot.x, spot.y, spot.z, spot.heading); }   // twoje auto stoi puste (albo nie ma prowadzalnego) — przenosi się
   else {
     const own = parkedCars.find(q => q.owner === 'player'); if (own) removeParked(own);
-    addParked('player', type, MAIN_CAR_COLOR, spot.x, spot.y, spot.z, spot.heading);
+    addParked('player', type, playerCarColor, spot.x, spot.y, spot.z, spot.heading);
   }
   hudToast(type === 'bike' ? 'Twój rower' : 'Twój samochód: ' + CAR_TYPES[type].name);
   return true;

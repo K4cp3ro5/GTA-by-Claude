@@ -33,8 +33,12 @@ function physicsStep(dt){
   return physAcc / FIXED;
 }
 
+/* pomiary CPU (ms, średnia krocząca) — menu deweloperskie, zakładka Optymalizacja */
+const PERF = { frame: 0, phys: 0, ai: 0, render: 0 };
+const _perfK = 0.05, perfAdd = (k, v) => { PERF[k] += (v - PERF[k]) * _perfK; };
 function frame(now){
   requestAnimationFrame(frame);
+  const _t0 = performance.now();
   let dt = (now - last) / 1000;
   last = now;
   if (dt > 0.1) dt = 0.1;
@@ -46,7 +50,9 @@ function frame(now){
 
   updateSky(dt);
   updateTrafficLights(dt);
+  const _tA = performance.now();
   if (!npcFrozen){ updateNpcs(dt); updatePedestrians(dt); }   // menu deweloperskie: „zatrzymaj ruch”
+  perfAdd('ai', performance.now() - _tA);
   const carState = updateCar(dt);
   const planeKmh = mode === 'plane' ? updatePlane(dt) : 0;
   updatePlanesIdle(dt);
@@ -60,6 +66,7 @@ function frame(now){
   updateDestruction(dt);
   updateCats(dt);
   updatePolice(dt);
+  updateAmbulances(dt);
   const vehKmh = mode === 'plane' ? planeKmh : mode === 'boat' ? boatKmh : mode === 'heli' ? heliKmh : carState.kmh;
   if (mode === 'foot' && pointerLocked){ if (!(parachute.on && parachute.t > 0.7)) updatePlayer(dt); }   // pod otwartą czaszą steruje updateParachute
   else if (mode === 'foot') {
@@ -74,7 +81,9 @@ function frame(now){
   updateWheel();
   pruneParked();
 
+  const _tP = performance.now();
   const alpha = physicsStep(dt);
+  perfAdd('phys', performance.now() - _tP);
   updateWaterHazards(dt);
   navUpdate(dt);
   updateSea(dt);
@@ -95,7 +104,10 @@ function frame(now){
   updateLampLights();
   updateHud(dt, vehKmh);
 
+  const _tR = performance.now();
   renderer.render(scene, camera);
+  const _t1 = performance.now();
+  perfAdd('render', _t1 - _tR); perfAdd('frame', _t1 - _t0);
 }
 
 /* ---------------------------------------------------------------

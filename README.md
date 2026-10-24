@@ -128,6 +128,7 @@ Jak wystartować: ustaw samolot na pasie, trzymaj `W`, a gdy prędkościomierz p
 - **Do 2 gwiazdek** policjanci tylko chcą cię zatrzymać — podbiegają i zakuwają (niebieski pasek pod gwiazdkami); w aucie wyciągają cię, gdy stoisz. **Od 3 gwiazdek** strzelają — tylko pieszo (nigdy z auta), z bliska (do ok. 22 m), najwyżej czterech naraz i niezbyt celnie. Policjanci nie stoją w jednym miejscu: dwaj najbliżsi podchodzą do ciebie, reszta rozstawia się wokół (strzelający w pierścieniu 12–18 m). Gdy odjedziesz, wracają do radiowozu i ruszają za tobą.
 - **Helikoptery policji** pojawiają się tylko w pościgu: od 4 gwiazdek jeden, od 5 dwa, przy 6 trzy (najwyżej trzy). Nadlatują spoza kadru, gonią cię nad dachami (omijają wieżowce, pochylają się w locie), krążą nad tobą z reflektorami na różnych wysokościach i nie wlatują w siebie. Od 5 gwiazdek strzelec strzela z drzwi, przy 6 helikopter zniża się nad wolnym miejscem i **spuszcza policjantów na linach**. Zestrzelony helikopter zastępuje następny po 3 s; po zgubieniu policji odlatują.
 - **Ucieczka**: zniknij z pola widzenia (za budynkami, pod estakadą, w hali, w kontenerze). Wtedy cała ekipa jedzie w ostatnie znane miejsce, policjanci wysiadają i przeczesują okolicę (zaglądają też do kontenerów); jeśli cię nie znajdą przed końcem odliczania, gwiazdki znikają, a jednostki wracają do patrolu.
+- **Policję można wyłączyć** (menu pauzy albo menu deweloperskie, wybór jest zapamiętany): radiowozy, policjanci i helikoptery znikają od razu, gwiazdki się kasują, a przestępstwa nie mają skutków. Po włączeniu patrole wracają spoza kadru.
 - **Zatrzymanie**: ekran „ZATRZYMANY” i wyjście przed **komisariatem** (wschodni sąsiad szpitala: budynek z napisem POLICJA, parking radiowozów, lądowisko helikoptera policji na dachu). Gdy policja cię zabije — jak zawsze szpital. Śmierć i zatrzymanie kasują gwiazdki.
 
 ### Helikoptery, lądowiska i kryjówki
@@ -165,13 +166,14 @@ Jak wystartować: ustaw samolot na pasie, trzymaj `W`, a gdy prędkościomierz p
 
 ### Ruch uliczny
 
-| Pirat drogowy | Rowerzysta | Typy aut |
-|---|---|---|
-| ![Pirat](screenshots/pirat.jpg) | ![Rowerzysta](screenshots/rowerzysta.jpg) | ![Typy aut](screenshots/typy-aut.jpg) |
+| Pirat drogowy | Rowerzysta | Typy aut | Karetka na sygnale |
+|---|---|---|---|
+| ![Pirat](screenshots/pirat.jpg) | ![Rowerzysta](screenshots/rowerzysta.jpg) | ![Typy aut](screenshots/typy-aut.jpg) | ![Karetka](screenshots/karetka.jpg) |
 
 - **Auta NPC** (zwykłe, pickupy, sportowe; kierowcy ostrożni, zwykli i dynamiczni) jeżdżą prawostronnie, stają na czerwonym i na STOP, ustępują pierwszeństwa, objeżdżają ronda, włączają kierunkowskazy, wyprzedzają lewym pasem na autostradzie, omijają zaparkowane auta. Po stłuczce stają na światłach awaryjnych, na strzały uciekają.
 - **Piraci drogowi** — kwasowo zielone auta (także na minimapie) z podrasowanym silnikiem. Nie przestrzegają żadnych przepisów: jadą na czerwonym, bez pierwszeństwa, praktycznie z prędkością maksymalną, slalomem, wyprzedzają przeciwnym pasem nawet na przejściach i potrącają pieszych i rowerzystów.
 - **Rowerzyści** jeżdżą przy prawej krawędzi jezdni, auta wymijają ich z odstępem.
+- **Karetki** (domyślnie 3) — białe furgony z przedziałem medycznym, czerwonym pasem, napisem AMBULANS i niebieskimi kogutami — jeżdżą po mieście jak zwykłe auta. Co jakiś czas któraś włącza **sygnał**: koguty migają, słychać dwutonową syrenę (głośniej, im bliżej), karetka jedzie szybciej. Zniszczona karetka wraca po chwili spoza kadru.
 - **Piesi** spacerują po chodnikach i przechodzą po pasach (na światłach w swojej fazie).
 
 ### Ty
@@ -226,17 +228,19 @@ Jak wystartować: ustaw samolot na pasie, trzymaj `W`, a gdy prędkościomierz p
 
 ### Menu deweloperskie (`` ` ``)
 
-![Menu deweloperskie](screenshots/debug.jpg)
+| Zakładki (NPC) | Kolor auta z menu |
+|---|---|
+| ![Menu deweloperskie](screenshots/debug.jpg) | ![Kolor auta](screenshots/kolor-auta.jpg) |
 
-Pełnoekranowy panel z bieżącymi statystykami w nagłówku (FPS, ciała fizyczne, auta, piesi, łodzie, samoloty, tryb) i kartami w kolumnach — suwaki, przełączniki, przyciski:
+Pełnoekranowy panel z bieżącymi statystykami w nagłówku (FPS, ciała fizyczne, auta, piesi, łodzie, samoloty, tryb) i **zakładkami** (ostatnio otwarta jest zapamiętana) — suwaki, przełączniki, przyciski:
 
-- **Populacja**: auta NPC i piesi do 200, rowerzyści, łodzie i samoloty NPC; „Domyślne” i „Puste ulice”. Na słabszym komputerze wystarczy zmniejszyć liczbę aut i pieszych.
-- **Ruch drogowy**: zatrzymanie ruchu, LOD AI, szansa potrącenia rowerzysty przez pirata, dodawanie piratów.
-- **Czas i świat**: godzina, zatrzymanie i tempo doby, tempo gry (zwolnione tempo), mgła.
-- **Grafika i wydajność**: cienie, rozdzielczość renderowania, pole widzenia, ukrycie HUD.
-- **Gracz**: nieśmiertelność, nieskończona amunicja, moc auta, leczenie, amunicja, postawienie auta, usunięcie skradzionych aut.
+- **Gra**: godzina, zatrzymanie i tempo doby, tempo gry (zwolnione tempo); nieśmiertelność, nieskończona amunicja, leczenie, amunicja; szybki cel trasy, zrzut balastu mewy.
+- **Grafika**: cienie, rozdzielczość renderowania, pole widzenia, mgła, ukrycie HUD.
+- **NPC**: auta NPC i piesi do 200, rowerzyści, łodzie i samoloty NPC („Domyślne”, „Puste ulice”); zatrzymanie ruchu, szansa potrącenia rowerzysty przez pirata, dodawanie piratów; **karetki** (0–10, „najbliższa → na sygnale”); koty i koty-przyjaciele.
+- **Samochody i pojazdy**: typ twojego auta, **kolor auta** (12 próbek i dowolny kolor; prowadzone auto zmienia kolor od razu, pieszo — twoje auto i kolejne z menu `V`; zapamiętany), moc auta, postawienie auta, usunięcie skradzionych; samolot na ziemi albo w powietrzu, łódź, helikopter (na lotnisku, na dachu wieżowca, w powietrzu).
 - **Policja**: włączenie / wyłączenie, gwiazdki (0–6) wprost, „+1 gwiazdka”, „Zgub policję”, tryb „skrzywdzony kot = śmierć gracza”, liczniki radiowozów i policjantów.
-- **Pojazdy, teleporty, nawigacja i ptaki**: typ auta, samolot na ziemi albo w powietrzu, helikopter (na lotnisku, na dachu wieżowca, w powietrzu), łódź, 13 miejsc teleportu (m.in. komisariat, hangar-kryjówka, najbliższy kontener), szybki cel trasy, zrzut balastu.
+- **Teleport i mapa**: 13 miejsc teleportu (m.in. komisariat, hangar-kryjówka, najbliższy kontener).
+- **Optymalizacja**: pomiary (czas klatki CPU, fizyka, AI, render, wywołania rysowania, trójkąty, obiekty sceny) i LOD AI z zasięgiem.
 
 ### Ekran ładowania i pauza
 
@@ -244,14 +248,15 @@ Pełnoekranowy panel z bieżącymi statystykami w nagłówku (FPS, ciała fizycz
 |---|---|
 | ![Ekran ładowania](screenshots/ladowanie.jpg) | ![Pauza](screenshots/pauza.jpg) |
 
-Ładowanie: sylwetka miasta o zmierzchu z mrugającymi oknami, pasek z procentem, etapy (grafika, fizyka, dzielnice, autostrady, ruch, lotniska, shadery) i zmieniające się wskazówki. Pauza (`Esc`): rozmyte zatrzymane miasto, stan gry w jednym wierszu, powrót, sterowanie, mapa, menu deweloperskie i ściągawka klawiszy (z aktualnych ustawień).
+Ładowanie: sylwetka miasta o zmierzchu z mrugającymi oknami, pasek z procentem, etapy (grafika, fizyka, dzielnice, autostrady, ruch, lotniska, shadery) i zmieniające się wskazówki. Pauza (`Esc`): rozmyte zatrzymane miasto, stan gry w jednym wierszu, powrót, sterowanie, mapa, **przełącznik policji** (WŁĄCZONA / WYŁĄCZONA, zapamiętany), menu deweloperskie i ściągawka klawiszy (z aktualnych ustawień).
 
 ## Jak to jest zrobione
 
 - **Three.js r128** (grafika) i **cannon.js 0.6.2** (fizyka) z CDN, reszta to czysty JavaScript bez frameworków. Dźwięk syntezuje Web Audio, tekstury rysuje Canvas 2D.
-- 44 zwykłe skrypty ze wspólnym zakresem globalnym, ładowanych w kolejności z `loadorder.txt` (bez bundlera, więc gra działa z `file://`).
+- 45 zwykłych skryptów ze wspólnym zakresem globalnym, ładowanych w kolejności z `loadorder.txt` (bez bundlera, więc gra działa z `file://`).
 - Geometria miasta scalana w kilkadziesiąt siatek (ok. 200 wywołań rysowania), statyczne kolizje w komórkach 48 m.
 - Auta NPC to ciała kinematyczne na trasach z punktów; skrzyżowania rozstrzygane wg czasu dojazdu, ronda, światła, kolejki, objazdy i zmiana pasa.
+- **Wydajność** (bez zmiany wyglądu i zachowania — test symulacji daje identyczny wynik): decyzje AI aut sprawdzają tylko auta i pieszych z sąsiednich komórek siatki 24 m (wcześniej każdy z każdym — przy 160 autach i 150 pieszych AI zajmowało ok. 8,8 ms na klatkę, teraz ok. 1,9 ms), a kolizja kamery szuka trójkątów w siatce 16 m zamiast w ~49 tys. trójkątów (ok. 1 ms → 0,002 ms). Pomiary w menu deweloperskim (Optymalizacja).
 
 ```
 index.html        strona, style, HUD, ekran ładowania
