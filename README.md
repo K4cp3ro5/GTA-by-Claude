@@ -44,7 +44,7 @@ Klawisze można zmienić w menu (**STEROWANIE**). `Esc` w trakcie gry to pauza �
 | `A` `D` / strzałki | skręt |
 | `Spacja` | hamulec ręczny (drift) |
 | `Q` / `E` | lewy / prawy kierunkowskaz (gaśnie sam po skręcie) |
-| `H` | klakson — auto stojące przed tobą rusza |
+| `H` | klakson — auto stojące przed tobą rusza; w skradzionym radiowozie albo karetce — włącza / wyłącza koguty i syrenę |
 | `R` | postaw auto na koła |
 | `F` | wysiądź |
 
@@ -128,6 +128,7 @@ Jak wystartować: ustaw samolot na pasie, trzymaj `W`, a gdy prędkościomierz p
 - **Do 2 gwiazdek** policjanci tylko chcą cię zatrzymać — podbiegają i zakuwają (niebieski pasek pod gwiazdkami); w aucie wyciągają cię, gdy stoisz. **Od 3 gwiazdek** strzelają — tylko pieszo (nigdy z auta), z bliska (do ok. 22 m), najwyżej czterech naraz i niezbyt celnie. Policjanci nie stoją w jednym miejscu: dwaj najbliżsi podchodzą do ciebie, reszta rozstawia się wokół (strzelający w pierścieniu 12–18 m). Gdy odjedziesz, wracają do radiowozu i ruszają za tobą.
 - **Helikoptery policji** pojawiają się tylko w pościgu: od 4 gwiazdek jeden, od 5 dwa, przy 6 trzy (najwyżej trzy). Nadlatują spoza kadru, gonią cię nad dachami (omijają wieżowce, pochylają się w locie), krążą nad tobą z reflektorami na różnych wysokościach i nie wlatują w siebie. Od 5 gwiazdek strzelec strzela z drzwi, przy 6 helikopter zniża się nad wolnym miejscem i **spuszcza policjantów na linach**. Zestrzelony helikopter zastępuje następny po 3 s; po zgubieniu policji odlatują.
 - **Ucieczka**: zniknij z pola widzenia (za budynkami, pod estakadą, w hali, w kontenerze). Wtedy cała ekipa jedzie w ostatnie znane miejsce, policjanci wysiadają i przeczesują okolicę (zaglądają też do kontenerów); jeśli cię nie znajdą przed końcem odliczania, gwiazdki znikają, a jednostki wracają do patrolu.
+- **Skradziony radiowóz** zostaje w barwach policji (belka z kogutami, pasy, napisy), a **skradziona karetka** — karetką. `H` włącza i wyłącza w nich koguty i syrenę (zamiast klaksonu); sygnał zostaje włączony także po wysiadce i przesiadce, a auta stojące przed tobą ruszają jak na klakson.
 - **Policję można wyłączyć** (menu pauzy albo menu deweloperskie, wybór jest zapamiętany): radiowozy, policjanci i helikoptery znikają od razu, gwiazdki się kasują, a przestępstwa nie mają skutków. Po włączeniu patrole wracają spoza kadru.
 - **Zatrzymanie**: ekran „ZATRZYMANY” i wyjście przed **komisariatem** (wschodni sąsiad szpitala: budynek z napisem POLICJA, parking radiowozów, lądowisko helikoptera policji na dachu). Gdy policja cię zabije — jak zawsze szpital. Śmierć i zatrzymanie kasują gwiazdki.
 
@@ -173,7 +174,7 @@ Jak wystartować: ustaw samolot na pasie, trzymaj `W`, a gdy prędkościomierz p
 - **Auta NPC** (zwykłe, pickupy, sportowe; kierowcy ostrożni, zwykli i dynamiczni) jeżdżą prawostronnie, stają na czerwonym i na STOP, ustępują pierwszeństwa, objeżdżają ronda, włączają kierunkowskazy, wyprzedzają lewym pasem na autostradzie, omijają zaparkowane auta. Po stłuczce stają na światłach awaryjnych, na strzały uciekają.
 - **Piraci drogowi** — kwasowo zielone auta (także na minimapie) z podrasowanym silnikiem. Nie przestrzegają żadnych przepisów: jadą na czerwonym, bez pierwszeństwa, praktycznie z prędkością maksymalną, slalomem, wyprzedzają przeciwnym pasem nawet na przejściach i potrącają pieszych i rowerzystów.
 - **Rowerzyści** jeżdżą przy prawej krawędzi jezdni, auta wymijają ich z odstępem.
-- **Karetki** (domyślnie 3) — białe furgony z przedziałem medycznym, czerwonym pasem, napisem AMBULANS i niebieskimi kogutami — jeżdżą po mieście jak zwykłe auta. Co jakiś czas któraś włącza **sygnał**: koguty migają, słychać dwutonową syrenę (głośniej, im bliżej), karetka jedzie szybciej. Zniszczona karetka wraca po chwili spoza kadru.
+- **Karetki** (domyślnie 3) — białe furgony z przedziałem medycznym, czerwonym pasem, napisem AMBULANS i niebieskimi kogutami — jeżdżą po mieście jak zwykłe auta. Co jakiś czas któraś włącza **sygnał**: koguty migają, słychać dwutonową syrenę (głośniej, im bliżej), karetka jedzie szybciej. Zniszczona karetka wraca po chwili spoza kadru. Karetkę można ukraść — zostaje karetką, a `H` włącza jej sygnał.
 - **Piesi** spacerują po chodnikach i przechodzą po pasach (na światłach w swojej fazie).
 
 ### Ty

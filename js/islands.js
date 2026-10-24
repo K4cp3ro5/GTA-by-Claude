@@ -41,7 +41,7 @@ function updateWaterHazards(dt){
     const s = safeSpot(p.x, p.z, 2, 90) || { x: HOSPITAL_SPAWN.x, y: 0, z: HOSPITAL_SPAWN.z };
     if (!onFoot){
       const c = safeSpot(s.x, s.z, 5, 40) || s, T = CAR_TYPES[carType];
-      takeOver(carType, driving.color, driving.owner, c.x, c.y, c.z, 0);
+      takeOver(carType, driving.color, driving.owner, c.x, c.y, c.z, 0, undefined, driving.livery, driving.siren);
       mode = 'foot'; player.mesh.visible = true; addBody(player.body); Sound.engine(false, 0, 0);
     }
     player.body.position.set(s.x, s.y + 1.2, s.z); player.body.velocity.set(0, 0, 0); player.body.wakeUp();

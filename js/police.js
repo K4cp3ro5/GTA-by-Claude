@@ -87,19 +87,26 @@ function wantedClear(msg){
 /* --- radiowozy --- */
 const POLICE_KINDS = { small: { type: 'sedan', crew: 2, color: 0xf2f2ef, stripe: 0x1d3fa0 }, big: { type: 'pickup', crew: 3, color: 0x1f2a44, stripe: 0xf2f2ef } };
 const _copTex = heliTextTex('POLICJA');
-function policeDecorate(n){
-  const K = POLICE_KINDS[n.cop.kind], T = CAR_TYPES[n.type];
-  const roof = carParts(n.type).filter(q => q[3] === 'paint').reduce((a, q) => q[5] + q[1] / 2 > a[5] + a[1] / 2 ? q : a), top = roof[5] + roof[1] / 2;
-  const bar = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.14, 0.38), new THREE.MeshLambertMaterial({ color: 0x22262e })); bar.position.set(0, top + 0.07, roof[6]); n.mesh.add(bar);
+/* barwy radiowozu (belka z kogutami, pasy, napisy POLICJA) w układzie modelu z nosem w +Z i y od podłoża — dla NPC i dla
+   skradzionego radiowozu gracza (ambulances.js: carLivery); red / blue — materiały kogutów */
+function policeLivery(type, kind){
+  const K = POLICE_KINDS[kind], T = CAR_TYPES[type], g = new THREE.Group();
+  const roof = carParts(type).filter(q => q[3] === 'paint').reduce((a, q) => q[5] + q[1] / 2 > a[5] + a[1] / 2 ? q : a), top = roof[5] + roof[1] / 2;
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.14, 0.38), new THREE.MeshLambertMaterial({ color: 0x22262e })); bar.position.set(0, top + 0.07, roof[6]); g.add(bar);
   const red = new THREE.MeshBasicMaterial({ color: 0x4a0a0a }), blue = new THREE.MeshBasicMaterial({ color: 0x0a144a });
   const lr = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.12, 0.3), red), lb = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.12, 0.3), blue);
-  lr.position.set(0.33, top + 0.19, roof[6]); lb.position.set(-0.33, top + 0.19, roof[6]); n.mesh.add(lr); n.mesh.add(lb);
-  const sy = n.type === 'pickup' ? 1.0 : 0.66;
+  lr.position.set(0.33, top + 0.19, roof[6]); lb.position.set(-0.33, top + 0.19, roof[6]); g.add(lr); g.add(lb);
+  const sy = type === 'pickup' ? 1.0 : 0.66;
   for (const s of [-1, 1]){
-    const st = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.2, T.half[2] * 1.7), new THREE.MeshLambertMaterial({ color: K.stripe })); st.position.set(s * (T.half[0] + 0.02), sy, 0); n.mesh.add(st);
-    const tx = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 0.32), new THREE.MeshLambertMaterial({ map: _copTex })); tx.position.set(s * (T.half[0] + 0.04), sy + 0.3, 0.1); tx.rotation.y = s * Math.PI / 2; n.mesh.add(tx);
+    const st = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.2, T.half[2] * 1.7), new THREE.MeshLambertMaterial({ color: K.stripe })); st.position.set(s * (T.half[0] + 0.02), sy, 0); g.add(st);
+    const tx = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 0.32), new THREE.MeshLambertMaterial({ map: _copTex })); tx.position.set(s * (T.half[0] + 0.04), sy + 0.3, 0.1); tx.rotation.y = s * Math.PI / 2; g.add(tx);
   }
-  n.cop.red = red; n.cop.blue = blue;
+  return { group: g, red: red, blue: blue };
+}
+function policeDecorate(n){
+  const L = policeLivery(n.type, n.cop.kind);
+  n.mesh.add(L.group);
+  n.cop.red = L.red; n.cop.blue = L.blue;
 }
 /* auto NPC staje się radiowozem (model w barwach policji, bez profilu pirata) */
 function policify(n, kind, role){

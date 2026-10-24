@@ -3,6 +3,8 @@
    Jeżdżą po pętlach miejskich jak zwykłe auta NPC (logika z update-npc.js, wymiary jak pickup); co jakiś czas któraś
    włącza sygnał: koguty migają, słychać syrenę dwutonową (głośność wg najbliższej), karetka jedzie szybciej (dalej
    z zachowaniem przepisów). Liczba w menu deweloperskim (NPC → Karetki); zniszczona / usunięta wraca po chwili spoza kadru.
+   Pojazdy służb gracza: skradziony radiowóz / karetka zachowuje barwy (carLivery na modelu auta gracza i atrapy), H włącza
+   i wyłącza koguty z syreną (toggleServiceSiren; stan idzie za autem także po wysiadce — updateServiceSirens).
    --------------------------------------------------------------- */
 const AMB = { want: 3, spawnT: 0, sirenD: 1e9 };
 const AMB_COLOR = 0xf4f4f0;
@@ -34,26 +36,64 @@ function ambGeometries(){
   add(body, B(1.92, 0.22, 0.12), DARK, 0, 0.5, 2.63);                       // zderzak przedni
   add(body, B(1.96, 0.22, 0.12), DARK, 0, 0.5, -2.63);                      // zderzak tylny
   add(body, B(1.4, 0.1, 0.32), DARK, 0, 1.9, 1.3);                          // belka świetlna (podstawa)
+  const shell = mergeColored(body);                                        // bez kół — karoseria na aucie gracza (koła są jego)
   const tg = new THREE.CylinderGeometry(0.42, 0.42, 0.3, 14); tg.rotateZ(Math.PI / 2);
   for (const [x, z] of [[0.9, 1.75], [-0.9, 1.75], [0.9, -1.6], [-0.9, -1.6]]) add(body, tg, 0x141518, x, 0.42, z);
   for (const s of [-1, 1]){
     add(lamps, B(0.38, 0.18, 0.05), 0xfff3d0, s * 0.68, 0.88, 2.63);        // reflektory
     add(lamps, B(0.22, 0.4, 0.05), 0x7a1512, s * 0.86, 1.05, -2.64);        // tylne światła
   }
-  return (_ambGeo = { body: mergeColored(body), lamps: mergeColored(lamps), lamp: B(0.5, 0.14, 0.28), lampS: B(0.22, 0.16, 0.16), text: new THREE.PlaneGeometry(2.4, 0.45), textR: new THREE.PlaneGeometry(1.5, 0.28) });
+  return (_ambGeo = { body: mergeColored(body), shell: shell, lamps: mergeColored(lamps), lamp: B(0.5, 0.14, 0.28), lampS: B(0.22, 0.16, 0.16), text: new THREE.PlaneGeometry(2.4, 0.45), textR: new THREE.PlaneGeometry(1.5, 0.28) });
 }
-function buildAmbulanceModel(){
+/* karetka: karoseria (NPC z kołami i światłami; auto gracza — sama karoseria), koguty A / B, napisy */
+function ambulanceGroup(npc){
   const G = ambGeometries(), g = new THREE.Group();
-  const body = new THREE.Mesh(G.body, _npcMatBody); body.castShadow = true; g.add(body);
-  g.add(new THREE.Mesh(G.lamps, _npcMatLamp));
+  const body = new THREE.Mesh(npc ? G.body : G.shell, _npcMatBody); body.castShadow = true; g.add(body);
+  if (npc) g.add(new THREE.Mesh(G.lamps, _npcMatLamp));
   const bA = new THREE.MeshBasicMaterial({ color: 0x0a144a }), bB = new THREE.MeshBasicMaterial({ color: 0x0a144a });
   /* koguty: belka na kabinie (dwa) i narożniki przedziału (przód i tył) — naprzemiennie A / B */
   [[0.38, 2.02, 1.3, bA, 'lamp'], [-0.38, 2.02, 1.3, bB, 'lamp'], [0.86, 2.63, 0.4, bB, 'lampS'], [-0.86, 2.63, 0.4, bA, 'lampS'], [0.86, 2.63, -2.48, bA, 'lampS'], [-0.86, 2.63, -2.48, bB, 'lampS']]
     .forEach(q => { const m = new THREE.Mesh(G[q[4]], q[3]); m.position.set(q[0], q[1], q[2]); g.add(m); });
   for (const s of [-1, 1]){ const t = new THREE.Mesh(G.text, _ambTextMat); t.position.set(s * 1.012, 1.85, -1.0); t.rotation.y = s * Math.PI / 2; g.add(t); }
   const tr = new THREE.Mesh(G.textR, _ambTextMat); tr.position.set(0, 2.15, -2.632); tr.rotation.y = Math.PI; g.add(tr);
-  scene.add(g);
   return { group: g, a: bA, b: bB };
+}
+function buildAmbulanceModel(){ const M = ambulanceGroup(true); scene.add(M.group); return M; }
+
+/* barwy służb na modelu auta gracza / atrapy (vehicle.js: buildCarModel; grupa w m.body — ten sam układ co carParts):
+   radiowóz — policeLivery na lakierze w barwach policji; karetka — bryła karetki zamiast nadwozia pickupa (zostają koła
+   i światła modelu, więc hamowanie i kierunkowskazy działają). livery = null zdejmuje barwy. */
+function carLivery(m, type, livery){
+  if (m.liv){ m.body.remove(m.liv.group); if (m.liv.own) m.liv.group.traverse(o => { if (o.geometry) o.geometry.dispose(); }); m.liv = null; }
+  const shellMats = m.mats.slice(0, 4);                                    // paint, dark, glass, chrome (bez świateł)
+  m.body.children.forEach(c => { if (c.isMesh && shellMats.indexOf(c.material) >= 0) c.visible = livery !== 'amb'; });
+  if (!livery) return;
+  let L;
+  if (livery === 'amb'){ const M = ambulanceGroup(false); L = { group: M.group, a: M.a, b: M.b, kind: 'amb', onA: 0x2a5cff, onB: 0x2a5cff, offA: 0x0a144a, offB: 0x0a144a, own: false }; }
+  else { const P = policeLivery(type, livery.slice(7)); L = { group: P.group, a: P.red, b: P.blue, kind: 'police', onA: 0xff2020, onB: 0x2050ff, offA: 0x4a0a0a, offB: 0x0a144a, own: true }; }
+  m.body.add(L.group); m.liv = L;
+}
+function liveryLights(L, on, blink){ L.a.color.setHex(on && blink ? L.onA : L.offA); L.b.color.setHex(on && !blink ? L.onB : L.offB); }
+/* H w radiowozie / karetce gracza */
+function toggleServiceSiren(){
+  if (!driving.livery) return;
+  driving.siren = !driving.siren;
+  hudToast(driving.siren ? 'Sygnały włączone (H)' : 'Sygnały wyłączone (H)', 1.6);
+}
+/* koguty i syreny pojazdów służb gracza: prowadzone auto i atrapy z włączonym sygnałem (głośność wg odległości; w aucie pełna) */
+function updateServiceSirens(){
+  const bP = Math.floor(clock * 6) % 2, bA = Math.floor(clock * 5) % 2, pp = playerWorldPos();
+  let dP = 1e9, dA = 1e9;
+  const one = (L, on, x, z, inside) => {
+    liveryLights(L, on, L.kind === 'amb' ? bA : bP);
+    if (!on) return;
+    const d = inside ? 0 : Math.hypot(x - pp.x, z - pp.z);
+    if (L.kind === 'amb') dA = Math.min(dA, d); else dP = Math.min(dP, d);
+  };
+  if (driving.livery && carModel.liv && !activeCarGone) one(carModel.liv, driving.siren, chassisBody.position.x, chassisBody.position.z, mode === 'car');
+  for (const p of parkedCars) if (p.livery && p.mesh.liv) one(p.mesh.liv, p.siren, p.x, p.z, false);
+  Sound.sirenSelf(dP < 1e8 ? clamp(1 - dP / 200, 0, 1) * 0.85 : 0);
+  Sound.ambSelf(dA < 1e8 ? clamp(1 - dA / 200, 0, 1) * 0.85 : 0);
 }
 /* nowa karetka na pętli miejskiej, daleko od gracza (> far m) i od innych aut (> 12 m) */
 function spawnAmbulance(far){
@@ -108,4 +148,5 @@ function updateAmbulances(dt){
   }
   AMB.sirenD = sd;
   Sound.ambSiren(sd < 1e8 ? clamp(1 - sd / 200, 0, 1) : 0);
+  updateServiceSirens();
 }

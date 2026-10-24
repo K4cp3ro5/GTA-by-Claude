@@ -29,7 +29,7 @@ const BIND_ROWS = [
   ['vehicleWheel','Menu pojazdów (przytrzymaj)'],
   ['indLeft','Kierunkowskaz lewy (w aucie)'], ['indRight','Kierunkowskaz prawy (w aucie)'],
   ['slot1','Pasek — pole 1'], ['slot2','Pasek — pole 2'], ['slot3','Pasek — pole 3'], ['slot4','Pasek — pole 4'], ['slot5','Pasek — pole 5'], ['slot6','Pasek — pole 6'], ['slot7','Pasek — pole 7'], ['slot8','Pasek — pole 8'], ['slot9','Pasek — pole 9'], ['inventory','Ekwipunek (plecak)'],
-  ['horn','Klakson'], ['daytime','Przyspiesz dobę'], ['map','Mapa (PPM — cel trasy)'], ['mute','Wycisz dźwięk']
+  ['horn','Klakson / sygnały (radiowóz, karetka)'], ['daytime','Przyspiesz dobę'], ['map','Mapa (PPM — cel trasy)'], ['mute','Wycisz dźwięk']
 ];
 function loadBinds(){
   try {
@@ -207,7 +207,7 @@ document.addEventListener('keydown', e => {
   keys[k] = true;
   if (mode === 'car' && (k === BIND.indLeft || k === BIND.indRight)){ togglePlayerInd(k === BIND.indLeft ? 'L' : 'R'); return; }
   if (k === BIND.enter || (k === 'KeyE' && mode !== 'car')) toggleVehicle();
-  if (k === BIND.horn && mode === 'car') Sound.horn(true);
+  if (k === BIND.horn && mode === 'car'){ if (driving.livery) toggleServiceSiren(); else Sound.horn(true); }   // radiowóz / karetka: sygnały
   if (k === BIND.reload){ if (mode === 'car') resetCar(); else Weapons.reload(); }
   if (k === BIND.mute){ muted = !muted; Sound.setMuted(muted); }
   if (mode === 'foot'){
@@ -387,7 +387,7 @@ function dbgTeleport(x, z, heading, yTop){
   if (mode === 'heli') exitHeli(true);
   if (mode === 'boat') exitBoat(true);
   const g = groundAt(x, z, yTop === undefined ? 30 : yTop); const y = g === null ? 0 : g;
-  if (mode === 'car') takeOver(carType, driving.color, driving.owner, x, y, z, heading);
+  if (mode === 'car') takeOver(carType, driving.color, driving.owner, x, y, z, heading, undefined, driving.livery, driving.siren);
   else { player.body.position.set(x, y + 1.2, z); player.body.velocity.set(0, 0, 0); if (heading !== undefined){ player.facing = heading; camYaw = heading + Math.PI; } }
   refreshDebugInfo();
 }

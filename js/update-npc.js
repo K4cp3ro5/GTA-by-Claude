@@ -42,7 +42,7 @@ function updateNpcs(dt){
   _npcFrame++;
   npcGridBuild(); _ngFill(NGRID.ped, Pedestrians.list);
   const pp = mode === 'car' ? chassisBody.position : player.body.position;
-  const honk = mode === 'car' && down('horn');
+  const honk = mode === 'car' && (driving.livery ? driving.siren : down('horn'));   // sygnał skradzionego pojazdu służb działa jak klakson
   for (let i = 0; i < npcs.length; i++){
     const n = npcs[i];
     if (n.cop && n.cop.role !== 'patrol'){ policeCarStep(n, dt); continue; }      // radiowóz w pościgu / szukaniu (police.js)

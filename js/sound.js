@@ -252,8 +252,10 @@ const Sound = {
   },
 
   /* syrena radiowozów (police.js): dwa tony zawodzące wolnym LFO, głośność wg najbliższego radiowozu w pościgu (0..1) */
-  sirenNodes: null,
-  siren(vol){
+  sirenNodes: null, _sirNpc: 0, _sirMe: 0, _ambNpc: 0, _ambMe: 0,
+  siren(vol){ this._sirNpc = vol; this._sirenApply(Math.max(vol, this._sirMe)); },
+  sirenSelf(vol){ this._sirMe = vol; this._sirenApply(Math.max(vol, this._sirNpc)); },     // skradziony radiowóz gracza (H)
+  _sirenApply(vol){
     if (!this.ready) return;
     const ctx = this.ctx, t = ctx.currentTime;
     if (!this.sirenNodes){
@@ -270,7 +272,9 @@ const Sound = {
   },
   /* syrena karetek (ambulances.js): dwa tony na zmianę (hi-lo ~0.7 s), głośność wg najbliższej karetki na sygnale (0..1) */
   ambNodes: null,
-  ambSiren(vol){
+  ambSiren(vol){ this._ambNpc = vol; this._ambApply(Math.max(vol, this._ambMe)); },
+  ambSelf(vol){ this._ambMe = vol; this._ambApply(Math.max(vol, this._ambNpc)); },          // skradziona karetka gracza (H)
+  _ambApply(vol){
     if (!this.ready) return;
     const ctx = this.ctx, t = ctx.currentTime;
     if (!this.ambNodes){

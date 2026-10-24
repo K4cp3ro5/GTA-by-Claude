@@ -46,7 +46,8 @@ const _npcDoor = { x: 0, z: 0 };
 const MAIN_CAR_COLOR = 0xb3272b, PARKED_STOLEN_MAX = 4;
 /* kolor twojego auta (menu deweloperskie, zapamiętany w localStorage); nowe auto z menu V dostaje ten kolor */
 let playerCarColor = (() => { try { const v = parseInt(localStorage.getItem('gta_car_color'), 16); return isFinite(v) ? v : MAIN_CAR_COLOR; } catch(e){ return MAIN_CAR_COLOR; } })();
-const driving = { owner: 'player', type: 'sedan', color: playerCarColor };
+/* livery: null | 'police-small' | 'police-big' | 'amb' — barwy pojazdu służb (skradziony radiowóz / karetka); siren — koguty i syrena (H) */
+const driving = { owner: 'player', type: 'sedan', color: playerCarColor, livery: null, siren: false };
 if (playerCarColor !== MAIN_CAR_COLOR) carModel.paintMat.color.setHex(playerCarColor);
 /* zmiana koloru: prowadzone auto (także skradzione) od razu; pieszo — twoje auto (stojące albo zaparkowane) i kolejne z menu V */
 function setCarColor(hex){
@@ -60,17 +61,18 @@ function setCarColor(hex){
 }
 let drivingIdentity = 'main';
 let activeCarGone = false;              // prowadzalne auto zniszczone (destruction.js) — ciało poza światem do następnego takeOver           // zgodność: 'main' = auto gracza, 'jacked' = skradzione
-const parkedCars = [];                  // { id, owner, type, color, mesh, body, x, y (podłoże), z, heading, t }
+const parkedCars = [];                  // { id, owner, type, color, mesh, body, x, y (podłoże), z, heading, t, livery, siren }
 let parkedSeq = 0;
-function setDriving(owner, type, color){
-  driving.owner = owner; driving.type = type; driving.color = color;
+function setDriving(owner, type, color, livery, siren){
+  driving.owner = owner; driving.type = type; driving.color = color; driving.livery = livery || null; driving.siren = !!(livery && siren);
   drivingIdentity = owner === 'player' ? 'main' : 'jacked';
 }
 /* wysokość dachu modelu typu (bryła atrapy od podłoża do dachu) */
 const _carTop = {};
 function carTopOf(type){ return _carTop[type] || (_carTop[type] = Math.max(...carParts(type).map(q => q[5] + q[1] / 2))); }
-function addParked(owner, type, color, x, yGround, z, heading){
+function addParked(owner, type, color, x, yGround, z, heading, livery, siren){
   const T = CAR_TYPES[type], mdl = buildCarModel(color, true, type), top = carTopOf(type);
+  if (livery) carLivery(mdl, type, livery);
   mdl.root.position.set(x, yGround + T.restY, z);          // root = środek nadwozia (jak w syncCar)
   mdl.root.rotation.y = heading + Math.PI;
   const b = new CANNON.Body({ mass: 0, material: matCar });
@@ -80,7 +82,7 @@ function addParked(owner, type, color, x, yGround, z, heading){
   b.collisionFilterGroup = G_CAR;
   b.collisionFilterMask  = -1;
   addBody(b);
-  const p = { id: ++parkedSeq, owner: owner, type: type, color: color, mesh: mdl, body: b, x: x, y: yGround, z: z, heading: heading, t: clock };
+  const p = { id: ++parkedSeq, owner: owner, type: type, color: color, mesh: mdl, body: b, x: x, y: yGround, z: z, heading: heading, t: clock, livery: livery || null, siren: !!(livery && siren) };
   parkedCars.push(p);
   return p;
 }
@@ -98,20 +100,21 @@ function parkedDoorPoint(p, out){
 function parkActive(){
   if (activeCarGone) return null;
   const T = CAR_TYPES[carType], p = chassisBody.position;
-  const q = addParked(driving.owner, carType, driving.color, p.x, p.y - T.restY, p.z, carYaw());
+  const q = addParked(driving.owner, carType, driving.color, p.x, p.y - T.restY, p.z, carYaw(), driving.livery, driving.siren);   // koguty migają dalej
   q.hp = carHp;                                                             // stan auta zostaje z atrapą
   return q;
 }
-/* prowadzalne auto przyjmuje typ, kolor, właściciela i pozycję (yGround = podłoże) */
-function takeOver(type, color, owner, x, yGround, z, heading, hp){
+/* prowadzalne auto przyjmuje typ, kolor, właściciela, barwy służb (livery, siren) i pozycję (yGround = podłoże) */
+function takeOver(type, color, owner, x, yGround, z, heading, hp, livery, siren){
   if (activeCarGone){ activeCarGone = false; addBody(chassisBody); carModel.root.visible = true; carModel.wheels.forEach(w => { w.visible = true; }); }
   carHp = hp === undefined ? CAR_HP_MAX : hp;
   applyCarType(type, color);
+  if (livery || carModel.liv) carLivery(carModel, type, livery || null);
   chassisBody.position.set(x, yGround + CAR_TYPES[type].restY + 0.13, z);
   chassisBody.quaternion.setFromAxisAngle(new CANNON.Vec3(0,1,0), heading + Math.PI);
   chassisBody.velocity.set(0, 0, 0);
   chassisBody.angularVelocity.set(0, 0, 0);
-  setDriving(owner, type, color);
+  setDriving(owner, type, color, livery, siren);
 }
 const _parkDoor = { x: 0, z: 0 };
 
@@ -163,18 +166,19 @@ function nearestVehicle(){
 function jackCar(n){
   parkActive();
   const x = n.pos.x, z = n.pos.y, y = n.y || 0, h = n.heading, color = n.color, type = n.type || 'sedan', cop = !!n.cop;
+  const livery = n.cop ? 'police-' + n.cop.kind : n.amb ? 'amb' : null;                         // radiowóz / karetka zostaje w swoich barwach
   if (cop) policeCrime('kradzież radiowozu', x, z);
   else if (policeNear(x, z, 35)) policeCrime('kradzież', x, z, 8);                // kradzież na oczach policji
   removeNpcCar(n);
   if (!cop) spawnRandomNpcCar();                                                  // radiowozy uzupełnia police.js
-  takeOver(type, color, 'stolen', x, y, z, h);
+  takeOver(type, color, 'stolen', x, y, z, h, undefined, livery, false);
 }
 /* wejście do zaparkowanego auta (twojego albo skradzionego) */
 function enterParked(q){
-  const d = { owner: q.owner, type: q.type, color: q.color, x: q.x, y: q.y, z: q.z, heading: q.heading, hp: q.hp };
+  const d = { owner: q.owner, type: q.type, color: q.color, x: q.x, y: q.y, z: q.z, heading: q.heading, hp: q.hp, livery: q.livery, siren: q.siren };
   parkActive();
   removeParked(q);
-  takeOver(d.type, d.color, d.owner, d.x, d.y, d.z, d.heading, d.hp);
+  takeOver(d.type, d.color, d.owner, d.x, d.y, d.z, d.heading, d.hp, d.livery, d.siren);
 }
 /* zgodność ze starszym kodem / testami: wróć do auta gracza, jeśli stoi zaparkowane */
 function returnToMainCar(){ const own = parkedCars.find(q => q.owner === 'player'); if (own) enterParked(own); }
