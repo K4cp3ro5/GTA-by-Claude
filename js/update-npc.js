@@ -5,8 +5,42 @@ const _npAxis = new CANNON.Vec3(0, 1, 0);
 /* AI aut dalej niż NPC_LOD_DIST od gracza liczone co drugą klatkę (z dt skumulowanym) — ciało
    kinematyczne jedzie w tym czasie dalej z ostatnią prędkością */
 let NPC_LOD_DIST = 220, _npcFrame = 0;
+/* siatka sąsiedztwa (komórki 24 m, budowana co klatkę z n.pos i p.pos): npcConflict, npcPathSweep i piesi przed maską sprawdzają
+   tylko auta i pieszych z komórek w zasięgu (wcześniej każdy z każdym — przy 160 autach i 150 pieszych ~9 ms na klatkę).
+   Kandydaci w kolejności list (indeksy rosnąco), a promień ma zapas na ruch i przyspieszenie w tej klatce (LOD: pozycja sprzed
+   do 0.2 s), więc wynik jest identyczny jak przy pełnym przeglądzie. */
+const NGRID = { C: 24, car: new Map(), ped: new Map(), ver: -1, vmax: 0, pirV: 0, near: [], peds: [] };
+function _ngFill(map, list){
+  for (const L of map.values()) L.length = 0;
+  const C = NGRID.C;
+  for (let i = 0; i < list.length; i++){
+    const p = list[i].pos, key = Math.floor(p.x / C) * 65536 + Math.floor(p.y / C);
+    let L = map.get(key); if (!L) map.set(key, L = []); L.push(i);
+  }
+}
+const _ngCmp = (a, b) => a - b;
+function _ngQuery(map, x, z, r, out){
+  out.length = 0;
+  const C = NGRID.C, x0 = Math.floor((x - r) / C), x1 = Math.floor((x + r) / C), z0 = Math.floor((z - r) / C), z1 = Math.floor((z + r) / C);
+  for (let cx = x0; cx <= x1; cx++) for (let cz = z0; cz <= z1; cz++){ const L = map.get(cx * 65536 + cz); if (L) for (let k = 0; k < L.length; k++) out.push(L[k]); }
+  if (out.length > 1) out.sort(_ngCmp);
+  return out;
+}
+function npcGridBuild(){
+  _ngFill(NGRID.car, npcs); NGRID.ver = npcsVer;
+  let vmax = 0, pirV = 0;
+  for (const n of npcs){ if (n.speed > vmax) vmax = n.speed; if (n.profile === 'pirat' && n.speed > pirV) pirV = n.speed; }
+  NGRID.vmax = vmax; NGRID.pirV = pirV;
+}
+/* auta, które npcConflict / npcPathSweep mogą uwzględnić (odległość progu z npcConflict + 20 m zapasu) */
+function npcNearCars(n){
+  if (NGRID.ver !== npcsVer) npcGridBuild();
+  const r = n.profile === 'pirat' ? Math.max(16, n.speed * 2, NGRID.vmax * 2.5) : Math.max(16, NGRID.pirV * 2.5);
+  return _ngQuery(NGRID.car, n.pos.x, n.pos.y, r + 20, NGRID.near);
+}
 function updateNpcs(dt){
   _npcFrame++;
+  npcGridBuild(); _ngFill(NGRID.ped, Pedestrians.list);
   const pp = mode === 'car' ? chassisBody.position : player.body.position;
   const honk = mode === 'car' && down('horn');
   for (let i = 0; i < npcs.length; i++){
@@ -104,10 +138,11 @@ function updateNpc(n, i, dt, honk){
       if (o){ block = true; why = 'atrapa'; obst = o; break; }
     }
     /* piesi na jezdni (na przejściu albo leżący) — auto staje przed nimi */
-    const pir = n.profile === 'pirat';
-    if (!block && low && !pir) for (const p of Pedestrians.list){ if (pedOnRoad(p) && checkPoint(p.pos.x, p.pos.y, 0.7)){ block = true; why = 'pieszy'; break; } }
+    const pir = n.profile === 'pirat', PL = Pedestrians.list;
+    const nearP = low ? _ngQuery(NGRID.ped, n.pos.x, n.pos.y, look + 4, NGRID.peds) : NGRID.peds;     // piesi w zasięgu sprawdzenia przed maską
+    if (!block && low && !pir) for (let q = 0; q < nearP.length; q++){ const p = PL[nearP[q]]; if (pedOnRoad(p) && checkPoint(p.pos.x, p.pos.y, 0.7)){ block = true; why = 'pieszy'; break; } }
     /* pirat nie hamuje przed pieszymi — potrąca tych, którzy są na jezdni przed maską */
-    if (pir && low && n.speed > 3) for (const p of Pedestrians.list){
+    if (pir && low && n.speed > 3) for (let q = 0; q < nearP.length; q++){ const p = PL[nearP[q]];
       if (p.state === 'down' || !pedOnRoad(p)) continue;
       const ox = p.pos.x - n.pos.x, oz = p.pos.y - n.pos.y, a = ox * dx + oz * dz;
       if (a > 0 && a < (n.halfL || 2.05) + 0.6 && Math.abs(ox * dz - oz * dx) < (n.halfW || 0.93) + 0.4){ Pedestrians.hit(p, n.speed + 2); n.pedHits = (n.pedHits || 0) + 1; }
@@ -121,8 +156,9 @@ function updateNpc(n, i, dt, honk){
        reguła pierwszeństwa (auta w strefie konfliktu i przed maską dalej zatrzymują). */
     let blockedByNpc = false, cap = Infinity;     // cap = prędkość auta jadącego przed nami w tym samym kierunku
     if (!block){
-      const ignoring = n.ignoreNpcT > 0;
-      for (let k = 0; k < npcs.length; k++){
+      const ignoring = n.ignoreNpcT > 0, near = npcNearCars(n);
+      for (let q = 0; q < near.length; q++){
+        const k = near[q];
         if (k === i) continue;
         const r = npcConflict(n, npcs[k], dx, dz, ignoring);
         if (r === true){ block = true; blockedByNpc = npcs[k].speed < 0.3; why = 'npc:' + npcs[k].id; break; }
@@ -233,7 +269,9 @@ function npcCornerCap(n){
 /* czy po mojej trasie (próbki co 1.5 m do 8 m) moje nadwozie zahaczy o auto stojące (v < 1 m/s) obok */
 function npcPathSweep(n, dx, dz){
   let cand = null;
-  for (const m of npcs){
+  const near = npcNearCars(n);
+  for (let q = 0; q < near.length; q++){
+    const m = npcs[near[q]];
     if (m === n || m.speed > 1 || Math.abs((m.y || 0) - n.y) > 2.5) continue;
     if (n.profile === 'pirat' && m.type === 'bike') continue;                    // pirat jedzie po rowerzyście (npcConflict go przewraca)
     if (Math.hypot(m.pos.x - n.pos.x, m.pos.y - n.pos.y) > 12) continue;

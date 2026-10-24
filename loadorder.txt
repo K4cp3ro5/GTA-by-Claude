@@ -33,6 +33,7 @@ boats.js
 hideouts.js
 heli.js
 police.js
+ambulances.js
 birds.js
 daynight.js
 update-player.js

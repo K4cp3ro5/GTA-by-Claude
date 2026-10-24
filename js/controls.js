@@ -105,6 +105,10 @@ function closeSettings(){ settingsEl.classList.remove('on'); rebindTarget = null
 settingsBtn.addEventListener('click', ev => { ev.stopPropagation(); openSettings(); });
 document.getElementById('gMap').addEventListener('click', ev => { ev.stopPropagation(); openMap(); });
 document.getElementById('gDev').addEventListener('click', ev => { ev.stopPropagation(); toggleDebugMenu(); });
+/* menu pauzy: policja włączona / wyłączona */
+const gPoliceBtn = document.getElementById('gPolice');
+function syncPoliceBtn(){ gPoliceBtn.textContent = 'POLICJA: ' + (policeOn ? 'WŁĄCZONA' : 'WYŁĄCZONA'); gPoliceBtn.classList.toggle('off', !policeOn); }
+gPoliceBtn.addEventListener('click', ev => { ev.stopPropagation(); setPoliceOn(!policeOn); syncPoliceBtn(); });
 document.getElementById('closeSettings').addEventListener('click', ev => { ev.stopPropagation(); closeSettings(); });
 document.getElementById('resetBinds').addEventListener('click', ev => {
   ev.stopPropagation();
@@ -223,7 +227,7 @@ let dayMult = 1, gameSpeed = 1, npcFrozen = false, fovAdd = 0;
 const debugEl = document.getElementById('debugMenu');
 const dbgEl = id => document.getElementById(id);
 const POP0 = {};                                            // liczebności startowe (przycisk „Domyślne”)
-const npcCarsOnly = () => npcs.filter(n => n.type !== 'bike');
+const npcCarsOnly = () => npcs.filter(n => n.type !== 'bike' && !n.amb);
 function setNpcCars(n){
   let c = npcCarsOnly();
   while (c.length > n){ removeNpcCar(c[c.length - 1]); c.pop(); }
@@ -244,6 +248,7 @@ function setNpcFrozen(on){
   if (on){ for (const n of npcs) n.body.velocity.set(0, 0, 0); for (const p of Pedestrians.list) if (p.body) p.body.velocity.set(0, 0, 0); }
 }
 const pct = v => Math.round(v * 100) + '%';
+let npcLodRange = 220;                                   // zasięg LOD AI (suwak; przełącznik włącza / wyłącza)
 const DBG_CTL = {
   cars:      { get: () => npcCarsOnly().length,                  set: v => setNpcCars(v),          heavy: true },
   bikes:     { get: () => npcs.filter(n => n.type === 'bike').length, set: v => setNpcBikes(v), heavy: true },
@@ -252,7 +257,9 @@ const DBG_CTL = {
   air:       { get: () => airPlanes.length,                      set: v => setAirCount(v),         heavy: true },
   cats:      { get: () => CATS.length,                           set: v => setCatCount(v),         heavy: true },
   freezeNpc: { get: () => npcFrozen,                             set: v => setNpcFrozen(v) },
-  lod:       { get: () => NPC_LOD_DIST < 1e6,                    set: v => { NPC_LOD_DIST = v ? 220 : Infinity; } },
+  lod:       { get: () => NPC_LOD_DIST < 1e6,                    set: v => { NPC_LOD_DIST = v ? npcLodRange : Infinity; } },
+  lodDist:   { get: () => npcLodRange,                           set: v => { npcLodRange = v; if (NPC_LOD_DIST < 1e6) NPC_LOD_DIST = v; }, fmt: v => v + ' m' },
+  ambulances:{ get: () => AMB.want,                              set: v => setAmbulanceCount(v),   heavy: true },
   ram:       { get: () => PIRATE_RAM_CHANCE,                     set: v => { PIRATE_RAM_CHANCE = v; }, fmt: pct },
   time:      { get: () => Math.round(timeOfDay * 1440) % 1440,   set: v => { timeOfDay = v / 1440; updateSky(0); }, fmt: v => timeLabel(v) },
   freezeTime:{ get: () => timeFrozen,                            set: v => { timeFrozen = v; } },
@@ -266,7 +273,7 @@ const DBG_CTL = {
   god:       { get: () => godMode,                               set: v => { godMode = v; } },
   infAmmo:   { get: () => infAmmo,                               set: v => { infAmmo = v; } },
   carSpeed:  { get: () => carSpeedMult,                          set: v => { carSpeedMult = v; }, fmt: v => v.toFixed(1) + '×' },
-  police:    { get: () => policeOn,                              set: v => { policeOn = v; if (!v) wantedClear(null); } },
+  police:    { get: () => policeOn,                              set: v => { setPoliceOn(v); syncPoliceBtn(); } },
   stars:     { get: () => WANTED.stars,                          set: v => dbgSetStars(v), fmt: v => v ? '★'.repeat(v) : '—' },
   catDeath:  { get: () => catDeathMode,                          set: v => { catDeathMode = v; } }
 };
@@ -316,7 +323,7 @@ function toggleDebugMenu(){
 }
 function refreshDebugInfo(){
   const nb = npcs.filter(n => n.type === 'bike').length;
-  dbgEl('dbgFps').textContent = (el.fps.textContent.match(/^d+/) || ['—'])[0];
+  dbgEl('dbgFps').textContent = (el.fps.textContent.match(/^\d+/) || ['—'])[0];
   dbgEl('dbgBodies').textContent = String(world.bodies.length);
   dbgEl('dbgCars').textContent = (npcs.length - nb) + ' / ' + nb;
   dbgEl('dbgPeds').textContent = String(Pedestrians.list.length);
@@ -325,6 +332,40 @@ function refreshDebugInfo(){
   dbgEl('dbgPirCount').textContent = String(npcs.filter(n => n.profile === 'pirat').length);
   dbgEl('dbgCatFriends').textContent = String(catFriendCount());
   dbgEl('dbgCops').textContent = String(npcs.filter(n => n.cop).length); dbgEl('dbgCopsFoot').textContent = String(COPS.filter(c => c.state !== 'down').length);
+  dbgEl('dbgAmbSiren').textContent = ambulances().filter(n => n.amb.siren).length + ' / ' + ambulances().length;
+  const ms = v => v.toFixed(2) + ' ms';
+  dbgEl('dbgFrameMs').textContent = ms(PERF.frame); dbgEl('dbgPhysMs').textContent = ms(PERF.phys); dbgEl('dbgAiMs').textContent = ms(PERF.ai); dbgEl('dbgRenderMs').textContent = ms(PERF.render);
+  dbgEl('dbgCalls').textContent = String(renderer.info.render.calls); dbgEl('dbgTris').textContent = (renderer.info.render.triangles / 1000).toFixed(0) + ' tys.';
+  if (!refreshDebugInfo.objT || clock - refreshDebugInfo.objT > 2){ refreshDebugInfo.objT = clock; let k = 0; scene.traverse(() => { k++; }); refreshDebugInfo.objs = k; }
+  dbgEl('dbgObjs').textContent = String(refreshDebugInfo.objs);
+  dbgColorSync();
+}
+/* zakładki menu deweloperskiego (zapamiętana ostatnia) */
+const dbgTabs = debugEl.querySelectorAll('.dtab');
+function dbgTab(id){
+  dbgTabs.forEach(b => b.classList.toggle('on', b.dataset.tab === id));
+  debugEl.querySelectorAll('.dsec[data-tab]').forEach(s => { s.hidden = s.dataset.tab !== id; });
+  try { localStorage.setItem('gta_dbg_tab', id); } catch(e){}
+}
+dbgTabs.forEach(b => b.addEventListener('click', ev => { ev.stopPropagation(); dbgTab(b.dataset.tab); }));
+dbgTab((() => { try { return localStorage.getItem('gta_dbg_tab') || 'game'; } catch(e){ return 'game'; } })());
+/* kolor auta: próbki + dowolny kolor */
+const DBG_CAR_COLORS = [0xb3272b, 0xe8e6e1, 0x16181c, 0x8d939b, 0x1f4fa8, 0x2f7d46, 0xe8b923, 0xe0681f, 0x6a2c8f, 0x3fa9c9, 0xd35fa0, 0x5a3a24];
+const dbgColorsEl = dbgEl('dbgColors');
+DBG_CAR_COLORS.forEach(c => {
+  const b = document.createElement('button'); b.style.background = '#' + c.toString(16).padStart(6, '0'); b.dataset.color = c; b.title = '#' + c.toString(16).padStart(6, '0');
+  b.addEventListener('click', ev => { ev.stopPropagation(); setCarColor(c); dbgColorSync(); });
+  dbgColorsEl.appendChild(b);
+});
+const dbgColorPick = document.createElement('label'); dbgColorPick.innerHTML = '<input type="color"> dowolny';
+dbgColorsEl.appendChild(dbgColorPick);
+const dbgColorInp = dbgColorPick.querySelector('input');
+dbgColorInp.addEventListener('click', ev => ev.stopPropagation());
+dbgColorInp.addEventListener('input', () => { setCarColor(parseInt(dbgColorInp.value.slice(1), 16)); dbgColorSync(); });
+function dbgColorSync(){
+  const cur = mode === 'car' ? driving.color : playerCarColor;
+  dbgColorsEl.querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.color === cur));
+  if (document.activeElement !== dbgColorInp) dbgColorInp.value = '#' + cur.toString(16).padStart(6, '0');
 }
 debugEl.addEventListener('click', ev => { if (ev.target === debugEl) toggleDebugMenu(); });
 dbgEl('closeDebug').addEventListener('click', ev => { ev.stopPropagation(); toggleDebugMenu(); });
@@ -367,7 +408,7 @@ const DBG_ACT = {
   addPirate:  () => { for (let t = 0; t < 12; t++){ const n = spawnRandomNpcCar(); if (n.type !== 'bike' && !n.path.hwyRoute){ npcMakePirate(n); break; } removeNpcCar(n); } },
   nearPirate: () => {
     const p = playerWorldPos();
-    const c = npcs.filter(n => n.type !== 'bike' && n.profile !== 'pirat').sort((a, b) => Math.hypot(a.pos.x - p.x, a.pos.y - p.z) - Math.hypot(b.pos.x - p.x, b.pos.y - p.z))[0];
+    const c = npcs.filter(n => n.type !== 'bike' && n.profile !== 'pirat' && !n.cop && !n.amb).sort((a, b) => Math.hypot(a.pos.x - p.x, a.pos.y - p.z) - Math.hypot(b.pos.x - p.x, b.pos.y - p.z))[0];
     if (c){ npcMakePirate(c); hudToast('Pirat: auto ' + Math.round(Math.hypot(c.pos.x - p.x, c.pos.y - p.z)) + ' m od ciebie'); }
   },
   heal:        () => { player.health = 100; player.stamina = 100; },
@@ -380,6 +421,10 @@ const DBG_ACT = {
     if (mode === 'car'){ hudToast('Najpierw wysiądź z auta (F)'); return; }
     if (mode === 'boat') return;
     const b = boats.find(q => !q.npc); b.v = 0; enterBoat(b); camCur.set(b.pos.x, 6, b.pos.z + 12);
+  },
+  ambNear:    () => {
+    const p = playerWorldPos(), c = ambulances().filter(n => !n.amb.siren).sort((a, b) => Math.hypot(a.pos.x - p.x, a.pos.y - p.z) - Math.hypot(b.pos.x - p.x, b.pos.y - p.z))[0];
+    if (c){ ambSiren(c, true); hudToast('Karetka na sygnale: ' + Math.round(Math.hypot(c.pos.x - p.x, c.pos.y - p.z)) + ' m od ciebie'); } else hudToast('Brak wolnej karetki');
   },
   wpHospital: () => { setWaypoint(HOSPITAL_SPAWN.x, HOSPITAL_SPAWN.z + 2); hudToast('Cel: szpital'); },
   wpAirport:  () => { setWaypoint(AIRPORT_W.front.x, AIRPORT_W.term.z0 + 10); hudToast('Cel: lotnisko miejskie'); },

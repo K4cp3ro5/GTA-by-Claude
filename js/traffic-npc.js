@@ -4,6 +4,7 @@
 const PIRATE_COLOR = 0x7cff2e;                 // piraci drogowi: kwasowa zieleń (nie występuje w zwykłym ruchu)
 const NPC_COLORS = [0x2e4d8f, 0xd9d4c8, 0x2f6f4e, 0x8a8f96, 0xe0a52c, 0x6b3a8f];
 const npcs = [];
+let npcsVer = 0;                              // zmienia się przy dodaniu / usunięciu auta (siatka sąsiedztwa w update-npc.js)
 let npcIdSeq = 0;
 
 /* pętla po prostokącie siatki, prawy pas (3.5 m od osi): wschód -> południe -> zachód -> północ,
@@ -205,7 +206,7 @@ function spawnNpcCar(path, colorHex, startIdx, frac, type){
   b.allowSleep = false;
   addBody(b);
   n.body = b;
-  npcs.push(n);
+  npcs.push(n); npcsVer++;
   return n;
 }
 /* nowe auto (kradzież, menu debug): w losowym miejscu którejś pętli, ale poza zasięgiem
@@ -240,7 +241,7 @@ function offsetLoop(P, off){
 }
 /* menu debug: istniejące auto staje się piratem (profil jak przy spawnie, nowy lakier i kierunkowskazy na nowym modelu) */
 function npcMakePirate(n){
-  if (n.type === 'bike' || n.profile === 'pirat' || n.cop) return false;
+  if (n.type === 'bike' || n.profile === 'pirat' || n.cop || n.amb) return false;
   n.profile = 'pirat'; n.obey = rand(1.35, 1.6); n.target = Math.max(n.target * 1.25, 13); n.hwyF = 1.25;
   n.accel = CAR_TYPES[n.type].npc.accel * 2.0; n.gapX = -0.5; n.react = 0; n.color = PIRATE_COLOR;
   npcHazardOff(n);
@@ -275,7 +276,7 @@ function removeNpcCar(n){
   delBody(n.body);
   scene.remove(n.mesh);
   const idx = npcs.indexOf(n);
-  if (idx >= 0) npcs.splice(idx, 1);
+  if (idx >= 0){ npcs.splice(idx, 1); npcsVer++; }
 }
 
 /* dwa auta na każdej pętli miejskiej i 1–3 na trasie autostradowej, w równych odstępach (poza rondami

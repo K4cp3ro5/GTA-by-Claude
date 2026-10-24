@@ -290,6 +290,7 @@
   .gpause{display:none;gap:8px;flex-wrap:wrap}
   #gate.paused .gpause{display:flex}
   .gbtn{padding:11px 16px;font-size:11px;letter-spacing:.1em;font-weight:600}
+  .gbtn.off{color:#8d8b86;border-style:dashed}
   .gside{background:rgba(18,20,26,.82);border:1px solid #2a2e37;border-radius:12px;padding:16px 18px 12px;box-shadow:0 20px 60px rgba(0,0,0,.4)}
   .gside h3{font-size:11px;font-weight:600;letter-spacing:.2em;color:var(--sodium);margin-bottom:10px;text-transform:uppercase}
   #gateKeys{display:grid;grid-template-columns:auto 1fr;gap:7px 14px;align-items:center;font-size:12.5px;color:#b9b6ae}
@@ -389,6 +390,22 @@
   .dchip b{color:var(--paint);font-weight:600;font-variant-numeric:tabular-nums}
   #closeDebug{pointer-events:auto;cursor:pointer;flex:none;width:34px;height:34px;border-radius:8px;border:1px solid #2f343e;background:#1c1f26;color:#c8c6bf;font-weight:500;font-size:16px;line-height:1;transition:background .12s,color .12s}
   #closeDebug:hover{background:var(--sodium);color:#14161b;border-color:var(--sodium)}
+  .dtabs{display:flex;gap:4px;padding:8px 14px 0;border-bottom:1px solid #262a32;background:#14161c;overflow-x:auto;flex:none}
+  .dtab{pointer-events:auto;cursor:pointer;display:flex;align-items:center;gap:8px;background:transparent;border:1px solid transparent;border-bottom:0;border-radius:8px 8px 0 0;
+    padding:10px 16px 11px;font-weight:600;font-size:13px;letter-spacing:.04em;color:#8d8b86;white-space:nowrap;transition:color .12s,background .12s}
+  .dtab i{font-style:normal;color:#6f6d68;font-size:13px}
+  .dtab:hover{color:var(--paint)}
+  .dtab.on{background:#1a1d23;border-color:#272b33;color:var(--paint);margin-bottom:-1px;padding-bottom:12px}
+  .dtab.on i{color:var(--sodium)}
+  .dsec[hidden]{display:none}
+  .dsubtle{color:#6f6d68}
+  .dcolors{display:flex;flex-wrap:wrap;gap:7px;align-items:center}
+  .dcolors button{pointer-events:auto;cursor:pointer;width:30px;height:30px;border-radius:50%;border:2px solid #1a1d23;box-shadow:0 0 0 1px #3a3f4a;padding:0}
+  .dcolors button.on{box-shadow:0 0 0 2px var(--sodium)}
+  .dcolors label{pointer-events:auto;cursor:pointer;display:flex;align-items:center;gap:7px;font-size:12.5px;color:#8f8c85;margin-left:4px}
+  .dcolors input[type=color]{width:34px;height:30px;border:1px solid #3a3f4a;border-radius:6px;background:#232730;padding:2px;cursor:pointer}
+  .dstatgrid{display:grid;grid-template-columns:1fr auto;gap:8px 16px;font-size:14px;color:#cfccc5}
+  .dstatgrid b{color:var(--paint);font-weight:600;font-variant-numeric:tabular-nums;text-align:right}
   .dgrid{flex:1;overflow-y:auto;padding:18px 20px 22px;display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:16px;align-content:start}
   .dsec{background:#1a1d23;border:1px solid #272b33;border-radius:10px;padding:16px 18px 14px;display:flex;flex-direction:column;gap:13px}
   .dsec h3{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600;letter-spacing:.12em;color:#d7d5cf;text-transform:uppercase;padding-bottom:8px;border-bottom:1px solid #252931}
@@ -436,7 +453,7 @@
 
 <!-- ekran ładowania: pasek liczy wczytane skrypty (data-scripts = 2 biblioteki + pliki z loadorder.txt, sprawdza harness);
      main-loop.js woła LOADER.finish(), błąd podczas ładowania odsłania menu z komunikatem (#err) -->
-<div id="loader" data-scripts="46">
+<div id="loader" data-scripts="47">
   <div class="lsun"></div>
   <svg id="lcity" viewBox="0 0 1600 400" preserveAspectRatio="xMidYMax slice" aria-hidden="true"></svg>
   <div class="lbox">
@@ -573,7 +590,7 @@ var LOADER = (function(){
       <h1>GTA by <em>Claude</em></h1>
       <p id="gatetxt">Dwie wyspy, dwanaście na dwanaście kwartałów, autostrady z koniczyną, lotniska, port, łodzie, mieszkańcy na chodnikach i pełna doba. Wszystko — asfalt, okna, silnik — generowane w locie.</p>
       <div class="gbtns"><button id="go" disabled>BUDUJĘ MIASTO…</button><button id="settingsBtn">STEROWANIE</button></div>
-      <div class="gpause"><button class="gbtn" id="gMap">MAPA (M)</button><button class="gbtn" id="gDev">MENU DEWELOPERSKIE (`)</button></div>
+      <div class="gpause"><button class="gbtn" id="gMap">MAPA (M)</button><button class="gbtn" id="gPolice">POLICJA: WŁĄCZONA</button><button class="gbtn" id="gDev">MENU DEWELOPERSKIE (`)</button></div>
       <div id="err"></div>
     </div>
     <div class="gside"><h3>Sterowanie</h3><div id="gateKeys"></div></div>
@@ -607,66 +624,90 @@ var LOADER = (function(){
       </div>
       <button id="closeDebug" title="Zamknij (`)">✕</button>
     </div>
+    <nav class="dtabs">
+      <button class="dtab" data-tab="game"><i>☀</i>Gra</button>
+      <button class="dtab" data-tab="gfx"><i>▣</i>Grafika</button>
+      <button class="dtab" data-tab="npc"><i>◉</i>NPC</button>
+      <button class="dtab" data-tab="cars"><i>➜</i>Samochody i pojazdy</button>
+      <button class="dtab" data-tab="police"><i>★</i>Policja</button>
+      <button class="dtab" data-tab="world"><i>⌖</i>Teleport i mapa</button>
+      <button class="dtab" data-tab="perf"><i>⚡</i>Optymalizacja</button>
+    </nav>
     <div class="dgrid">
 
-      <section class="dsec">
+      <section class="dsec" data-tab="game">
+        <h3><i>☀</i>Czas</h3>
+        <div class="dctl"><span>Godzina</span><input type="range" data-dbg="time" min="0" max="1439" step="1"><output></output></div>
+        <label class="dtog"><span>Zatrzymaj czas doby</span><input type="checkbox" data-dbg="freezeTime"><i></i></label>
+        <div class="dctl"><span>Tempo doby</span><input type="range" data-dbg="daySpeed" min="1" max="60" step="1"><output></output></div>
+        <div class="dctl"><span>Tempo gry</span><input type="range" data-dbg="gameSpeed" min="0.1" max="2" step="0.05"><output></output></div>
+      </section>
+
+      <section class="dsec" data-tab="game">
+        <h3><i>♥</i>Gracz</h3>
+        <label class="dtog"><span>Nieśmiertelność</span><input type="checkbox" data-dbg="god"><i></i></label>
+        <label class="dtog"><span>Nieskończona amunicja</span><input type="checkbox" data-dbg="infAmmo"><i></i></label>
+        <div class="dbtngrid"><button class="dbtn" data-act="heal">Ulecz</button><button class="dbtn" data-act="ammo">Pełne magazynki</button></div>
+      </section>
+
+      <section class="dsec" data-tab="game">
+        <h3><i>⚑</i>Nawigacja i ptaki</h3>
+        <div class="drow"><span>Cel trasy</span><span class="dbtnrow"><button class="dbtn" data-act="wpHospital">Szpital</button><button class="dbtn" data-act="wpAirport">Lotnisko</button><button class="dbtn" data-act="wpClear">Usuń</button></span></div>
+        <div class="drow"><span>Zrzut mewy</span><span class="dbtnrow"><button class="dbtn" data-act="birdNear">Obok</button><button class="dbtn" data-act="birdMe">Na mnie</button></span></div>
+      </section>
+
+      <section class="dsec" data-tab="gfx">
+        <h3><i>▣</i>Obraz</h3>
+        <label class="dtog"><span>Cienie</span><input type="checkbox" data-dbg="shadows"><i></i></label>
+        <div class="dctl"><span>Rozdzielczość</span><input type="range" data-dbg="res" min="0.5" max="2" step="0.05"><output></output></div>
+        <div class="dctl"><span>Pole widzenia</span><input type="range" data-dbg="fov" min="-15" max="25" step="1"><output></output></div>
+        <div class="dctl"><span>Mgła</span><input type="range" data-dbg="fog" min="0.2" max="2" step="0.1"><output></output></div>
+        <label class="dtog"><span>Interfejs (HUD)</span><input type="checkbox" data-dbg="hud"><i></i></label>
+      </section>
+
+      <section class="dsec" data-tab="npc">
         <h3><i>◉</i>Populacja</h3>
         <div class="dctl"><span>Auta NPC</span><input type="range" data-dbg="cars" min="0" max="200" step="1"><output></output></div>
         <div class="dctl"><span>Rowerzyści</span><input type="range" data-dbg="bikes" min="0" max="40" step="1"><output></output></div>
         <div class="dctl"><span>Piesi</span><input type="range" data-dbg="peds" min="0" max="200" step="1"><output></output></div>
         <div class="dctl"><span>Łodzie NPC</span><input type="range" data-dbg="boats" min="0" max="24" step="1"><output></output></div>
-        <div class="dctl"><span>Koty</span><input type="range" data-dbg="cats" min="0" max="80" step="1"><output></output></div>
-        <div class="drow"><span>Koty-przyjaciele: <b id="dbgCatFriends">0</b> / 6</span><span class="dbtnrow"><button class="dbtn" data-act="catFriend">+1 przyjaciel</button><button class="dbtn warn" data-act="catRelease">Puść wolno</button></span></div>
         <div class="dctl"><span>Samoloty NPC</span><input type="range" data-dbg="air" min="0" max="6" step="1"><output></output></div>
         <div class="hint">Na słabszym komputerze zmniejsz liczbę aut i pieszych — to one najbardziej obciążają fizykę.</div>
         <div class="dbtnrow"><button class="dbtn" data-act="popDefault">Domyślne</button><button class="dbtn warn" data-act="popClear">Puste ulice</button></div>
       </section>
 
-      <section class="dsec">
+      <section class="dsec" data-tab="npc">
         <h3><i>⇄</i>Ruch drogowy</h3>
         <label class="dtog"><span>Zatrzymaj ruch (auta i piesi stoją)</span><input type="checkbox" data-dbg="freezeNpc"><i></i></label>
-        <label class="dtog"><span>LOD AI (dalekie auta co 2. klatkę)</span><input type="checkbox" data-dbg="lod"><i></i></label>
         <div class="dctl"><span>Pirat → rowerzysta</span><input type="range" data-dbg="ram" min="0" max="1" step="0.05"><output></output></div>
         <div class="drow"><span>Piraci: <b id="dbgPirCount">0</b></span><span class="dbtnrow"><button class="dbtn" data-act="addPirate">+1 pirat</button><button class="dbtn" data-act="nearPirate">Najbliższe → pirat</button></span></div>
       </section>
 
-      <section class="dsec">
-        <h3><i>☀</i>Czas i świat</h3>
-        <div class="dctl"><span>Godzina</span><input type="range" data-dbg="time" min="0" max="1439" step="1"><output></output></div>
-        <label class="dtog"><span>Zatrzymaj czas doby</span><input type="checkbox" data-dbg="freezeTime"><i></i></label>
-        <div class="dctl"><span>Tempo doby</span><input type="range" data-dbg="daySpeed" min="1" max="60" step="1"><output></output></div>
-        <div class="dctl"><span>Tempo gry</span><input type="range" data-dbg="gameSpeed" min="0.1" max="2" step="0.05"><output></output></div>
-        <div class="dctl"><span>Mgła</span><input type="range" data-dbg="fog" min="0.2" max="2" step="0.1"><output></output></div>
+      <section class="dsec" data-tab="npc">
+        <h3><i>✚</i>Karetki</h3>
+        <div class="dctl"><span>Karetki w mieście</span><input type="range" data-dbg="ambulances" min="0" max="10" step="1"><output></output></div>
+        <div class="drow"><span>Na sygnale: <b id="dbgAmbSiren">0</b></span><span class="dbtnrow"><button class="dbtn" data-act="ambNear">Najbliższa → na sygnale</button></span></div>
+        <div class="hint">Karetki jeżdżą po mieście jak zwykłe auta; co jakiś czas któraś włącza sygnał i jedzie szybciej.</div>
       </section>
 
-      <section class="dsec">
-        <h3><i>▣</i>Grafika i wydajność</h3>
-        <label class="dtog"><span>Cienie</span><input type="checkbox" data-dbg="shadows"><i></i></label>
-        <div class="dctl"><span>Rozdzielczość</span><input type="range" data-dbg="res" min="0.5" max="2" step="0.05"><output></output></div>
-        <div class="dctl"><span>Pole widzenia</span><input type="range" data-dbg="fov" min="-15" max="25" step="1"><output></output></div>
-        <label class="dtog"><span>Interfejs (HUD)</span><input type="checkbox" data-dbg="hud"><i></i></label>
+      <section class="dsec" data-tab="npc">
+        <h3><i>◆</i>Koty</h3>
+        <div class="dctl"><span>Koty</span><input type="range" data-dbg="cats" min="0" max="80" step="1"><output></output></div>
+        <div class="drow"><span>Koty-przyjaciele: <b id="dbgCatFriends">0</b> / 6</span><span class="dbtnrow"><button class="dbtn" data-act="catFriend">+1 przyjaciel</button><button class="dbtn warn" data-act="catRelease">Puść wolno</button></span></div>
       </section>
 
-      <section class="dsec">
-        <h3><i>♥</i>Gracz</h3>
-        <label class="dtog"><span>Nieśmiertelność</span><input type="checkbox" data-dbg="god"><i></i></label>
-        <label class="dtog"><span>Nieskończona amunicja</span><input type="checkbox" data-dbg="infAmmo"><i></i></label>
-        <div class="dctl"><span>Moc auta</span><input type="range" data-dbg="carSpeed" min="0.2" max="3" step="0.1"><output></output></div>
-        <div class="dbtngrid"><button class="dbtn" data-act="heal">Ulecz</button><button class="dbtn" data-act="ammo">Pełne magazynki</button><button class="dbtn" data-act="fixCar">Postaw auto</button><button class="dbtn warn" data-act="clearStolen">Usuń skradzione</button></div>
-      </section>
-
-      <section class="dsec">
-        <h3><i>★</i>Policja</h3>
-        <label class="dtog"><span>Policja włączona</span><input type="checkbox" data-dbg="police"><i></i></label>
-        <div class="dctl"><span>Gwiazdki</span><input type="range" data-dbg="stars" min="0" max="6" step="1"><output></output></div>
-        <label class="dtog"><span>Skrzywdzony kot = śmierć gracza (wybuch)</span><input type="checkbox" data-dbg="catDeath"><i></i></label>
-        <div class="drow"><span>Radiowozy: <b id="dbgCops">0</b> · policjanci: <b id="dbgCopsFoot">0</b></span><span class="dbtnrow"><button class="dbtn" data-act="wantedUp">+1 gwiazdka</button><button class="dbtn warn" data-act="wantedClear">Zgub policję</button></span></div>
-      </section>
-
-      <section class="dsec">
-        <h3><i>➜</i>Pojazdy</h3>
-        <div class="dlabel">Twoje auto</div>
+      <section class="dsec" data-tab="cars">
+        <h3><i>➜</i>Twoje auto</h3>
+        <div class="dlabel">Typ</div>
         <div class="dseg"><button class="dbtn" data-car="sedan">Zwykły</button><button class="dbtn" data-car="pickup">Pickup</button><button class="dbtn" data-car="sport">Sportowy</button><button class="dbtn" data-car="bike">Rower</button></div>
+        <div class="dlabel">Kolor <span class="dsubtle">(prowadzone auto; pieszo — twoje auto i następne z menu V)</span></div>
+        <div class="dcolors" id="dbgColors"></div>
+        <div class="dctl"><span>Moc auta</span><input type="range" data-dbg="carSpeed" min="0.2" max="3" step="0.1"><output></output></div>
+        <div class="dbtngrid"><button class="dbtn" data-act="fixCar">Postaw auto</button><button class="dbtn warn" data-act="clearStolen">Usuń skradzione</button></div>
+      </section>
+
+      <section class="dsec" data-tab="cars">
+        <h3><i>✈</i>Inne pojazdy</h3>
         <div class="dlabel">Samolot na lotnisku</div>
         <div class="dseg"><button class="dbtn" data-plane="jet">Odrzutowiec</button><button class="dbtn" data-plane="prop">Awionetka</button></div>
         <div class="dlabel">Samolot w powietrzu (150 m nad wysepką)</div>
@@ -677,7 +718,16 @@ var LOADER = (function(){
         <div class="dseg"><button class="dbtn" data-act="heli">Na lotnisku</button><button class="dbtn" data-act="heliRoof">Na dachu wieżowca</button><button class="dbtn" data-act="heliAir">W powietrzu</button></div>
       </section>
 
-      <section class="dsec">
+      <section class="dsec" data-tab="police">
+        <h3><i>★</i>Policja</h3>
+        <label class="dtog"><span>Policja włączona</span><input type="checkbox" data-dbg="police"><i></i></label>
+        <div class="dctl"><span>Gwiazdki</span><input type="range" data-dbg="stars" min="0" max="6" step="1"><output></output></div>
+        <label class="dtog"><span>Skrzywdzony kot = śmierć gracza (wybuch)</span><input type="checkbox" data-dbg="catDeath"><i></i></label>
+        <div class="drow"><span>Radiowozy: <b id="dbgCops">0</b> · policjanci: <b id="dbgCopsFoot">0</b></span><span class="dbtnrow"><button class="dbtn" data-act="wantedUp">+1 gwiazdka</button><button class="dbtn warn" data-act="wantedClear">Zgub policję</button></span></div>
+        <div class="hint">Wyłączona policja znika od razu (radiowozy, policjanci, helikoptery) i nie reaguje na przestępstwa. Przełącznik jest też w menu pauzy.</div>
+      </section>
+
+      <section class="dsec" data-tab="world">
         <h3><i>⌖</i>Teleport</h3>
         <div class="dbtngrid">
           <button class="dbtn" data-tp="start">Start</button><button class="dbtn" data-tp="hospital">Szpital</button><button class="dbtn" data-tp="port">Port</button>
@@ -687,10 +737,25 @@ var LOADER = (function(){
         </div>
       </section>
 
-      <section class="dsec">
-        <h3><i>⚑</i>Nawigacja i ptaki</h3>
-        <div class="drow"><span>Cel trasy</span><span class="dbtnrow"><button class="dbtn" data-act="wpHospital">Szpital</button><button class="dbtn" data-act="wpAirport">Lotnisko</button><button class="dbtn" data-act="wpClear">Usuń</button></span></div>
-        <div class="drow"><span>Zrzut mewy</span><span class="dbtnrow"><button class="dbtn" data-act="birdNear">Obok</button><button class="dbtn" data-act="birdMe">Na mnie</button></span></div>
+      <section class="dsec" data-tab="perf">
+        <h3><i>⚡</i>Pomiary</h3>
+        <div class="dstatgrid">
+          <span>Klatka (CPU)</span><b id="dbgFrameMs">—</b>
+          <span>Fizyka</span><b id="dbgPhysMs">—</b>
+          <span>AI aut i pieszych</span><b id="dbgAiMs">—</b>
+          <span>Render (CPU)</span><b id="dbgRenderMs">—</b>
+          <span>Wywołania rysowania</span><b id="dbgCalls">—</b>
+          <span>Trójkąty</span><b id="dbgTris">—</b>
+          <span>Obiekty sceny</span><b id="dbgObjs">—</b>
+        </div>
+        <div class="hint">Średnie z ostatnich klatek (ms). Czas GPU nie jest tu liczony — przy niskim FPS i małym czasie CPU ogranicza karta graficzna (spróbuj mniejszej rozdzielczości albo bez cieni).</div>
+      </section>
+
+      <section class="dsec" data-tab="perf">
+        <h3><i>⚙</i>Oszczędzanie</h3>
+        <label class="dtog"><span>LOD AI (dalekie auta co 2. klatkę)</span><input type="checkbox" data-dbg="lod"><i></i></label>
+        <div class="dctl"><span>Zasięg LOD AI</span><input type="range" data-dbg="lodDist" min="120" max="600" step="10"><output></output></div>
+        <div class="hint">Zawsze włączone (bez wpływu na wygląd i zachowanie): siatka sąsiedztwa aut i pieszych (decyzje AI sprawdzają tylko pobliskie obiekty), siatka trójkątów dla kolizji kamery, uśpione ciała fizyczne.</div>
       </section>
 
     </div>
@@ -735,6 +800,7 @@ var LOADER = (function(){
 <script src="js/hideouts.js"></script>
 <script src="js/heli.js"></script>
 <script src="js/police.js"></script>
+<script src="js/ambulances.js"></script>
 <script src="js/birds.js"></script>
 <script src="js/daynight.js"></script>
 <script src="js/update-player.js"></script>

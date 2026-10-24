@@ -11,12 +11,70 @@ let camShake = 0, planeCamYaw = 0, planeCamPitch = 0;  // wstrząs (wybuch) / ob
 const CAM_PITCH_MIN = -1.53, CAM_PITCH_MAX = 1.5;      // pieszo i w aucie: od patrzenia prawie pionowo w dół do prawie pionowo w górę
 /* wysięgnik kamery: odległość do pierwszej przeszkody od celu w stronę kamery — siatki (camBlockers) i wszystkie kolizje świata
    (budynki, drzewa, latarnie, wiadukty, ściany hal); kamera staje przed nią, żeby postać / pojazd była widoczna */
-const _cbRay = new THREE.Raycaster();
+/* siatki przeszkód kamery są statyczne: ich trójkąty (w układzie świata) leżą w siatce komórek 16 m, a promień sprawdza tylko trójkąty
+   z komórek wokół odcinka (THREE.Raycaster przeglądał wszystkie ~49 tys. — ~1 ms na klatkę). Test trójkąta jak w THREE.Ray.intersectTriangle
+   (z pomijaniem tylnych ścian wg strony materiału), więc wynik jest ten sam: najbliższe trafienie w zasięgu. */
+const CAMGRID = { cell: 16, cells: new Map(), v: null, side: null, stamp: null, q: 0, built: false };
+function camGridBuild(){
+  CAMGRID.built = true;
+  const V = [], S = [], C = CAMGRID.cell, cells = CAMGRID.cells, a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  for (const m of camBlockers){
+    m.updateMatrixWorld(true);
+    const g = m.geometry, pos = g.attributes.position, idx = g.index, mats = Array.isArray(m.material) ? m.material : null;
+    const n = idx ? idx.count : pos.count;
+    const ranges = mats ? g.groups.map(gr => [gr.start, gr.start + gr.count, mats[gr.materialIndex]])
+      : [[Math.max(0, g.drawRange.start), Math.min(n, g.drawRange.start + g.drawRange.count), m.material]];
+    for (const [s0, s1, mat] of ranges){
+      if (!mat) continue;
+      for (let k = s0, e = Math.min(s1, n); k + 2 < e; k += 3){
+        const ia = idx ? idx.getX(k) : k, ib = idx ? idx.getX(k + 1) : k + 1, ic = idx ? idx.getX(k + 2) : k + 2;
+        a.fromBufferAttribute(pos, ia).applyMatrix4(m.matrixWorld); b.fromBufferAttribute(pos, ib).applyMatrix4(m.matrixWorld); c.fromBufferAttribute(pos, ic).applyMatrix4(m.matrixWorld);
+        const t = S.length; V.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z); S.push(mat.side);
+        const x0 = Math.floor(Math.min(a.x, b.x, c.x) / C), x1 = Math.floor(Math.max(a.x, b.x, c.x) / C), z0 = Math.floor(Math.min(a.z, b.z, c.z) / C), z1 = Math.floor(Math.max(a.z, b.z, c.z) / C);
+        for (let cx = x0; cx <= x1; cx++) for (let cz = z0; cz <= z1; cz++){ const key = cx * 65536 + cz; let L = cells.get(key); if (!L) cells.set(key, L = []); L.push(t); }
+      }
+    }
+  }
+  CAMGRID.v = new Float32Array(V); CAMGRID.side = new Uint8Array(S); CAMGRID.stamp = new Uint32Array(S.length);
+}
+/* odległość wzdłuż promienia (o, d — znormalizowany) do najbliższego trójkąta siatek kamery, najwyżej far; Infinity — brak */
+function camGridRay(ox, oy, oz, dx, dy, dz, far){
+  if (!CAMGRID.built) camGridBuild();
+  const C = CAMGRID.cell, V = CAMGRID.v, S = CAMGRID.side, st = CAMGRID.stamp, q = ++CAMGRID.q;
+  const ex = ox + dx * far, ez = oz + dz * far;
+  const x0 = Math.floor(Math.min(ox, ex) / C), x1 = Math.floor(Math.max(ox, ex) / C), z0 = Math.floor(Math.min(oz, ez) / C), z1 = Math.floor(Math.max(oz, ez) / C);
+  let best = Infinity;
+  for (let cx = x0; cx <= x1; cx++) for (let cz = z0; cz <= z1; cz++){
+    const L = CAMGRID.cells.get(cx * 65536 + cz); if (!L) continue;
+    for (let k = 0; k < L.length; k++){
+      const t = L[k]; if (st[t] === q) continue; st[t] = q;
+      const i = t * 9, side = S[t];
+      /* THREE.Ray.intersectTriangle(a, b, c, backfaceCulling); BackSide — odwrócona kolejność (c, b, a) z pomijaniem */
+      let ax = V[i], ay = V[i + 1], az = V[i + 2], cx2 = V[i + 6], cy2 = V[i + 7], cz2 = V[i + 8];
+      if (side === THREE.BackSide){ ax = V[i + 6]; ay = V[i + 7]; az = V[i + 8]; cx2 = V[i]; cy2 = V[i + 1]; cz2 = V[i + 2]; }
+      const e1x = V[i + 3] - ax, e1y = V[i + 4] - ay, e1z = V[i + 5] - az, e2x = cx2 - ax, e2y = cy2 - ay, e2z = cz2 - az;
+      const nx = e1y * e2z - e1z * e2y, ny = e1z * e2x - e1x * e2z, nz = e1x * e2y - e1y * e2x;
+      let DdN = dx * nx + dy * ny + dz * nz, sign;
+      if (DdN > 0){ if (side !== THREE.DoubleSide) continue; sign = 1; }
+      else if (DdN < 0){ sign = -1; DdN = -DdN; }
+      else continue;
+      const qx = ox - ax, qy = oy - ay, qz = oz - az;
+      const DdQxE2 = sign * (dx * (qy * e2z - qz * e2y) + dy * (qz * e2x - qx * e2z) + dz * (qx * e2y - qy * e2x));
+      if (DdQxE2 < 0) continue;
+      const DdE1xQ = sign * (dx * (e1y * qz - e1z * qy) + dy * (e1z * qx - e1x * qz) + dz * (e1x * qy - e1y * qx));
+      if (DdE1xQ < 0 || DdQxE2 + DdE1xQ > DdN) continue;
+      const QdN = -sign * (qx * nx + qy * ny + qz * nz);
+      if (QdN < 0) continue;
+      const tt = QdN / DdN;
+      if (tt <= far && tt < best) best = tt;
+    }
+  }
+  return best;
+}
 function camBoomFree(from, dir, len){
   let free = len;
-  _cbRay.set(from, dir); _cbRay.far = len + 0.4;
-  const hits = _cbRay.intersectObjects(camBlockers, false);
-  if (hits.length && hits[0].distance < free) free = hits[0].distance;
+  const hd = camGridRay(from.x, from.y, from.z, dir.x, dir.y, dir.z, len + 0.4);
+  if (hd < free) free = hd;
   const h = rayHit(from.x, from.y, from.z, from.x + dir.x * (len + 0.4), from.y + dir.y * (len + 0.4), from.z + dir.z * (len + 0.4), G_WORLD);
   if (h && h.distance < free) free = h.distance;
   return free < len ? Math.max(0.45, free - 0.35) : len;

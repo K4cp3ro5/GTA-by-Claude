@@ -268,6 +268,23 @@ const Sound = {
     }
     this.sirenNodes.g.gain.setTargetAtTime(clamp(vol, 0, 1) * 0.07, t, 0.15);
   },
+  /* syrena karetek (ambulances.js): dwa tony na zmianę (hi-lo ~0.7 s), głośność wg najbliższej karetki na sygnale (0..1) */
+  ambNodes: null,
+  ambSiren(vol){
+    if (!this.ready) return;
+    const ctx = this.ctx, t = ctx.currentTime;
+    if (!this.ambNodes){
+      if (vol <= 0.001) return;
+      const g = ctx.createGain(); g.gain.value = 0;
+      const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 900; f.Q.value = 1.1;
+      const o = ctx.createOscillator(); o.type = 'square'; o.frequency.value = 820;
+      const lfo = ctx.createOscillator(); lfo.type = 'square'; lfo.frequency.value = 0.72;            // 660 / 980 Hz na zmianę
+      const lg = ctx.createGain(); lg.gain.value = 160; lfo.connect(lg); lg.connect(o.frequency);
+      o.connect(f); f.connect(g); g.connect(this.master); o.start(); lfo.start();
+      this.ambNodes = { g: g, o: o, lfo: lfo };
+    }
+    this.ambNodes.g.gain.setTargetAtTime(clamp(vol, 0, 1) * 0.045, t, 0.15);
+  },
   /* wirnik helikoptera (heli.js): szum przez filtr pasmowy, głośność modulowana „łopatami” (rate Hz), vol 0..1 */
   rotorNodes: null,
   rotor(vol, rate){
