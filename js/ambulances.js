@@ -78,6 +78,7 @@ function liveryLights(L, on, blink){ L.a.color.setHex(on && blink ? L.onA : L.of
 function toggleServiceSiren(){
   if (!driving.livery) return;
   driving.siren = !driving.siren;
+  Sound.chirp(driving.siren);
   hudToast(driving.siren ? 'Sygnały włączone (H)' : 'Sygnały wyłączone (H)', 1.6);
 }
 /* koguty i syreny pojazdów służb gracza: prowadzone auto i atrapy z włączonym sygnałem (głośność wg odległości; w aucie pełna) */
@@ -92,8 +93,8 @@ function updateServiceSirens(){
   };
   if (driving.livery && carModel.liv && !activeCarGone) one(carModel.liv, driving.siren, chassisBody.position.x, chassisBody.position.z, mode === 'car');
   for (const p of parkedCars) if (p.livery && p.mesh.liv) one(p.mesh.liv, p.siren, p.x, p.z, false);
-  Sound.sirenSelf(dP < 1e8 ? clamp(1 - dP / 200, 0, 1) * 0.85 : 0);
-  Sound.ambSelf(dA < 1e8 ? clamp(1 - dA / 200, 0, 1) * 0.85 : 0);
+  Sound.sirenSelf(dP < 1e8 ? clamp(1 - dP / 200, 0, 1) : 0);
+  Sound.ambSelf(dA < 1e8 ? clamp(1 - dA / 200, 0, 1) : 0);
 }
 /* nowa karetka na pętli miejskiej, daleko od gracza (> far m) i od innych aut (> 12 m) */
 function spawnAmbulance(far){

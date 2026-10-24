@@ -253,13 +253,13 @@ const Sound = {
 
   /* syrena radiowozów (police.js): dwa tony zawodzące wolnym LFO, głośność wg najbliższego radiowozu w pościgu (0..1) */
   sirenNodes: null, _sirNpc: 0, _sirMe: 0, _ambNpc: 0, _ambMe: 0,
-  siren(vol){ this._sirNpc = vol; this._sirenApply(Math.max(vol, this._sirMe)); },
-  sirenSelf(vol){ this._sirMe = vol; this._sirenApply(Math.max(vol, this._sirNpc)); },     // skradziony radiowóz gracza (H)
-  _sirenApply(vol){
+  siren(vol){ this._sirNpc = vol; this._sirenApply(Math.max(vol * 0.07, this._sirMe * 0.3)); },
+  sirenSelf(vol){ this._sirMe = vol; this._sirenApply(Math.max(this._sirNpc * 0.07, vol * 0.3)); },   // skradziony radiowóz gracza (H) — głośniej, w aucie ponad silnikiem
+  _sirenApply(level){
     if (!this.ready) return;
     const ctx = this.ctx, t = ctx.currentTime;
     if (!this.sirenNodes){
-      if (vol <= 0.001) return;
+      if (level <= 0.0001) return;
       const g = ctx.createGain(); g.gain.value = 0;
       const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1100; f.Q.value = 0.9;
       const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 900;
@@ -268,17 +268,17 @@ const Sound = {
       o.connect(f); f.connect(g); g.connect(this.master); o.start(); lfo.start();
       this.sirenNodes = { g: g, o: o, lfo: lfo };
     }
-    this.sirenNodes.g.gain.setTargetAtTime(clamp(vol, 0, 1) * 0.07, t, 0.15);
+    this.sirenNodes.g.gain.setTargetAtTime(level, t, 0.15);
   },
   /* syrena karetek (ambulances.js): dwa tony na zmianę (hi-lo ~0.7 s), głośność wg najbliższej karetki na sygnale (0..1) */
   ambNodes: null,
-  ambSiren(vol){ this._ambNpc = vol; this._ambApply(Math.max(vol, this._ambMe)); },
-  ambSelf(vol){ this._ambMe = vol; this._ambApply(Math.max(vol, this._ambNpc)); },          // skradziona karetka gracza (H)
-  _ambApply(vol){
+  ambSiren(vol){ this._ambNpc = vol; this._ambApply(Math.max(vol * 0.045, this._ambMe * 0.2)); },
+  ambSelf(vol){ this._ambMe = vol; this._ambApply(Math.max(this._ambNpc * 0.045, vol * 0.2)); },     // skradziona karetka gracza (H)
+  _ambApply(level){
     if (!this.ready) return;
     const ctx = this.ctx, t = ctx.currentTime;
     if (!this.ambNodes){
-      if (vol <= 0.001) return;
+      if (level <= 0.0001) return;
       const g = ctx.createGain(); g.gain.value = 0;
       const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 900; f.Q.value = 1.1;
       const o = ctx.createOscillator(); o.type = 'square'; o.frequency.value = 820;
@@ -287,7 +287,15 @@ const Sound = {
       o.connect(f); f.connect(g); g.connect(this.master); o.start(); lfo.start();
       this.ambNodes = { g: g, o: o, lfo: lfo };
     }
-    this.ambNodes.g.gain.setTargetAtTime(clamp(vol, 0, 1) * 0.045, t, 0.15);
+    this.ambNodes.g.gain.setTargetAtTime(level, t, 0.15);
+  },
+  /* „blip” przy włączaniu (w górę) / wyłączaniu (w dół) sygnałów pojazdu służb — słychać od razu po H */
+  chirp(up){
+    if (!this.ready) return;
+    const ctx = this.ctx, t = ctx.currentTime, o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = 'square'; o.frequency.setValueAtTime(up ? 600 : 1300, t); o.frequency.exponentialRampToValueAtTime(up ? 1300 : 600, t + 0.22);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.16, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.26);
+    o.connect(g); g.connect(this.master); o.start(t); o.stop(t + 0.3);
   },
   /* wirnik helikoptera (heli.js): szum przez filtr pasmowy, głośność modulowana „łopatami” (rate Hz), vol 0..1 */
   rotorNodes: null,
