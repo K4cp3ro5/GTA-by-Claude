@@ -4,6 +4,7 @@
 const moveDir = new THREE.Vector3();
 function updatePlayer(dt){
   const b = player.body;
+  if (player.hiding){ player.grounded = true; player.speed = 0; player.fallSpeed = 0; player.hurtFlash = Math.max(0, player.hurtFlash - dt * 1.8); return; }   // w kontenerze
   const wasGrounded = player.grounded;
   player.grounded = checkGrounded();
 
@@ -120,7 +121,9 @@ function damagePlayer(amount, cause){
 
 function respawnPlayer(){
   if (mode === 'ride') rideEnd(curRide, true);
+  if (player.hiding) hideExit(true);
   if (mode === 'plane') exitPlane(true);
+  if (mode === 'heli') exitHeli(true);
   if (mode === 'boat') exitBoat(true);
   if (mode === 'car'){
     mode = 'foot';
@@ -132,14 +135,15 @@ function respawnPlayer(){
   }
   endParachute();
   player.mesh.visible = true;
-  /* odrodzenie przed szpitalem (plac przed wejściem), twarzą do miasta */
-  player.body.position.set(HOSPITAL_SPAWN.x, 1.2, HOSPITAL_SPAWN.z);
-  player.facing = HOSPITAL_SPAWN.facing; camYaw = HOSPITAL_SPAWN.facing + Math.PI; camPitch = -0.12;
+  /* odrodzenie przed szpitalem (plac przed wejściem), twarzą do miasta; po zatrzymaniu — przed komisariatem */
+  const busted = !!player.busted, S = busted ? POLICE_STATION.spawn : HOSPITAL_SPAWN;
+  player.body.position.set(S.x, 1.2, S.z); noLerp(player.body);
+  player.facing = S.facing; camYaw = S.facing + Math.PI; camPitch = -0.12;
   player.body.velocity.set(0, 0, 0);
   player.body.wakeUp();
   player.fallSpeed = 0;
   player.health = 100;
   player.stamina = 100;
-  player.dead = false; player.deathMsg = null; player.deathCause = '';
-  hudToast('Szpital — wypisano cię po leczeniu', 3);
+  player.dead = false; player.deathMsg = null; player.deathCause = ''; player.busted = false;
+  hudToast(busted ? 'Komisariat — zwolniono cię po przesłuchaniu' : 'Szpital — wypisano cię po leczeniu', 3);
 }

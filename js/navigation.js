@@ -1,7 +1,9 @@
 /* ---------------------------------------------------------------
    19b. NAWIGACJA I MAPA — pełna mapa (M): przesuwanie (LPM), przybliżanie (kółko), prawy klik = znacznik
    celu (fioletowy, jak w GTA V); trasa: autem i pieszo po drogach (graf ulic siatki + dojazdy do szpitala,
-   portu i dróg wysepki; autem z poszanowaniem jednokierunkowej obwodnicy), między wyspami przez przystanie
+   portu i dróg wysepki; autem z poszanowaniem jednokierunkowej obwodnicy), na wyspie głównej autem (nie rowerem) i z wiaduktu
+   po grafie z poziomami PGRAPH (police.js: ulice + rampy i jezdnie autostrad) — na wiadukcie trasa biegnie jezdnią i zjazdem,
+   a nie ulicami pod spodem; między wyspami przez przystanie
    (odcinek wodny), samolotem i łodzią w linii prostej. Trasa na minimapie i dużej mapie, słup znacznika w świecie.
    --------------------------------------------------------------- */
 const NAV = { nodes: [], adj: [], edges: [], built: false };
@@ -29,6 +31,8 @@ function navBuild(){
   }
   const H = add(HOSPITAL.access.x, HOSPITAL.front.z, 'main'); edge(id(4, GRID), H);
   const H2 = add(HOSPITAL_SPAWN.x, HOSPITAL.front.z, 'main'); edge(H, H2);
+  const PS = add(POLICE_STATION.access.x, POLICE_STATION.front.z, 'main'); edge(id(7, GRID), PS);           // komisariat
+  const PS2 = add(POLICE_STATION.spawn.x, POLICE_STATION.front.z, 'main'); edge(PS, PS2);
   const P = add(PORTS.main.x, PORTS.main.z, 'main'); edge(id(5, 0), P);
   const AW = add(AIRPORT_W.front.x, AIRPORT_W.access.z, 'main'); edge(id(0, 6), AW);                        // lotnisko miejskie
   const AW2 = add(AIRPORT_W.front.x, AIRPORT_W.term.z0, 'main'); edge(AW, AW2);
@@ -73,15 +77,21 @@ function navCompute(){
   navBuild();
   if (!waypoint){ navRoute = []; return; }
   const p = playerWorldPos(), wx = waypoint.x, wz = waypoint.z;
-  if (mode === 'plane' || mode === 'boat'){ navRoute = [[p.x, p.z], [wx, wz]]; return; }
+  if (mode === 'plane' || mode === 'boat' || mode === 'heli'){ navRoute = [[p.x, p.z], [wx, wz]]; return; }
   const car = mode === 'car', si = islandAt(p.x, p.z), di = islandAt(wx, wz);
   if (!si){ navRoute = [[p.x, p.z], [wx, wz]]; return; }
-  if (di && di.name === si.name){ navRoute = navRoadRoute(p.x, p.z, wx, wz, si.name, car); return; }
+  /* poziom: autem (nie rowerem — zakaz wjazdu na autostrady) zawsze z wiaduktami; pieszo tylko gdy jesteś na wiadukcie */
+  const gy = policeTarget().gy || 0, lv = (car && carType !== 'bike') || gy > 2.5;
+  const road = (x0, y0, z0, x1, z1, isl) => {
+    if (lv && isl === 'main'){ const r = pgRoute(x0, y0, z0, x1, 0, z1, car ? 'car' : 'foot'); if (r) return r; }
+    return navRoadRoute(x0, z0, x1, z1, isl, car);
+  };
+  if (di && di.name === si.name){ navRoute = road(p.x, gy, p.z, wx, wz, si.name); return; }
   /* inna wyspa (albo cel na wodzie): drogą do przystani, łodzią do przystani celu, dalej drogą */
-  const ps = NAV.nodes[NAV.port[si.name]], r1 = navRoadRoute(p.x, p.z, ps.x, ps.z, si.name, car);
+  const ps = NAV.nodes[NAV.port[si.name]], r1 = road(p.x, gy, p.z, ps.x, ps.z, si.name);
   if (!di){ navRoute = r1.concat([[wx, wz]]); return; }
   const pd = NAV.nodes[NAV.port[di.name]];
-  navRoute = r1.concat(navRoadRoute(pd.x, pd.z, wx, wz, di.name, car));
+  navRoute = r1.concat(road(pd.x, 0, pd.z, wx, wz, di.name));
 }
 /* słup znacznika celu w świecie (widoczny z daleka) */
 const navBeam = new THREE.Group();
@@ -104,7 +114,7 @@ function navUpdate(dt){
   _navT -= dt;
   if (_navT <= 0){ _navT = 0.4; navCompute(); }
   const p = playerWorldPos();
-  if (Math.hypot(p.x - waypoint.x, p.z - waypoint.z) < (mode === 'plane' ? 150 : mode === 'car' || mode === 'boat' ? 35 : 25)){ setWaypoint(null); hudToast('Dotarłeś do celu'); }
+  if (Math.hypot(p.x - waypoint.x, p.z - waypoint.z) < (mode === 'plane' ? 150 : mode === 'heli' ? 60 : mode === 'car' || mode === 'boat' ? 35 : 25)){ setWaypoint(null); hudToast('Dotarłeś do celu'); }
 }
 /* trasa i znacznik na minimapie (znacznik poza kadrem — przy krawędzi) */
 function navDrawMinimap(g, toMap, MM){
@@ -130,12 +140,17 @@ function navPin(g, x, y, s){
 const bigEl = document.getElementById('bigmap'), bigCv = document.getElementById('bigmapCv'), bigG = bigCv.getContext('2d');
 const BIG = { cx: 0, cz: 0, s: 1, drag: null };
 const MAP_LABELS = [['PORT', () => [PORTS.main.x + 60, PORTS.main.z + 30]], ['LOTNISKO', () => [0, AIRPORT.runway.z - 30]], ['LOTNISKO', () => [AIRPORT_W.apron.x0, AIRPORT_W.runway.z0 - 14]], ['PRZYSTAŃ', () => [PORTS.airport.x, PORTS.airport.z + 26]],
-                    ['SZPITAL', () => [HOSPITAL_SPAWN.x, HOSPITAL.main.z1 + 14]], ['WĘZEŁ A1/A2', () => [0, 30]], ['PARK ROZRYWKI', () => [PARK.boulX, 30]]];
+                    ['SZPITAL', () => [HOSPITAL_SPAWN.x, HOSPITAL.main.z1 + 14]], ['POLICJA', () => [POLICE_STATION.spawn.x, POLICE_STATION.main.z1 + 14]], ['WĘZEŁ A1/A2', () => [0, 30]], ['PARK ROZRYWKI', () => [PARK.boulX, 30]]];
 function openMap(){
   if (mapOpen) return;
   mapOpen = true;
   const W = window.innerWidth, H = window.innerHeight;
-  BIG.s = Math.min(W / MAP_W, H / MAP_H) * 0.92; BIG.cx = MAP_X0 + MAP_W / 2; BIG.cz = MAP_Z0 + MAP_H / 2;   // cały świat w kadrze
+  /* przybliżenie wg środka transportu: pieszo i rowerem — okolica, autem i łodzią — dzielnica, samolotem i helikopterem — cały świat */
+  const fit = Math.min(W / MAP_W, H / MAP_H) * 0.92, bike = mode === 'car' && CAR_TYPES[carType].bike, p0 = playerWorldPos();
+  const zf = (mode === 'plane' || mode === 'heli') ? 1 : ((mode === 'car' && !bike) || mode === 'boat') ? 2.4 : 4.2;
+  BIG.s = fit * zf;
+  if (zf === 1){ BIG.cx = MAP_X0 + MAP_W / 2; BIG.cz = MAP_Z0 + MAP_H / 2; }
+  else { BIG.cx = clamp(p0.x, MAP_X0, MAP_X0 + MAP_W); BIG.cz = clamp(p0.z, MAP_Z0, MAP_Z0 + MAP_H); }
   bigEl.classList.add('on');
   for (const k in keys) keys[k] = false;
   if (pointerLocked) document.exitPointerLock();
@@ -155,7 +170,7 @@ function drawBigMap(){
   const g = bigG;
   g.fillStyle = '#16384b'; g.fillRect(0, 0, W, H);
   const o = bigToScreen(MAP_X0, MAP_Z0);
-  g.imageSmoothingEnabled = true; g.drawImage(mapStatic, o[0], o[1], MAP_W * BIG.s, MAP_H * BIG.s);
+  g.imageSmoothingEnabled = true; drawMapLayers(g, null, o[0], o[1], MAP_W * BIG.s, MAP_H * BIG.s, playerLevel());
   /* trasa */
   if (waypoint && navRoute.length > 1){
     const line = (w, c) => { g.lineWidth = w; g.strokeStyle = c; g.lineJoin = 'round'; g.lineCap = 'round'; g.beginPath(); navRoute.forEach((q, k) => { const m = bigToScreen(q[0], q[1]); k ? g.lineTo(m[0], m[1]) : g.moveTo(m[0], m[1]); }); g.stroke(); };
@@ -169,11 +184,13 @@ function drawBigMap(){
   for (const c of CATS){ if (c.dead) continue; const m = bigToScreen(c.x, c.z); g.fillStyle = c.fedT > clock ? '#ff7aa2' : '#ff9d2e'; g.beginPath(); g.arc(m[0], m[1], 2.6, 0, TAU); g.fill(); }
   for (const a of airPlanes){ const m = bigToScreen(a.pos.x, a.pos.z); g.save(); g.translate(m[0], m[1]); g.rotate(-a.heading + Math.PI); g.fillStyle = '#cfe3ee'; g.fillRect(-1.3, -6, 2.6, 12); g.fillRect(-6, -1.4, 12, 2.8); g.restore(); }
   for (const q of planes){ if (q.wreckT > 0 || q === curPlane) continue; const m = bigToScreen(q.pos.x, q.pos.z); g.fillStyle = '#f2f0ea'; g.beginPath(); g.arc(m[0], m[1], 3, 0, TAU); g.fill(); }
+  for (const h of helis){ if (h.gone || h.ai || h === curHeli) continue; const m = bigToScreen(h.pos.x, h.pos.z); g.strokeStyle = '#f2f0ea'; g.lineWidth = 1.5; g.beginPath(); g.arc(m[0], m[1], 5, 0, TAU); g.stroke(); g.fillStyle = '#f2f0ea'; g.font = '700 8px Helvetica, Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('H', m[0], m[1] + 0.5); }
+  policeDrawMap(g, bigToScreen, BIG.s, true, playerLevel() === 'air' ? null : (playerLevel() === 'hwy' ? (policeTarget().gy || 0) : 0));
   const own = driving.owner === 'player' && mode !== 'car' ? chassisBody.position : (parkedCars.find(q => q.owner === 'player') || null);
   if (own){ const m = bigToScreen(own.x, own.z); g.fillStyle = '#4aa3ff'; g.strokeStyle = '#fff'; g.lineWidth = 1.5; g.fillRect(m[0] - 4, m[1] - 4, 8, 8); g.strokeRect(m[0] - 4, m[1] - 4, 8, 8); }
   /* gracz (strzałka wg kierunku) */
   const p = playerWorldPos(), pm = bigToScreen(p.x, p.z);
-  const hd = mode === 'car' ? carYaw() : mode === 'boat' && curBoat ? curBoat.heading : mode === 'plane' && curPlane ? (_cpF.set(0, 0, 1).applyQuaternion(curPlane.quat), Math.atan2(_cpF.x, _cpF.z)) : player.facing;
+  const hd = mode === 'car' ? carYaw() : mode === 'heli' && curHeli ? curHeli.yaw : mode === 'boat' && curBoat ? curBoat.heading : mode === 'plane' && curPlane ? (_cpF.set(0, 0, 1).applyQuaternion(curPlane.quat), Math.atan2(_cpF.x, _cpF.z)) : player.facing;
   g.save(); g.translate(pm[0], pm[1]); g.rotate(-hd + Math.PI);
   g.fillStyle = '#f2f0ea'; g.strokeStyle = '#111'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(0, -9); g.lineTo(6.5, 7); g.lineTo(0, 3); g.lineTo(-6.5, 7); g.closePath(); g.fill(); g.stroke();
   g.restore();

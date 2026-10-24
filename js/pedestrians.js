@@ -219,12 +219,17 @@ Pedestrians.hit = function(n, force, gentle){
   n.body.position.set(n.pos.x, -50, n.pos.y);   // leżący pieszy nie zostawia niewidzialnej kolizji w miejscu, gdzie stał
   Sound.hurt();
 };
+/* trafienie siatki kulą gracza (weapons.js): policjant (police.js) albo pieszy — zabójstwo podnosi poszukiwanie */
 Pedestrians.hitMesh = function(mesh, dmg){
   let o = mesh;
-  while (o && !o.userData.pedRef) o = o.parent;
-  if (o) Pedestrians.hit(o.userData.pedRef, dmg);
+  while (o && !o.userData.pedRef && !o.userData.copRef) o = o.parent;
+  if (!o) return;
+  if (o.userData.copRef){ copHit(o.userData.copRef, dmg * 1.3, 'strzał'); return; }
+  const n = o.userData.pedRef;
+  if (n.state !== 'down') policeCrime('zabójstwo', n.pos.x, n.pos.y);
+  Pedestrians.hit(n, dmg);
 };
-Pedestrians.meshes = function(){ return Pedestrians.list.filter(n => n.state !== 'down').map(n => n.group); };
+Pedestrians.meshes = function(){ return Pedestrians.list.filter(n => n.state !== 'down').map(n => n.group).concat(typeof COPS !== 'undefined' ? COPS.filter(c => c.state !== 'down').map(c => c.group) : []); };
 function removePed(n){
   delBody(n.body);
   scene.remove(n.group);

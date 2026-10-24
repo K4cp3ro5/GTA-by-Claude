@@ -111,7 +111,7 @@ const Weapons = {
   /* broń palna w dłoni, pieszo: kamera zza ramienia i postać zwrócona w stronę celownika; pod otwartą czaszą tylko przy PPM
      (bez celowania kamera zostaje za czaszą), w swobodnym spadku — nie */
   aiming(){
-    if (mode !== 'foot' || this.def().kind !== 'ranged' || player.dead) return false;
+    if (mode !== 'foot' || this.def().kind !== 'ranged' || player.dead || player.hiding) return false;
     if (typeof parachute !== 'undefined' && parachute.on) return parachute.t > 0.7 && !!mouseDownR;
     return true;
   },
@@ -148,10 +148,11 @@ const Weapons = {
     Sound.shoot(d.id !== 'pistol');
     Pedestrians.scare(player.body.position.x, player.body.position.z, 40);
     npcPanicAt(player.body.position.x, player.body.position.z);
+    policeCrime('strzały', player.body.position.x, player.body.position.z);       // strzały przy policji: co najmniej 1 gwiazdka
     this._fire(d);
     /* odrzut: kamera w górę (przy przycelowaniu słabiej), lekko na boki; rozrzut rośnie przy serii */
     const kk = d.kick * (this.ads ? 0.6 : 1);
-    camPitch = clamp(camPitch + kk, -0.95, 0.62); camYaw += (Math.random() - 0.5) * kk * 0.6;
+    camPitch = clamp(camPitch + kk, CAM_PITCH_MIN, CAM_PITCH_MAX); camYaw += (Math.random() - 0.5) * kk * 0.6;
     this.bloom = Math.min(1.6, this.bloom + d.bloom);
     if (a.mag <= 0) setTimeout(() => this.reload(), 180);
   },
@@ -243,7 +244,11 @@ const Weapons = {
       let diff = ang - player.facing;
       while (diff >  Math.PI) diff -= TAU;
       while (diff < -Math.PI) diff += TAU;
-      if (Math.abs(diff) < 0.9) Pedestrians.hit(n, d.dmg, true);
+      if (Math.abs(diff) < 0.9){ policeCrime('potrącenie', n.pos.x, n.pos.y); Pedestrians.hit(n, d.dmg, true); }
+    }
+    for (const c of COPS){                                                       // cios w policjanta
+      if (c.state === 'down' || Math.hypot(c.pos.x - p.x, c.pos.y - p.z) > d.range + 0.2) continue;
+      if (Math.abs(wrapAngle(Math.atan2(c.pos.x - p.x, c.pos.y - p.z) - player.facing)) < 0.9) copHit(c, d.dmg, 'cios');
     }
     if (typeof CATS !== 'undefined') for (const c of CATS){                      // cios w kota
       if (c.dead || Math.hypot(c.x - p.x, c.z - p.z) > d.range + 0.3) continue;
@@ -252,29 +257,40 @@ const Weapons = {
   },
   /* namierzanie (RPG naprowadzane, jak w GTA V): po przycelowaniu (PPM) cele w KWADRATOWEJ strefie na środku ekranu (połowa boku =
      LOCK_ZONE × wysokość ekranu), do LOCK_RANGE = 1 km, widoczne; wybierany najbliższy środka (zasłonięty — następny); utrzymany LOCK_TIME =
-     namierzony. Widoczność (długi raycast przez komórki kolizji) sprawdzana co 0.15 s dla trzech najlepszych kandydatów. */
+     namierzony. Cel przyklejony (nie przeskakuje na inny bliżej środka); widoczność (długi raycast) co 0.15 s. */
   updateLock(dt){
-    if (!this.locking()){ this.lock = null; this.lockT = 0; return; }
+    if (!this.locking()){ this.lock = null; this.lockT = 0; this._lostT = 0; this._hidT = 0; return; }
     const cp = camera.position, half = LOCK_ZONE * innerHeight, cand = [];
+    let cur = null;
     for (const t of lockTargets()){
       const p = lockTargetPos(t); if (!p) continue;
       const l = Math.hypot(p.x - cp.x, p.y - cp.y, p.z - cp.z);
       if (l < 6 || l > LOCK_RANGE) continue;
       _wA.set(p.x, p.y, p.z).project(camera); if (_wA.z > 1) continue;
       const sx = _wA.x * innerWidth / 2, sy = _wA.y * innerHeight / 2;                          // piksele od środka ekranu
-      if (Math.abs(sx) > half || Math.abs(sy) > half) continue;
-      cand.push({ t: t, l: l, s: Math.hypot(sx, sy) + l * 0.02 + (this.lock && t.o === this.lock.o ? -40 : 0) });   // bliżej środka i gracza; obecny cel ma przewagę
+      const inZone = Math.abs(sx) <= half && Math.abs(sy) <= half, q = { t: t, l: l, s: Math.hypot(sx, sy) + l * 0.02, inZone: inZone, onScreen: Math.abs(sx) < innerWidth / 2 && Math.abs(sy) < innerHeight / 2 };
+      if (this.lock && t.o === this.lock.o) cur = q;
+      if (inZone) cand.push(q);
     }
-    cand.sort((a, b) => a.s - b.s);
+    /* widoczność bieżącego celu co 0.15 s; chwilowe zasłonięcie (słup, drzewo, inne auto) do 0.6 s nie zrywa namierzania */
     this._losT = (this._losT || 0) - dt;
-    if (this._losT <= 0 || !this._hidden){
-      this._losT = 0.15; this._hidden = new Set();
-      for (const q of cand.slice(0, 3)){ const p = lockTargetPos(q.t), h = rayHit(cp.x, cp.y, cp.z, p.x, p.y, p.z, G_WORLD); if (h && h.distance < q.l - 3) this._hidden.add(q.t.o); }
+    if (cur && this._losT <= 0){ this._losT = 0.15; const p = lockTargetPos(cur.t), h = rayHit(cp.x, cp.y, cp.z, p.x, p.y, p.z, G_WORLD); this._hid = !!(h && h.distance < cur.l - 3); }
+    this._hidT = cur && this._hid ? (this._hidT || 0) + dt : 0;
+    /* cel jest „przyklejony”: zostaje, dopóki jest w kwadracie (namierzony — dopóki jest na ekranie) i nie zniknął z widoku na dłużej;
+       inny cel bliżej środka go nie podmienia. Zgubiony — 0.35 s zwłoki, dopiero potem nowy cel (bez migania ramki) */
+    const keep = cur && (cur.inZone || (this.lockT >= LOCK_TIME && cur.onScreen)) && this._hidT < 0.6;
+    if (keep){
+      this._lostT = 0; this.lockDist = cur.l;
+      if (!this._hid){ const was = this.lockT; this.lockT += dt; if (was < LOCK_TIME && this.lockT >= LOCK_TIME) Sound.tick(true); }
+      return;
     }
-    const bq = cand.find(q => !this._hidden.has(q.t.o)), best = bq ? bq.t : null;                // pierwszy niezasłonięty
-    this.lockDist = bq ? bq.l : 0;
-    if (best && this.lock && best.o === this.lock.o){ const was = this.lockT; this.lockT += dt; if (was < LOCK_TIME && this.lockT >= LOCK_TIME) Sound.tick(true); }
-    else { this.lock = best; this.lockT = 0; }
+    if (this.lock){ this._lostT = (this._lostT || 0) + dt; if (this._lostT < 0.35) return; this.lock = null; this.lockT = 0; }
+    /* nowy cel: najbliższy środka kwadratu i widoczny (sprawdzane najwyżej 3 najlepsze) */
+    cand.sort((a, b) => a.s - b.s);
+    for (const q of cand.slice(0, 3)){
+      const p = lockTargetPos(q.t), h = rayHit(cp.x, cp.y, cp.z, p.x, p.y, p.z, G_WORLD);
+      if (!h || h.distance > q.l - 3){ this.lock = q.t; this.lockT = 0; this._lostT = 0; this._hid = false; this._hidT = 0; this.lockDist = q.l; break; }
+    }
   },
   updatePose(dt){
     updateShotFx(dt);

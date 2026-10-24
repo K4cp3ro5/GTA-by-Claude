@@ -467,8 +467,8 @@ function planeStep(p, dt, inp){
     if (land) tp = agl > 6 ? -0.08 : -0.01;
     if (lift < 1) tp = Math.min(tp, -0.15 * (1 - lift));                                         // przeciągnięcie: nos w dół
     pitch = approach(pitch, tp, T.pitchRate * 0.8 * Math.max(eff, 0.4) * dt);
-    bank = approach(bank, clamp(inp.turn, -1, 1) * 0.7, T.rollRate * 0.6 * dt);
-    h -= g * Math.tan(bank) / Math.max(p.v, 15) * Math.max(lift, 0.3) * dt;                     // zakręt z przechyłu (w prawo: kurs maleje)
+    bank = approach(bank, clamp(inp.turn, -1, 1) * 1.0, T.rollRate * 0.85 * dt);
+    h -= g * Math.tan(bank) / Math.max(p.v, 15) * Math.max(lift, 0.3) * 1.7 * dt;               // zakręt z przechyłu (w prawo: kurs maleje); ciaśniej niż w realu — małe miasto
     h += inp.rud * 0.25 * eff * dt;
     if (lift < 1) p.vy -= g * (1 - lift) * dt; else p.vy = damp(p.vy, 0, 2, dt);
     if (land && agl < 6) p.vy = approach(p.vy, -1.5, 4 * dt);

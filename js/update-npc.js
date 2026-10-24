@@ -11,6 +11,7 @@ function updateNpcs(dt){
   const honk = mode === 'car' && down('horn');
   for (let i = 0; i < npcs.length; i++){
     const n = npcs[i];
+    if (n.cop && n.cop.role !== 'patrol'){ policeCarStep(n, dt); continue; }      // radiowóz w pościgu / szukaniu (police.js)
     n.lodAcc = (n.lodAcc || 0) + dt;
     /* LOD tylko na swobodnym odcinku: nie przy skrzyżowaniu, na rondzie, przy objeździe / zmianie pasa ani gdy auto przed czymś hamuje */
     const free = !n.lat && !(n.rb >= 0) && !n.why && !(_nearAxis(n.pos.x) < ROAD_H + 14 && _nearAxis(n.pos.y) < ROAD_H + 14);

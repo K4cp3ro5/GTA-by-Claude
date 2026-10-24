@@ -209,6 +209,7 @@ setNpcBoatCount(NPC_BOAT_COUNT);
 function playerWorldPos(){
   if (mode === 'car') return chassisBody.position;
   if (mode === 'plane' && curPlane) return curPlane.pos;
+  if (mode === 'heli' && curHeli) return curHeli.pos;
   if (mode === 'boat' && curBoat) return curBoat.pos;
   if (mode === 'ride' && curRide) return ridePos();
   return player.body.position;

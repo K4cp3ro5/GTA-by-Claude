@@ -7,6 +7,61 @@
    Wszystko omija pas autostrady (hwyRectCovered) i ma kolizje tam, gdzie da się uderzyć.
    --------------------------------------------------------------- */
 const COLOR_BUFS = new Map();
+/* lądowiska helikopterów na dachach (wieżowce, szpital, komisariat) — heli.js stawia na części z nich helikoptery */
+const HELIPADS = [];               // { x, z, y (wierzch), r, kind: 'tower' | 'hospital' | 'police' }
+/* windy na dach z lądowiskiem: drzwi na parterze (x, z, y) i wyjście na dachu (rx, ry, rz) — F przenosi między nimi (heli.js) */
+const LIFTS = [];
+/* kryjówki: wnętrza hal z otwartymi wrotami — policja widzi gracza w środku tylko przez wrota (ściany i strop zasłaniają
+   promienie wzroku, helikopter nie widzi wcale); policjanci wchodzą do środka przez wrota (police.js) */
+const HIDE_ZONES = [];             // { x0, x1, z0, z1, y0, y1, door: { x, z, nx, nz, w }, name }
+/* hala z wrotami zamiast pełnej bryły: cienkie ściany (widoczne też od środka) z otworem wrót, strop od spodu, posadzka;
+   kolizja ścian, nadproża i dachu. side — strona wrót: 'n' (−z), 's' (+z), 'w' (−x), 'e' (+x); wallBuf — bufor ścian */
+function hollowHall(cx, cz, w, d, h, y0, side, doorW, doorH, wallBuf, uS, name){
+  const t = 0.35, x0 = cx - w / 2, x1 = cx + w / 2, z0 = cz - d / 2, z1 = cz + d / 2;
+  const wall = (bx, bz, bw, bd, by, bh) => { wallBuf.box(bx, by + bh / 2, bz, bw, bh, bd, uS || 6, false); staticBox(bx, by + bh / 2, bz, bw, bh, bd); };
+  if (side !== 'n') wall(cx, z0 + t / 2, w, t, y0, h);
+  if (side !== 's') wall(cx, z1 - t / 2, w, t, y0, h);
+  if (side !== 'w') wall(x0 + t / 2, cz, t, d, y0, h);
+  if (side !== 'e') wall(x1 - t / 2, cz, t, d, y0, h);
+  const dw = doorW / 2, lin = h - doorH;
+  if (side === 'n' || side === 's'){                                          // wrota w ścianie wzdłuż x
+    const zw = side === 'n' ? z0 + t / 2 : z1 - t / 2, sw = (w - doorW) / 2;
+    wall(x0 + sw / 2, zw, sw, t, y0, h); wall(x1 - sw / 2, zw, sw, t, y0, h); wall(cx, zw, doorW, t, y0 + doorH, lin);
+    CB(0xd8b23a).box(cx - dw - 0.1, y0 + doorH / 2, zw, 0.2, doorH, t + 0.06, 1, false); CB(0xd8b23a).box(cx + dw + 0.1, y0 + doorH / 2, zw, 0.2, doorH, t + 0.06, 1, false);
+    CB(0x55595f).box(cx, y0 + doorH - 0.35, zw + (side === 'n' ? 0.6 : -0.6), doorW, 0.7, 0.7, 1, false);   // zwinięta brama rolowana
+  } else {
+    const xw = side === 'w' ? x0 + t / 2 : x1 - t / 2, sd = (d - doorW) / 2;
+    wall(xw, z0 + sd / 2, t, sd, y0, h); wall(xw, z1 - sd / 2, t, sd, y0, h); wall(xw, cz, t, doorW, y0 + doorH, lin);
+    CB(0xd8b23a).box(xw, y0 + doorH / 2, cz - dw - 0.1, t + 0.06, doorH, 0.2, 1, false); CB(0xd8b23a).box(xw, y0 + doorH / 2, cz + dw + 0.1, t + 0.06, doorH, 0.2, 1, false);
+    CB(0x55595f).box(xw + (side === 'w' ? 0.6 : -0.6), y0 + doorH - 0.35, cz, 0.7, 0.7, doorW, 1, false);
+  }
+  CB(0x4b5056).box(cx, y0 + h - 0.12, cz, w - 2 * t, 0.24, d - 2 * t, 1, false);       // strop (spód dokładany automatycznie)
+  staticBox(cx, y0 + h - 0.2, cz, w, 0.4, d);                                      // dach (wierzch = y0 + h)
+  CB(0x77746e).plane(cx, y0 + 0.035, cz, w - 2 * t, d - 2 * t, 1, 1);              // posadzka
+  const nx = side === 'e' ? 1 : side === 'w' ? -1 : 0, nz = side === 's' ? 1 : side === 'n' ? -1 : 0;
+  const door = { x: nx ? (nx > 0 ? x1 : x0) : cx, z: nz ? (nz > 0 ? z1 : z0) : cz, nx: nx, nz: nz, w: doorW };
+  const zone = { x0: x0, x1: x1, z0: z0, z1: z1, y0: y0, y1: y0 + h, door: door, name: name || 'hala' };
+  HIDE_ZONES.push(zone);
+  return zone;
+}
+/* hangar łukowy (oś wzdłuż z, wrota od −z): kolizja przybliżająca łuk (ściany boczne, „ramiona”, sklepienie), ściana tylna,
+   ściana czołowa z otworem wrót; wnętrze jako kryjówka. Wygląd: landmarks.js (czoło z wycięciem na wrota) */
+function archHangarShell(hx, hz, r, sy, len, doorW, doorH){
+  const H = r * sy, z0 = hz - len / 2, z1 = hz + len / 2, yAt = x => sy * Math.sqrt(Math.max(0, r * r - x * x));
+  for (const s of [-1, 1]){
+    staticBox(hx + s * (r - 0.7), yAt(r - 1.4) / 2, hz, 1.4, yAt(r - 1.4), len);
+    staticBox(hx + s * (r - 2.6), yAt(r - 3.2) - 0.6, hz, 2.4, 1.2, len);
+    staticBox(hx + s * (r - 5), yAt(r - 5.6) - 0.5, hz, 2.6, 1.0, len);
+  }
+  staticBox(hx, H - 0.5, hz, (r - 6.2) * 2, 1.0, len);
+  staticBox(hx, H / 2, z1 - 0.3, 2 * r, H, 0.6);
+  const sw = r - doorW / 2;
+  staticBox(hx - doorW / 2 - sw / 2, H / 2, z0 + 0.3, sw, H, 0.6); staticBox(hx + doorW / 2 + sw / 2, H / 2, z0 + 0.3, sw, H, 0.6);
+  staticBox(hx, doorH + (H - doorH) / 2, z0 + 0.3, doorW, H - doorH, 0.6);
+  const zone = { x0: hx - r, x1: hx + r, z0: z0, z1: z1, y0: 0, y1: H, door: { x: hx, z: z0, nx: 0, nz: -1, w: doorW }, name: 'hangar' };
+  HIDE_ZONES.push(zone);
+  return zone;
+}
 function CB(hex){ let b = COLOR_BUFS.get(hex); if (!b){ b = new GeoBuf(); COLOR_BUFS.set(hex, b); } return b; }
 
 /* --- tekstury --- */
@@ -82,21 +137,34 @@ function addTower(cx, cz, w, d, h, pool){
     y += th; left -= th;
     if (t < tiers - 1){ tw = Math.max(8, tw * rand(0.68, 0.8)); td = Math.max(8, td * rand(0.68, 0.8)); }
   }
-  const mw = tw * 0.62, md = td * 0.62;
-  CB(0x3b4046).box(cx, y + 1.6, cz, mw, 3.2, md, 4, true);                 // kondygnacja techniczna
-  const top = y + 3.2;
-  if (rnd() < 0.4 && Math.min(mw, md) > 7){
-    const r = Math.min(mw, md) * 0.42;
-    CB(0x2a2d31).disc(cx, top + 0.03, cz, r, 20);
-    CB(0xe7e3d6).ring(cx, top + 0.05, cz, r - 0.5, r - 0.2, 20);
+  /* lądowisko na dachu ostatniej kondygnacji (szerokie wieżowce; co najmniej trzy w mieście) albo kondygnacja techniczna z anteną */
+  let top = y;
+  const padRoll = rnd();                                                    // losowanie zawsze (ta sama kolejność rnd — miasto bez zmian)
+  if (Math.min(tw, td) >= 9.5 && (padRoll < 0.55 || HELIPADS.filter(p => p.kind === 'tower').length < 3)){
+    const r = Math.min(tw, td) * 0.4;
+    HELIPADS.push({ x: cx, z: cz, y: top, r: r, kind: 'tower' });
+    /* winda: drzwi od południa na parterze (pod podium), właz w narożniku dachu */
+    const lz = cz + d / 2;
+    CB(0x2a3640).box(cx, y0 + 1.4, lz + 0.06, 2.2, 2.8, 0.12, 1, false); CB(0xd8d4cc).box(cx, y0 + 2.95, lz + 0.08, 2.6, 0.3, 0.16, 1, false);
+    wordSignQuad('WINDA', '#2a3640', '#ffd36a', [cx + 1.1, y0 + 3.15, lz + 0.17], [cx - 1.1, y0 + 3.15, lz + 0.17], [cx - 1.1, y0 + 3.75, lz + 0.17], [cx + 1.1, y0 + 3.75, lz + 0.17]);
+    const hx = cx + tw / 2 - 1.1, hz = cz + td / 2 - 1.1;
+    CB(0x8a8f96).box(hx, top + 0.08, hz, 1.2, 0.16, 1.2, 1, true); CB(0xd8b23a).box(hx, top + 0.17, hz, 1.0, 0.02, 1.0, 1, true);
+    LIFTS.push({ x: cx, z: lz + 0.9, y: y0, rx: hx, rz: hz, ry: top, name: 'wieżowiec' });
+    CB(0x2a2d31).disc(cx, top + 0.03, cz, r, 24);
+    CB(0xe7e3d6).ring(cx, top + 0.05, cz, r - 0.5, r - 0.2, 24);
     CB(0xe7e3d6).plane(cx - r * 0.3, top + 0.06, cz, r * 0.14, r * 0.9, 1, 1);
     CB(0xe7e3d6).plane(cx + r * 0.3, top + 0.06, cz, r * 0.14, r * 0.9, 1, 1);
     CB(0xe7e3d6).plane(cx, top + 0.065, cz, r * 0.6, r * 0.14, 1, 1);
+    for (let k = 0; k < 8; k++){ const a = k / 8 * TAU; CB(0xffd36a).box(cx + Math.cos(a) * (r + 0.3), top + 0.08, cz + Math.sin(a) * (r + 0.3), 0.25, 0.12, 0.25, 1, true); }   // lampki obrzeża
   } else {
+    const mw = tw * 0.62, md = td * 0.62;
+    CB(0x3b4046).box(cx, y + 1.6, cz, mw, 3.2, md, 4, true);               // kondygnacja techniczna z anteną
+    staticBox(cx, y + 1.6, cz, mw, 3.2, md);
+    top = y + 3.2;
     CB(0x8a8f96).box(cx, top + 5, cz, 0.35, 10, 0.35, 1, true);
     CB(0xc23a2a).box(cx, top + 10.2, cz, 0.6, 0.4, 0.6, 1, true);
   }
-  buildings.push({ x: cx, z: cz, w: w, d: d });
+  buildings.push({ x: cx, z: cz, w: w, d: d, top: top });
 }
 
 /* --- blok mieszkalny z balkonami na dłuższych ścianach --- */
@@ -264,7 +332,7 @@ function buildIndustrialBlock(cx, cz){
   crossBuf.plane(cx, y + 0.02, cz, LOT - 4, LOT - 4, 3, 3);
   const hw = 22, hd = 12.5, hx = cx, hz = cz + (rnd() < 0.5 ? -1 : 1) * 4.6, H = rand(7.5, 9.5);
   if (!hwyRectCovered(hx, hz, hw, hd, 3.5)){
-    corrBuf.box(hx, y + H / 2, hz, hw, H, hd, 6, false);
+    hollowHall(hx, hz, hw, hd, H, y, hz > cz ? 'n' : 's', 7, Math.min(5, H - 1.6), corrBuf, 6, 'hala');   // otwarta hala (kryjówka), wrota od placu
     const n = 5, tw = hw / n, rh = 2.0, top = y + H;
     for (let k = 0; k < n; k++){
       const x0 = hx - hw / 2 + k * tw, x1 = x0 + tw, za = hz - hd / 2, zb = hz + hd / 2;
@@ -273,8 +341,7 @@ function buildIndustrialBlock(cx, cz){
       triOut(CB(0x8f9497), [x0, top, za], [x1, top, za], [x1, top + rh, za], [0, 0, -1]);
       triOut(CB(0x8f9497), [x0, top, zb], [x1, top, zb], [x1, top + rh, zb], [0, 0, 1]);
     }
-    staticBox(hx, y + H / 2, hz, hw, H, hd);
-    buildings.push({ x: hx, z: hz, w: hw, d: hd });
+    buildings.push({ x: hx, z: hz, w: hw, d: hd, top: y + H, hollow: true });
     if (rnd() < 0.4){                                                         // komin z cegły
       const kx = hx + hw / 2 - 2, kz = hz + (hz > cz ? 1 : -1) * (hd / 2 + 1.6), R = 1.0, Hk = rand(20, 28), seg = 12;
       if (!hwyRectCovered(kx, kz, 2.2, 2.2, 2)){
@@ -291,9 +358,10 @@ function buildIndustrialBlock(cx, cz){
     if (rnd() < 0.25) continue;
     const x = cx - 9 + k * 4.5 - 1.5 + rand(-0.3, 0.3), z = cz + side * rand(5.5, 8.5), rot = rnd() < 0.5 ? 0 : 0.08;
     if (hwyRectCovered(x, z, 3, 7, 2)) continue;
-    CB(cols[randInt(0, cols.length - 1)]).boxRot(x, y + 1.3, z, 2.4, 2.6, 6.1, rot, 2, true);
-    staticBoxRot(x, y + 1.3, z, 2.4, 2.6, 6.1, rot);
-    if (rnd() < 0.3){ CB(cols[randInt(0, cols.length - 1)]).boxRot(x, y + 3.9, z, 2.4, 2.6, 6.1, rot, 2, true); staticBoxRot(x, y + 3.9, z, 2.4, 2.6, 6.1, rot); }
+    /* pas przejazdu od bramy do wrót hali bez kontenerów (losowania jak dawniej — reszta miasta bez zmian) */
+    const free = Math.abs(x - cx) < 5.8, c1 = cols[randInt(0, cols.length - 1)];
+    if (!free){ CB(c1).boxRot(x, y + 1.3, z, 2.4, 2.6, 6.1, rot, 2, true); staticBoxRot(x, y + 1.3, z, 2.4, 2.6, 6.1, rot); }
+    if (rnd() < 0.3){ const c2 = cols[randInt(0, cols.length - 1)]; if (!free){ CB(c2).boxRot(x, y + 3.9, z, 2.4, 2.6, 6.1, rot, 2, true); staticBoxRot(x, y + 3.9, z, 2.4, 2.6, 6.1, rot); } }
   }
   /* ogrodzenie 3 m od krawężnika, brama 6 m od strony placu */
   const e = LOT / 2 - 3, gate = side, g = 3;

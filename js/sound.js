@@ -249,6 +249,43 @@ const Sound = {
     g.gain.exponentialRampToValueAtTime(0.0001, t + 0.17);
     src.connect(f); f.connect(g); g.connect(this.master);
     src.start(t); src.stop(t + 0.18);
+  },
+
+  /* syrena radiowozów (police.js): dwa tony zawodzące wolnym LFO, głośność wg najbliższego radiowozu w pościgu (0..1) */
+  sirenNodes: null,
+  siren(vol){
+    if (!this.ready) return;
+    const ctx = this.ctx, t = ctx.currentTime;
+    if (!this.sirenNodes){
+      if (vol <= 0.001) return;
+      const g = ctx.createGain(); g.gain.value = 0;
+      const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1100; f.Q.value = 0.9;
+      const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 900;
+      const lfo = ctx.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = 0.32;              // wycie: 600–1300 Hz co ~3 s
+      const lg = ctx.createGain(); lg.gain.value = 350; lfo.connect(lg); lg.connect(o.frequency);
+      o.connect(f); f.connect(g); g.connect(this.master); o.start(); lfo.start();
+      this.sirenNodes = { g: g, o: o, lfo: lfo };
+    }
+    this.sirenNodes.g.gain.setTargetAtTime(clamp(vol, 0, 1) * 0.07, t, 0.15);
+  },
+  /* wirnik helikoptera (heli.js): szum przez filtr pasmowy, głośność modulowana „łopatami” (rate Hz), vol 0..1 */
+  rotorNodes: null,
+  rotor(vol, rate){
+    if (!this.ready) return;
+    const ctx = this.ctx, t = ctx.currentTime;
+    if (!this.rotorNodes){
+      if (vol <= 0.001) return;
+      const src = ctx.createBufferSource(); src.buffer = this.noise; src.loop = true;
+      const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 420; f.Q.value = 1.2;
+      const am = ctx.createGain(); am.gain.value = 0.5;
+      const lfo = ctx.createOscillator(); lfo.type = 'square'; lfo.frequency.value = 12;
+      const lg = ctx.createGain(); lg.gain.value = 0.5; lfo.connect(lg); lg.connect(am.gain);
+      const g = ctx.createGain(); g.gain.value = 0;
+      src.connect(f); f.connect(am); am.connect(g); g.connect(this.master); src.start(); lfo.start();
+      this.rotorNodes = { g: g, lfo: lfo };
+    }
+    this.rotorNodes.lfo.frequency.setTargetAtTime(Math.max(2, rate || 12), t, 0.3);
+    this.rotorNodes.g.gain.setTargetAtTime(clamp(vol, 0, 1) * 0.5, t, 0.2);
   }
 };
 
@@ -259,8 +296,11 @@ chassisBody.addEventListener('collide', e => {
   if (v > 3.2) Sound.thud(v);
   /* obrażenia raz na kraksę (kilka kształtów naraz = kilka zdarzeń): najmocniejsze uderzenie w oknie 0.4 s */
   if (mode === 'car' && v > 11){ const d = (v - 11) * 3.6; if (clock - _crashT > 0.4){ _crashT = clock; _crashD = 0; } if (d > _crashD){ damagePlayer(d - _crashD, 'kraksa'); _crashD = d; } }
-  if (e.body && e.body.isPed && v > 2.2) Pedestrians.hit(e.body.pedRef, v);   // body.pedRef = obiekt pieszego (samo ciało nie ma group/state)
-  if (e.body && e.body.npcRef && v > 5.6){ const n = e.body.npcRef; npcHitByPlayer(n, v); if (v > 10){ n.hp = (n.hp === undefined ? 100 : n.hp) - (v - 10) * 3.6; if (n.hp <= 0) _boomQueue.push(() => destroyNpcCar(n)); } }   // > 20 km/h: NPC staje; od 36 km/h traci zdrowie (wybuch dopiero po ciężkich kraksach)
+  if (e.body && e.body.copRef && v > 2.2){ if (mode === 'car') copHit(e.body.copRef, v > 7 ? 100 : 40, 'auto'); }   // policjant pieszo (police.js)
+  else if (e.body && e.body.isPed && v > 2.2){ const pd = e.body.pedRef; if (mode === 'car' && pd && pd.state !== 'down') policeCrime(v > 7 ? 'zabójstwo' : 'potrącenie', pd.pos.x, pd.pos.y); Pedestrians.hit(pd, v); }   // body.pedRef = obiekt pieszego (samo ciało nie ma group/state)
+  if (e.body && e.body.npcRef && v > 5.6){ const n = e.body.npcRef; if (n.cop) policeRammed(n, v); else npcHitByPlayer(n, v); if (v > 10){ n.hp = (n.hp === undefined ? 100 : n.hp) - (v - 10) * 3.6; if (n.hp <= 0) _boomQueue.push(() => destroyNpcCar(n, true)); } }   // > 20 km/h: NPC staje; od 36 km/h traci zdrowie (wybuch dopiero po ciężkich kraksach)
   /* stan auta gracza: najmocniejsze uderzenie w oknie 0.4 s */
-  if (v > CAR_CRASH_V0){ if (clock - _carCrashT > 0.4){ _carCrashT = clock; _carCrashV = CAR_CRASH_V0; } if (v > _carCrashV){ const dv = v, prev = _carCrashV; _carCrashV = v; _boomQueue.push(() => carCrashDamage(dv, prev)); } }
+  /* radiowóz (ciało kinematyczne = nieskończona masa) liczony łagodniej — PIT i taranowanie bez wybuchu przy pierwszym kontakcie */
+  const vc = e.body && e.body.npcRef && e.body.npcRef.cop ? v * 0.55 : v;
+  if (vc > CAR_CRASH_V0){ if (clock - _carCrashT > 0.4){ _carCrashT = clock; _carCrashV = CAR_CRASH_V0; } if (vc > _carCrashV){ const dv = vc, prev = _carCrashV; _carCrashV = vc; _boomQueue.push(() => carCrashDamage(dv, prev)); } }
 });

@@ -121,14 +121,11 @@ function buildAirport(){
 
   /* --- hangar (blacha, dach dwuspadowy, wrota od strony płyty) --- */
   const hx = 118, hz = -734, hw2 = 34, hd = 26, hh = 12;
-  corrBuf.box(hx, hh / 2, hz, hw2, hh, hd, 6, false);
+  hollowHall(hx, hz, hw2, hd, hh, 0, 'n', 20, 9.5, corrBuf, 6, 'hangar');                 // otwarte wrota od strony płyty (kryjówka)
   quadOut(CB(0x6d7174), [hx - hw2 / 2 - 0.3, hh, hz - hd / 2 - 0.3], [hx + hw2 / 2 + 0.3, hh, hz - hd / 2 - 0.3], [hx + hw2 / 2 + 0.3, hh + 3, hz], [hx - hw2 / 2 - 0.3, hh + 3, hz], [0, 1, -1]);
   quadOut(CB(0x6d7174), [hx - hw2 / 2 - 0.3, hh, hz + hd / 2 + 0.3], [hx + hw2 / 2 + 0.3, hh, hz + hd / 2 + 0.3], [hx + hw2 / 2 + 0.3, hh + 3, hz], [hx - hw2 / 2 - 0.3, hh + 3, hz], [0, 1, 1]);
   for (const sx of [-1, 1]) triOut(CB(0x8f9497), [hx + sx * hw2 / 2, hh, hz - hd / 2], [hx + sx * hw2 / 2, hh, hz + hd / 2], [hx + sx * hw2 / 2, hh + 3, hz], [sx, 0, 0]);
-  CB(0x3f4449).plane(hx, hh * 0.45, hz - hd / 2 - 0.02, hw2 * 0.8, hh * 0.85, 1, 1);
-  quadOut(CB(0x3f4449), [hx - hw2 * 0.4, 0.05, hz - hd / 2 - 0.03], [hx + hw2 * 0.4, 0.05, hz - hd / 2 - 0.03], [hx + hw2 * 0.4, hh * 0.85, hz - hd / 2 - 0.03], [hx - hw2 * 0.4, hh * 0.85, hz - hd / 2 - 0.03], [0, 0, -1]);
-  staticBox(hx, hh / 2, hz, hw2, hh, hd);
-  buildings.push({ x: hx, z: hz, w: hw2, d: hd });
+  buildings.push({ x: hx, z: hz, w: hw2, d: hd, top: hh, hollow: true });
 
   /* --- rękaw wiatrowy przy pasie --- */
   CB(0xcfd2d4).box(-158, 3, A.taxi.z, 0.15, 6, 0.15, 1, true);
@@ -271,10 +268,11 @@ function buildAirportWest(){
   staticBox(wx, 9, wz, 4, 18, 4); buildings.push({ x: wx, z: wz, w: 4, d: 4 });
   const hx = -333, hz = 92, hw2 = 26, hd = 30, hh = 11;
   /* (hangary łukowe: landmarks.js) */
-  staticBox(hx, hh / 2, hz, hw2, hh, hd); buildings.push({ x: hx, z: hz, w: hw2, d: hd });
+  archHangarShell(hx, hz, 13, 0.8, 30, 14, 7.5); buildings.push({ x: hx, z: hz, w: hw2, d: hd, top: hh, hollow: true });
   flat(crossBuf, hx - hw2 / 2, hx + hw2 / 2, ap.z1, hz - hd / 2, y + 0.003);
   flat(crossBuf, hx + hw2 / 2, hx + hw2 / 2 + 8, hz - hd / 2, hz + 34 + hd / 2, y + 0.003);                 // dojazd do drugiego hangaru
-  staticBox(hx, hh / 2, hz + 34, hw2, hh, hd); buildings.push({ x: hx, z: hz + 34, w: hw2, d: hd });
+  archHangarShell(hx, hz + 34, 13, 0.8, 30, 14, 7.5); buildings.push({ x: hx, z: hz + 34, w: hw2, d: hd, top: hh, hollow: true });
+  CB(0x77746e).plane(hx, y + 0.004, hz, 24, 29, 1, 1); CB(0x77746e).plane(hx, y + 0.004, hz + 34, 24, 29, 1, 1);           // posadzki hangarów
   /* dojazd z alei j=6, droga przed terminalem, parking; znaki (wyjazd na jednokierunkową obwodnicę: A-7 + nakaz w lewo) */
   const ac = A.access, fr = A.front, pk = A.park;
   flat(crossBuf, ac.x1, ac.x0, ac.z - ac.hw, ac.z + ac.hw, y);

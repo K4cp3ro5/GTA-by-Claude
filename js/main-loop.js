@@ -53,17 +53,21 @@ function frame(now){
   updateAirTraffic(dt);
   const boatKmh = mode === 'boat' ? updateBoat(dt) : 0;
   updateBoatsIdle(dt);
+  const heliKmh = mode === 'heli' ? updateHeli(dt) : 0;
+  updateHelis(dt);
   updateBirds(dt);
   updatePark(dt);
   updateDestruction(dt);
   updateCats(dt);
-  const vehKmh = mode === 'plane' ? planeKmh : mode === 'boat' ? boatKmh : carState.kmh;
+  updatePolice(dt);
+  const vehKmh = mode === 'plane' ? planeKmh : mode === 'boat' ? boatKmh : mode === 'heli' ? heliKmh : carState.kmh;
   if (mode === 'foot' && pointerLocked){ if (!(parachute.on && parachute.t > 0.7)) updatePlayer(dt); }   // pod otwartą czaszą steruje updateParachute
   else if (mode === 'foot') {
     /* pauza sterowania przy zwolnionym kursorze — postać wciąż stoi na fizyce */
     player.body.velocity.x = damp(player.body.velocity.x, 0, 10, dt);
     player.body.velocity.z = damp(player.body.velocity.z, 0, 10, dt);
   }
+  updateFreeFall(dt);                          // skok z wysokości: Spacja otwiera spadochron (heli.js)
   updateParachute(dt);                         // po updatePlayer: nadpisuje prędkość i obrót postaci pod czaszą
   Weapons.updatePose(dt);
   updateInventory(dt);

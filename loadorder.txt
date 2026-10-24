@@ -30,6 +30,9 @@ destruction.js
 cats.js
 inventory.js
 boats.js
+hideouts.js
+heli.js
+police.js
 birds.js
 daynight.js
 update-player.js

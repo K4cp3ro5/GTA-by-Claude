@@ -7,7 +7,38 @@ const camCur    = new THREE.Vector3(0, 6, 20);
 const lookAt    = new THREE.Vector3();
 const rayCaster = new THREE.Raycaster();
 let camFov = 66, camKmh = 0, camDist = 7.6;
-let camShake = 0, planeCamYaw = 0;                     // wstrząs (wybuch) / obrót kamery samolotu myszą (wraca za ogon)
+let camShake = 0, planeCamYaw = 0, planeCamPitch = 0;  // wstrząs (wybuch) / obrót i nachylenie kamery pojazdu myszą (wracają za ogon)
+const CAM_PITCH_MIN = -1.53, CAM_PITCH_MAX = 1.5;      // pieszo i w aucie: od patrzenia prawie pionowo w dół do prawie pionowo w górę
+/* wysięgnik kamery: odległość do pierwszej przeszkody od celu w stronę kamery — siatki (camBlockers) i wszystkie kolizje świata
+   (budynki, drzewa, latarnie, wiadukty, ściany hal); kamera staje przed nią, żeby postać / pojazd była widoczna */
+const _cbRay = new THREE.Raycaster();
+function camBoomFree(from, dir, len){
+  let free = len;
+  _cbRay.set(from, dir); _cbRay.far = len + 0.4;
+  const hits = _cbRay.intersectObjects(camBlockers, false);
+  if (hits.length && hits[0].distance < free) free = hits[0].distance;
+  const h = rayHit(from.x, from.y, from.z, from.x + dir.x * (len + 0.4), from.y + dir.y * (len + 0.4), from.z + dir.z * (len + 0.4), G_WORLD);
+  if (h && h.distance < free) free = h.distance;
+  return free < len ? Math.max(0.45, free - 0.35) : len;
+}
+/* kamera pojazdu (łódź, samolot, helikopter): orbita wokół celu (mysz — pełny obrót i góra / dół, po 1.2 s bez ruchu myszy wraca za
+   ogon), wysięgnik skracany przed przeszkodą, nie schodzi pod ziemię / wodę; patrzy przed nos, gdy kamera jest za ogonem */
+const _ocT = new THREE.Vector3(), _ocD = new THREE.Vector3();
+function orbitCam(dt, cx, cy, cz, yawBase, dist, camH, ahead, stiff){
+  if (clock - lastMouseMove > 1.2){ planeCamYaw = angleDamp(planeCamYaw, 0, 1.5, dt); planeCamPitch = damp(planeCamPitch, 0, 1.5, dt); }
+  const yw = yawBase + planeCamYaw, R0 = Math.hypot(dist, camH), el = clamp(Math.atan2(camH, dist) + planeCamPitch, -1.2, 1.5);
+  _ocT.set(cx, cy + 1, cz);
+  _ocD.set(-Math.sin(yw) * Math.cos(el), Math.sin(el), -Math.cos(yw) * Math.cos(el));
+  const len = camBoomFree(_ocT, _ocD, R0);
+  _cpW.copy(_ocT).addScaledVector(_ocD, len);
+  const gy = Math.max(heightAt(_cpW.x, _cpW.z), isLand(_cpW.x, _cpW.z) ? 0 : WATER_Y) + 0.6; if (_cpW.y < gy && len >= R0 - 0.01) _cpW.y = gy;
+  if (len < R0 - 0.01) camCur.copy(_cpW);                                          // przed przeszkodą od razu (bez przenikania)
+  else { camCur.x = damp(camCur.x, _cpW.x, stiff, dt); camCur.y = damp(camCur.y, _cpW.y, stiff, dt); camCur.z = damp(camCur.z, _cpW.z, stiff, dt); }
+  camera.position.copy(camCur);
+  const back = Math.abs(planeCamYaw) < 0.15 && Math.abs(planeCamPitch) < 0.15;
+  camera.lookAt(cx + Math.sin(yawBase) * (back ? ahead : 0), cy + (back ? 0 : 0.5), cz + Math.cos(yawBase) * (back ? ahead : 0));
+  return yw;
+}
 const _camEuler = new THREE.Euler();
 
 const _cpF = new THREE.Vector3(), _cpW = new THREE.Vector3(), _cpL = new THREE.Vector3();
@@ -17,12 +48,7 @@ function updateCamera(dt, kmh){
   if (mode === 'boat' && curBoat){
     /* łódź: kamera pościgowa za rufą (mysz obraca jak w samolocie) */
     const b = curBoat;
-    if (clock - lastMouseMove > 1.2) planeCamYaw = angleDamp(planeCamYaw, 0, 1.5, dt);
-    const h = b.heading + planeCamYaw;
-    _cpW.set(b.pos.x - Math.sin(h) * BOAT_T.camDist, WATER_Y + BOAT_T.camH, b.pos.z - Math.cos(h) * BOAT_T.camDist);
-    camCur.x = damp(camCur.x, _cpW.x, 6, dt); camCur.y = damp(camCur.y, _cpW.y, 6, dt); camCur.z = damp(camCur.z, _cpW.z, 6, dt);
-    camera.position.copy(camCur);
-    camera.lookAt(b.pos.x + Math.sin(b.heading) * 6, WATER_Y + 1.2, b.pos.z + Math.cos(b.heading) * 6);
+    const h = orbitCam(dt, b.pos.x, WATER_Y + 0.2, b.pos.z, b.heading, BOAT_T.camDist, BOAT_T.camH, 6, 6);
     camFov = damp(camFov, 66 + clamp(kmh / 60, 0, 1) * 8, 2, dt);
     if (Math.abs(camera.fov - camFov - fovAdd) > 0.01){ camera.fov = camFov + fovAdd; camera.updateProjectionMatrix(); }
     sun.target.position.set(b.pos.x, 0, b.pos.z);
@@ -34,18 +60,24 @@ function updateCamera(dt, kmh){
     /* kamera pościgowa: za ogonem i nad samolotem, patrzy przed nos; płynnie, bez wysięgnika kolizyjnego */
     const p = curPlane, T = p.T;
     _cpF.set(0, 0, 1).applyQuaternion(p.quat);
-    if (clock - lastMouseMove > 1.2) planeCamYaw = angleDamp(planeCamYaw, 0, 1.5, dt);
-    _cpL.copy(_cpF).applyAxisAngle(_pY, planeCamYaw);
-    _cpW.copy(p.pos).addScaledVector(_cpL, -T.camDist); _cpW.y += T.camH;
-    const gy = planeGroundY(_cpW.x, _cpW.z, _cpW.y + 5) + 1.5; if (_cpW.y < gy) _cpW.y = gy;
-    camCur.x = damp(camCur.x, _cpW.x, 5, dt); camCur.y = damp(camCur.y, _cpW.y, 5, dt); camCur.z = damp(camCur.z, _cpW.z, 5, dt);
-    camera.position.copy(camCur);
-    _cpL.copy(p.pos).addScaledVector(_cpF, planeCamYaw ? 0 : 25); camera.lookAt(_cpL);
+    orbitCam(dt, p.pos.x, p.pos.y - 1, p.pos.z, Math.atan2(_cpF.x, _cpF.z), T.camDist, T.camH, 25, 5);
     camFov = damp(camFov, 70 + clamp(kmh / 400, 0, 1) * 10, 2, dt);
     if (Math.abs(camera.fov - camFov - fovAdd) > 0.01){ camera.fov = camFov + fovAdd; camera.updateProjectionMatrix(); }
     sun.target.position.set(p.pos.x, 0, p.pos.z);
     sun.position.set(p.pos.x + lightDir.x * 95, lightDir.y * 95 + 2, p.pos.z + lightDir.z * 95);
     camYaw = Math.atan2(-_cpF.x, -_cpF.z);
+    return;
+  }
+
+  if (mode === 'heli' && curHeli){
+    /* helikopter: za ogonem i nad wirnikiem, patrzy przed nos; mysz obraca (wraca za ogon) */
+    const h = curHeli;
+    const yw = orbitCam(dt, h.pos.x, h.pos.y - 1, h.pos.z, h.yaw, HELI_T.camDist, HELI_T.camH, 10, 6);
+    camFov = damp(camFov, 68 + clamp(kmh / 160, 0, 1) * 8, 2, dt);
+    if (Math.abs(camera.fov - camFov - fovAdd) > 0.01){ camera.fov = camFov + fovAdd; camera.updateProjectionMatrix(); }
+    sun.target.position.set(h.pos.x, 0, h.pos.z);
+    sun.position.set(h.pos.x + lightDir.x * 95, lightDir.y * 95 + 2, h.pos.z + lightDir.z * 95);
+    camYaw = yw + Math.PI;
     return;
   }
 
@@ -78,24 +110,27 @@ function updateCamera(dt, kmh){
   }
 
   camTarget.set(tx, ty, tz);
-  const cp = Math.cos(camPitch), sp = Math.sin(camPitch);
+  /* patrzenie w górę (camPitch > 0.32, ku 0…1): kamera podjeżdża blisko i nisko za plecy, a spojrzenie unosi się najwyżej do ~45°
+     (w aucie ~29°) — postać / auto zostaje w dolnej części kadru, nad nią niebo (jak w GTA); kamera nie schodzi pod postać */
+  const kUp = clamp((camPitch - 0.32) / (CAM_PITCH_MAX - 0.32), 0, 1), ku = kUp * kUp * (3 - 2 * kUp);
+  const footY = mode === 'car' ? carModel.root.position.y - 0.45 : player.mesh.position.y;
+  dist = lerp(dist, mode === 'car' ? CAR_TYPES[carType].half[2] + 3.5 : 2.0, ku);
+  const posPitch = Math.min(camPitch, 0.32), cp = Math.cos(posPitch), sp = Math.sin(posPitch);
   camWish.set(
     camTarget.x + Math.sin(camYaw) * cp * dist,
     camTarget.y + height - sp * dist,
     camTarget.z + Math.cos(camYaw) * cp * dist
   );
+  camWish.y = lerp(camWish.y, footY + (mode === 'car' ? 0.95 : 0.5), ku);
 
   /* wysięgnik sprężynowy: przy przeszkodzie skraca się od razu, a wydłuża płynnie (bez pompowania) */
   const dir = camWish.clone().sub(camTarget);
   const len = dir.length();
   dir.normalize();
-  rayCaster.set(camTarget, dir);
-  rayCaster.far = len + 0.4;
-  const hits = rayCaster.intersectObjects(camBlockers, false);
-  const free = (hits.length && hits[0].distance < len) ? Math.max(1.1, hits[0].distance - 0.35) : len;
+  const free = camBoomFree(camTarget, dir, len);
   camDist = free < camDist ? free : damp(camDist, free, 2.5, dt);
   camWish.copy(camTarget).addScaledVector(dir, camDist);
-  if (camWish.y < 0.6) camWish.y = 0.6;
+  if (camWish.y < footY + 0.3) camWish.y = footY + 0.3;
 
   /* w aucie: kamera sztywno na wysięgniku za interpolowanym celem (wygładzony jest kąt camYaw),
      bo ściganie celu z opóźnieniem dawało drgania przy nierównym kroku klatek */
@@ -109,10 +144,15 @@ function updateCamera(dt, kmh){
 
   lookAt.copy(camTarget);
   lookAt.y += mode === 'car' ? 0.35 : 0.30;
+  if (ku > 0){
+    const el = lerp(0.32, mode === 'car' ? 0.5 : 0.78, ku);
+    lookAt.lerp(_cpL.set(camCur.x - Math.sin(camYaw) * Math.cos(el) * 12, camCur.y + Math.sin(el) * 12, camCur.z - Math.cos(camYaw) * Math.cos(el) * 12), ku);
+  }
   camera.lookAt(lookAt);
 
-  if (Math.abs(camera.fov - camFov - fovAdd) > 0.01){
-    camera.fov = camFov + fovAdd;
+  const fovW = camFov + fovAdd + ku * 8;                                            // patrząc w górę — trochę szerzej
+  if (Math.abs(camera.fov - fovW) > 0.01){
+    camera.fov = fovW;
     camera.updateProjectionMatrix();
   }
 

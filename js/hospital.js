@@ -93,6 +93,13 @@ function buildHospital(){
   for (const [ox, oz, sw, sd] of [[0, 7.6, 15.6, 0.4], [0, -7.6, 15.6, 0.4], [7.6, 0, 0.4, 15.6], [-7.6, 0, 0.4, 15.6], [-2.2, 0, 0.8, 6.5], [2.2, 0, 0.8, 6.5], [0, 0, 3.6, 0.8]])
     CB(0xf2f0ea).box(hx + ox, ry + 0.06, hz + oz, sw, 0.02, sd, 1, true);
   CB(0xd8d4cc).box(mn.x0 + 8, mn.h + 1.6, cz + 4, 6, 3.2, 5, 2, true);                                       // maszynownia
+  staticBox(mn.x0 + 8, mn.h + 1.6, cz + 4, 6, 3.2, 5);
+  HELIPADS.push({ x: hx, z: hz, y: mn.h, r: 7.5, kind: 'hospital' });
+  /* winda na lądowisko: drzwi obok wejścia, właz na dachu przy maszynowni */
+  CB(0x2a3640).box(cx - 13, 1.4, mn.z0 - 0.06, 2.2, 2.8, 0.12, 1, false);
+  wordSignQuad('WINDA', '#2a3640', '#ffd36a', [cx - 11.9, 3.0, mn.z0 - 0.14], [cx - 14.1, 3.0, mn.z0 - 0.14], [cx - 14.1, 3.6, mn.z0 - 0.14], [cx - 11.9, 3.6, mn.z0 - 0.14]);
+  CB(0x8a8f96).box(mn.x0 + 13, mn.h + 0.08, cz + 4, 1.2, 0.16, 1.2, 1, true); CB(0xd8b23a).box(mn.x0 + 13, mn.h + 0.17, cz + 4, 1.0, 0.02, 1.0, 1, true);
+  LIFTS.push({ x: cx - 13, z: mn.z0 - 0.9, y: 0, rx: mn.x0 + 13, rz: cz + 4, ry: mn.h, name: 'szpital' });
 
   /* --- skrzydło (niższe) --- */
   const wx = (wg.x0 + wg.x1) / 2, wz = (wg.z0 + wg.z1) / 2, ww = wg.x1 - wg.x0, wd = wg.z1 - wg.z0;
@@ -148,4 +155,88 @@ function buildHospital(){
   mapExtras.push({ t: 'rect', x0: cx - 9, x1: cx + 9, z0: cz - 2.5, z1: cz + 2.5, c: '#d62f2f' });
   mapExtras.push({ t: 'rect', x0: cx - 2.5, x1: cx + 2.5, z0: cz - 9, z1: cz + 9, c: '#d62f2f' });
   terrainLog.push({ kind: 'hospital', x: cx, z: cz, r: 0, h: 0 });
+}
+
+/* ---------------------------------------------------------------
+   7a3b. KOMISARIAT POLICJI — na wschód od szpitala (pas podmiejski, x 40…134): dojazd z obwodnicy ulicą i=7,
+   droga przed wejściem, budynek z napisem POLICJA i niebieskimi lampami, lądowisko helikoptera policyjnego na
+   dachu, parking radiowozów. Po zatrzymaniu przez policję gracz wychodzi przed wejście (POLICE_STATION.spawn).
+   --------------------------------------------------------------- */
+const POLICE_STATION = {
+  access: { x: L(7), z0: CITY_EDGE, z1: 308, hw: 4 },
+  front:  { x0: L(7) - 4, x1: 134, z: 304, hw: 4 },
+  main:   { x0: 52, x1: 100, z0: 312, z1: 338, h: 10.5 },
+  park:   { x0: 104, x1: 134, z0: 312, z1: 348 },
+  spawn:  { x: 76, z: 309.6, facing: Math.PI },
+  pad:    { x: 64, z: 325 }
+};
+function buildPoliceStation(){
+  const S = POLICE_STATION, y = 0.03, ac = S.access, fr = S.front, mn = S.main, pk = S.park;
+  for (let i = treeSpots.length - 1; i >= 0; i--){ const t = treeSpots[i]; if (t.z > CITY_EDGE && t.z < 362 && t.x > 30 && t.x < 146) treeSpots.splice(i, 1); }
+  const paint = (x0, z0, x1, z1, w, col) => {
+    const l = Math.hypot(x1 - x0, z1 - z0) || 1, nx = -(z1 - z0) / l * w / 2, nz = (x1 - x0) / l * w / 2, py = y + 0.016;
+    CB(col || 0xeeeeea).quad([x0 - nx, py, z0 - nz], [x0 + nx, py, z0 + nz], [x1 + nx, py, z1 + nz], [x1 - nx, py, z1 - nz], [0,0],[1,0],[1,1],[0,1]);
+  };
+  const flat = (x0, x1, z0, z1, yy) => crossBuf.plane((x0 + x1) / 2, yy, (z0 + z1) / 2, x1 - x0, z1 - z0, (x1 - x0) / 6, (z1 - z0) / 6);
+  /* drogi: dojazd z obwodnicy, droga przed wejściem, parking */
+  flat(ac.x - ac.hw, ac.x + ac.hw, ac.z0, ac.z1, y);
+  flat(fr.x0, fr.x1, fr.z - fr.hw, fr.z + fr.hw, y + 0.001);
+  flat(pk.x0, pk.x1, pk.z0, pk.z1, y + 0.0012);
+  for (let z = ac.z0 + 2; z < fr.z - fr.hw - 2; z += 6) paint(ac.x, z, ac.x, z + 3, 0.16);
+  for (let x = ac.x + ac.hw + 4; x < fr.x1 - 6; x += 6) paint(x, fr.z, x + 3, fr.z, 0.15);
+  for (let x = ac.x - ac.hw + 0.3; x < ac.x - 0.4; x += 1.2) paint(x, ac.z0 + 1, x + 0.6, ac.z0 + 1, 0.3);   // linia ustąpienia przy obwodnicy
+  for (let z = pk.z0 + 1; z <= pk.z1 - 1.5; z += 3){ paint(pk.x0 + 1, z, pk.x0 + 6.5, z, 0.1); paint(pk.x1 - 6.5, z, pk.x1 - 1, z, 0.1); }   // stanowiska
+  /* plac przed wejściem */
+  CB(0xbdb9b0).box((mn.x0 + mn.x1) / 2, 0.06, fr.z + fr.hw + 2, mn.x1 - mn.x0, 0.08, 4, 2, true);
+  /* budynek: jasne ściany, granatowy cokół i pas pod gzymsem, pasy okien, attyka */
+  const cx = (mn.x0 + mn.x1) / 2, cz = (mn.z0 + mn.z1) / 2, w = mn.x1 - mn.x0, d = mn.z1 - mn.z0;
+  CB(0xdfe3e9).box(cx, mn.h / 2, cz, w, mn.h, d, 2, true);
+  CB(0x1d3460).box(cx, 0.6, cz, w + 0.2, 1.2, d + 0.2, 2, true);
+  CB(0x1d3460).box(cx, mn.h - 0.6, cz, w + 0.16, 1.2, d + 0.16, 2, false);
+  for (const fy of [2.6, 6.2]){
+    CB(0x2a4766).box(cx, fy, mn.z0 - 0.05, w - 1.4, 1.5, 0.12, 1, true); CB(0x2a4766).box(cx, fy, mn.z1 + 0.05, w - 1.4, 1.5, 0.12, 1, true);
+    CB(0x2a4766).box(mn.x0 - 0.05, fy, cz, 0.12, 1.5, d - 1.4, 1, true); CB(0x2a4766).box(mn.x1 + 0.05, fy, cz, 0.12, 1.5, d - 1.4, 1, true);
+    for (let px = mn.x0 + 4; px < mn.x1 - 2; px += 4){ CB(0xdfe3e9).box(px, fy, mn.z0 - 0.1, 0.35, 1.52, 0.1, 1, true); CB(0xdfe3e9).box(px, fy, mn.z1 + 0.1, 0.35, 1.52, 0.1, 1, true); }
+  }
+  for (const [x0, x1, z0, z1] of [[mn.x0 - 0.2, mn.x1 + 0.2, mn.z0 - 0.2, mn.z0 + 0.3], [mn.x0 - 0.2, mn.x1 + 0.2, mn.z1 - 0.3, mn.z1 + 0.2], [mn.x0 - 0.2, mn.x0 + 0.3, mn.z0, mn.z1], [mn.x1 - 0.3, mn.x1 + 0.2, mn.z0, mn.z1]])
+    CB(0xc9ced6).box((x0 + x1) / 2, mn.h + 0.45, (z0 + z1) / 2, x1 - x0, 0.9, z1 - z0, 1, true);
+  staticBox(cx, mn.h / 2, cz, w, mn.h, d);
+  buildings.push({ x: cx, z: cz, w: w, d: d, top: mn.h });
+  /* wejście: drzwi, daszek na słupach, niebieskie lampy, napis POLICJA */
+  const ex = S.spawn.x;
+  CB(0x24323d).box(ex, 1.7, mn.z0 - 0.08, 6, 3.0, 0.16, 1, true);
+  CB(0x1d3460).box(ex, 3.8, mn.z0 - 1.8, 9, 0.3, 3.6, 2, true);
+  for (const sx of [-1, 1]){ CB(0xb9bec6).box(ex + sx * 4.2, 1.85, mn.z0 - 3.4, 0.25, 3.7, 0.25, 1, true); staticBox(ex + sx * 4.2, 1.85, mn.z0 - 3.4, 0.25, 3.7, 0.25); CB(0x3d8bff).box(ex + sx * 3.4, 3.3, mn.z0 - 0.25, 0.5, 0.7, 0.3, 1, true); }
+  wordSignQuad('POLICJA', '#1d3460', '#ffffff', [ex + 9, mn.h - 3.6, mn.z0 - 0.2], [ex - 9, mn.h - 3.6, mn.z0 - 0.2], [ex - 9, mn.h - 1.5, mn.z0 - 0.2], [ex + 9, mn.h - 1.5, mn.z0 - 0.2]);
+  /* lądowisko na dachu: ciemny kwadrat, białe obramowanie i „H” */
+  const hx = S.pad.x, hz = S.pad.z, ry = mn.h + 0.05;
+  CB(0x2d3138).box(hx, ry, hz, 15, 0.1, 15, 2, true);
+  CB(0xc9cbc8).box(cx, mn.h + 0.01, cz, w - 1, 0.02, d - 1, 1, true);
+  for (const [ox, oz, sw, sd] of [[0, 7.1, 14.6, 0.4], [0, -7.1, 14.6, 0.4], [7.1, 0, 0.4, 14.6], [-7.1, 0, 0.4, 14.6], [-2.2, 0, 0.8, 6.5], [2.2, 0, 0.8, 6.5], [0, 0, 3.6, 0.8]])
+    CB(0xf2f0ea).box(hx + ox, ry + 0.06, hz + oz, sw, 0.02, sd, 1, true);
+  CB(0xd8d4cc).box(mn.x1 - 9, mn.h + 1.5, cz, 7, 3.0, 6, 2, true); staticBox(mn.x1 - 9, mn.h + 1.5, cz, 7, 3.0, 6);   // maszynownia
+  HELIPADS.push({ x: hx, z: hz, y: mn.h, r: 7, kind: 'police' });
+  /* parking: radiowozy (biało-granatowe, z belką świetlną) z kolizją */
+  [[pk.x0 + 3.8, -Math.PI / 2], [pk.x1 - 3.8, Math.PI / 2]].forEach(([px, hd], ri) => { for (let z = pk.z0 + 2.5; z < pk.z1 - 1.5; z += 3){
+    if ((Math.round(z) + ri * 3) % 9 < 4) continue;
+    const type = ri ? 'pickup' : 'sedan', T = CAR_TYPES[type], cs = Math.cos(hd), sn = Math.sin(hd);
+    const COL = { paint: 0xf2f2ef, dark: 0x15171b, glass: 0x141d22, chrome: 0xb9bec6, lampF: 0xfff3d0, lampR: 0x5a1512 };
+    carParts(type).forEach(q => { const lx = q[4], lz = q[6]; CB(COL[q[3]]).boxRot(px + lx * cs + lz * sn, q[5], z - lx * sn + lz * cs, q[0], q[1], q[2], hd, 2, true); });
+    CB(0x1d3fa0).boxRot(px, ri ? 1.0 : 0.62, z, T.half[0] * 2 + 0.06, 0.22, T.half[2] * 1.6, hd, 1, true);                       // pas boczny
+    const top = carTopOf2(type); CB(0x2a3140).boxRot(px, top + 0.08, z, 1.3, 0.14, 0.4, hd, 1, true);                       // belka świetlna
+    CB(0xd62f2f).boxRot(px - 0.35 * cs, top + 0.17, z + 0.35 * sn, 0.5, 0.1, 0.3, hd, 1, true); CB(0x2a6cff).boxRot(px + 0.35 * cs, top + 0.17, z - 0.35 * sn, 0.5, 0.1, 0.3, hd, 1, true);
+    [[T.track, -T.wbF], [-T.track, -T.wbF], [T.track, -T.wbR], [-T.track, -T.wbR]].forEach(wv => CB(0x141518).boxRot(px + wv[0] * cs + wv[1] * sn, T.wheelR, z - wv[0] * sn + wv[1] * cs, 0.28, T.wheelR * 2, T.wheelR * 2, hd, 1, true));
+    staticBoxRot(px, top / 2, z, T.half[0] * 2, top, T.half[2] * 2, hd);
+  } });
+  /* latarnie, znak przy wyjeździe na obwodnicę, drogowskaz na obwodnicy */
+  for (let x = fr.x0 + 14; x < fr.x1 - 4; x += 16) lampSpots.push({ x: x, z: fr.z - fr.hw - 0.8, rot: 0, y: 0 });
+  placeSign(ac.x + ac.hw + 1.0, CITY_EDGE + 7, 0, [FACE.A7(), FACE.C4()], { base: 0 });
+  placeSign(ac.x - 26, 256, -Math.PI / 2, [signFace('drogowskaz', texHwySign(['POLICJA'], '+'), shapeRect(1.8, 1.1))], { base: WALK_H, bottom: 2.1, poleR: 0.05 });
+  for (let x = mn.x0 + 4; x < mn.x1; x += 10) treeSpots.push({ x: x, z: 352, y: 0, type: 0, scale: 1.1, rot: x });
+  /* minimapa: drogi, parking, niebieska tarcza na budynku */
+  mapExtras.push({ t: 'rect', x0: ac.x - ac.hw, x1: ac.x + ac.hw, z0: ac.z0, z1: ac.z1, c: '#2b2e35' });
+  mapExtras.push({ t: 'rect', x0: fr.x0, x1: fr.x1, z0: fr.z - fr.hw, z1: fr.z + fr.hw, c: '#2b2e35' });
+  mapExtras.push({ t: 'rect', x0: pk.x0, x1: pk.x1, z0: pk.z0, z1: pk.z1, c: '#33363d' });
+  mapExtras.push({ t: 'rect', x0: cx - 6, x1: cx + 6, z0: cz - 4, z1: cz + 4, c: '#2f5fd0' });
+  terrainLog.push({ kind: 'police', x: cx, z: cz, r: 0, h: 0 });
 }

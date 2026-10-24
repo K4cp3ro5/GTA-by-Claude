@@ -30,7 +30,8 @@ const el = {
 };
 /* przyczyny śmierci (damagePlayer(…, cause), killPlayer) — podtytuł ekranu śmierci */
 const DEATH_CAUSES = { upadek: 'Upadek z wysokości.', kraksa: 'Wypadek samochodowy.', wybuch: 'Wybuch — za blisko ognia.', rakieta: 'Trafienie rakietą.', katastrofa: 'Katastrofa lotnicza.',
-  'wyskok': 'Wyskok z pędzącego auta.', strzał: 'Postrzał.', kot: 'Skrzywdziłeś kota. Karma wraca natychmiast.' };
+  'wyskok': 'Wyskok z pędzącego auta.', strzał: 'Postrzał.', kot: 'Skrzywdziłeś kota. Karma wraca natychmiast.', policja: 'Zastrzelony przez policję.',
+  zatrzymanie: 'Policja cię zatrzymała. Gwiazdki skasowane — tym razem skończyło się na przesłuchaniu.' };
 /* krótki komunikat na środku ekranu */
 let _toastT = 0;
 function hudToast(text, secs){ el.toast.textContent = text; el.toast.classList.add('on'); _toastT = secs || 2.2; }
@@ -66,6 +67,7 @@ const mapStatic = mkCanvas(Math.ceil(MAP_W * MAP_SCALE), Math.ceil(MAP_H * MAP_S
   g.setLineDash([]);
   /* autostrady A1/A2, koniczyna, łącznice i zjazdy w pasie podmiejskim (highways.js) */
   mapExtras.forEach(e => {
+    if (e.hwy) return;                                                    // wiadukty — osobna warstwa (mapHwy)
     g.fillStyle = e.c; g.strokeStyle = e.c;
     if (e.t === 'rect') g.fillRect(wx(e.x0), wz(e.z0), (e.x1 - e.x0) * MAP_SCALE, (e.z1 - e.z0) * MAP_SCALE);
     else if (e.t === 'disc'){ g.beginPath(); g.arc(wx(e.x), wz(e.z), e.r * MAP_SCALE, 0, TAU); g.fill(); }
@@ -79,6 +81,34 @@ const mapStatic = mkCanvas(Math.ceil(MAP_W * MAP_SCALE), Math.ceil(MAP_H * MAP_S
   ISLANDS.forEach(r => g.strokeRect(wx(r.x0), wz(r.z0), (r.x1 - r.x0) * MAP_SCALE, (r.z1 - r.z0) * MAP_SCALE));
 })();
 
+/* warstwa wiaduktów (autostrady nad ulicami): rysowana na minimapie i mapie z przezroczystością wg poziomu gracza */
+const mapHwy = mkCanvas(mapStatic.width, mapStatic.height);
+(function drawHwyLayer(){
+  const g = mapHwy.getContext('2d'), wx = v => (v - MAP_X0) * MAP_SCALE, wz = v => (v - MAP_Z0) * MAP_SCALE;
+  mapExtras.forEach(e => {
+    if (!e.hwy) return;
+    g.strokeStyle = 'rgba(10,12,16,.9)'; g.lineWidth = (e.w + 1.2) * MAP_SCALE; g.lineCap = 'butt'; g.lineJoin = 'round';   // obrzeże (bariery)
+    g.beginPath(); e.pts.forEach((q, k) => k ? g.lineTo(wx(q[0]), wz(q[1])) : g.moveTo(wx(q[0]), wz(q[1]))); g.stroke();
+  });
+  mapExtras.forEach(e => {
+    if (!e.hwy) return;
+    g.strokeStyle = e.c; g.lineWidth = e.w * MAP_SCALE; g.lineCap = 'butt'; g.lineJoin = 'round';
+    g.beginPath(); e.pts.forEach((q, k) => k ? g.lineTo(wx(q[0]), wz(q[1])) : g.moveTo(wx(q[0]), wz(q[1]))); g.stroke();
+  });
+})();
+/* poziom gracza: ulica, wiadukt (≥ 2.5 m nad ulicą, na autostradzie) albo powietrze — minimapa i mapa pokazują warstwy wg niego */
+function playerLevel(){
+  if (mode === 'plane' || mode === 'heli') return 'air';
+  const t = policeTarget(), p = playerWorldPos();
+  return (t.gy || 0) > 2.5 && hwyQuery(p.x, p.z, 2).length ? 'hwy' : 'street';
+}
+const LEVEL_LBL = { street: 'POZIOM: ULICA', hwy: 'POZIOM: WIADUKT', air: 'W POWIETRZU' };
+function drawMapLayers(g, img, x, y, w, h, lvl){
+  g.drawImage(mapStatic, x, y, w, h);
+  if (lvl === 'hwy'){ g.fillStyle = 'rgba(8,10,14,.5)'; g.fillRect(x, y, w, h); }      // na wiadukcie ulice przygaszone
+  g.globalAlpha = lvl === 'hwy' ? 1 : lvl === 'air' ? 0.85 : 0.32;                     // na ulicy wiadukty półprzezroczyste
+  g.drawImage(mapHwy, x, y, w, h); g.globalAlpha = 1;
+}
 const mm = document.getElementById('minimap');
 const mg = mm.getContext('2d');
 const MM = mm.width;
@@ -88,26 +118,31 @@ function drawMinimap(){
   const wp0 = playerWorldPos(), px = wp0.x, pz = wp0.z;
   const cx = (px - MAP_X0) * MAP_SCALE;
   const cz = (pz - MAP_Z0) * MAP_SCALE;
-  /* przybliżenie minimapy wg trybu (pieszo bliżej, autem / łodzią dalej, samolotem najdalej) — płynnie */
-  const zt = mode === 'plane' ? 0.28 : (mode === 'car' || mode === 'boat') ? 0.5 : 0.62;
+  /* przybliżenie minimapy wg środka transportu (płynnie): pieszo i rowerem najbliżej, autem i łodzią średnio, samolotem i helikopterem najdalej */
+  const bike = mode === 'car' && CAR_TYPES[carType].bike;
+  const zt = (mode === 'plane' || mode === 'heli') ? 0.22 : ((mode === 'car' && !bike) || mode === 'boat') ? 0.5 : 0.88;
   mmZoom += (zt - mmZoom) * 0.08;
   const zs = MAP_SCALE * mmZoom;
 
   mg.clearRect(0, 0, MM, MM);
   mg.fillStyle = '#16384b';
   mg.fillRect(0, 0, MM, MM);
-  mg.save(); mg.translate(MM / 2, MM / 2); mg.scale(mmZoom, mmZoom); mg.drawImage(mapStatic, -cx, -cz); mg.restore();
+  const lvl = playerLevel();
+  mg.save(); mg.translate(MM / 2, MM / 2); mg.scale(mmZoom, mmZoom); drawMapLayers(mg, null, -cx, -cz, mapStatic.width, mapStatic.height, lvl); mg.restore();
 
   const toMap = (wx, wz) => [ MM/2 + (wx - px) * zs, MM/2 + (wz - pz) * zs ];
   navDrawMinimap(mg, toMap, MM);                       // trasa do celu (navigation.js)
 
   /* NPC (piraci drogowi większym kwasowo zielonym punktem, jak lakier) */
+  const plY = lvl === 'hwy' ? (policeTarget().gy || 0) : 0;
   for (let i = 0; i < npcs.length; i++){
     const p = toMap(npcs[i].pos.x, npcs[i].pos.y), pir = npcs[i].profile === 'pirat';
-    if (p[0] < -6 || p[0] > MM+6 || p[1] < -6 || p[1] > MM+6) continue;
+    if (p[0] < -6 || p[0] > MM+6 || p[1] < -6 || p[1] > MM+6 || npcs[i].cop) continue;
+    mg.globalAlpha = lvl !== 'air' && Math.abs((npcs[i].y || 0) - plY) > 2.5 ? 0.3 : 1;      // auto na innym poziomie — przygaszone
     mg.fillStyle = pir ? '#7cff2e' : '#7f8794';
     if (pir) mg.fillRect(p[0]-2.5, p[1]-2.5, 5, 5); else mg.fillRect(p[0]-2, p[1]-2, 4, 4);
   }
+  mg.globalAlpha = 1;
 
   /* zaparkowane skradzione (i porzucone prowadzalne skradzione) — małe fioletowe kwadraty */
   mg.fillStyle = '#b07ad8';
@@ -140,6 +175,15 @@ function drawMinimap(){
   for (const c of CATS){ if (c.dead) continue; const q = toMap(c.x, c.z); if (q[0] < -4 || q[0] > MM + 4 || q[1] < -4 || q[1] > MM + 4) continue; mg.fillStyle = c.fedT > clock ? '#ff7aa2' : '#ff9d2e'; mg.beginPath(); mg.arc(q[0], q[1], 2.2, 0, TAU); mg.fill(); }
   /* samoloty NPC (ruch lotniczy) — małe sylwetki */
   for (const a of airPlanes){ const q = toMap(a.pos.x, a.pos.z); if (q[0] < -8 || q[0] > MM + 8 || q[1] < -8 || q[1] > MM + 8) continue; mg.save(); mg.translate(q[0], q[1]); mg.rotate(-a.heading + Math.PI); mg.fillStyle = '#cfe3ee'; mg.fillRect(-0.9, -4.5, 1.8, 9); mg.fillRect(-4.5, -1, 9, 2); mg.fillRect(-2, 3, 4, 1.4); mg.restore(); }
+  /* helikoptery (cywilne) i policja: radiowozy, policjanci, helikopter — stożki widzenia, migające znaczniki (police.js) */
+  for (const h of helis){ if (h.gone || h.ai || h === curHeli) continue; const q = toMap(h.pos.x, h.pos.z); if (q[0] < -8 || q[0] > MM + 8 || q[1] < -8 || q[1] > MM + 8) continue; mg.strokeStyle = '#f2f0ea'; mg.lineWidth = 1; mg.beginPath(); mg.arc(q[0], q[1], 4.5, 0, TAU); mg.stroke(); mg.fillStyle = '#f2f0ea'; mg.fillRect(q[0] - 1, q[1] - 3, 2, 6); }
+  policeDrawMap(mg, toMap, zs, false, lvl === 'air' ? null : plY);
+  if (mode === 'heli' && curHeli){
+    mg.save(); mg.translate(MM / 2, MM / 2); mg.rotate(-curHeli.yaw + Math.PI);
+    mg.strokeStyle = '#f2f0ea'; mg.lineWidth = 1.5; mg.beginPath(); mg.arc(0, 0, 7.5, 0, TAU); mg.stroke();
+    mg.fillStyle = '#f2f0ea'; mg.beginPath(); mg.moveTo(0, -6); mg.lineTo(2.6, 0); mg.lineTo(1, 2); mg.lineTo(1, 8); mg.lineTo(-1, 8); mg.lineTo(-1, 2); mg.lineTo(-2.6, 0); mg.closePath(); mg.fill();
+    mg.restore();
+  }
   /* samolot gracza */
   if (mode === 'plane' && curPlane){
     _cpF.set(0, 0, 1).applyQuaternion(curPlane.quat);
@@ -175,6 +219,15 @@ function drawMinimap(){
 
   mg.strokeStyle = 'rgba(200,198,191,.14)';
   mg.strokeRect(0.5, 0.5, MM-1, MM-1);
+  /* plakietka poziomu */
+  mg.font = '600 8px Inter, system-ui, sans-serif'; mg.textAlign = 'left'; mg.textBaseline = 'top';
+  const lt = LEVEL_LBL[lvl], lw = mg.measureText(lt).width + 8;
+  mg.fillStyle = lvl === 'hwy' ? 'rgba(90,98,116,.9)' : 'rgba(10,12,16,.7)'; mg.fillRect(4, 4, lw, 12); mg.fillStyle = '#e9e7e1'; mg.fillText(lt, 8, 6.5);
+  /* poszukiwanie: widzą cię — ramka miga czerwono-niebiesko; nie widzą — mapa wyszarzona */
+  if (WANTED.stars > 0){
+    if (WANTED.seen){ mg.lineWidth = 4; mg.strokeStyle = Math.floor(clock * 4) % 2 ? 'rgba(255,48,48,.9)' : 'rgba(58,108,255,.9)'; mg.strokeRect(2, 2, MM - 4, MM - 4); }
+    else { mg.save(); mg.globalCompositeOperation = 'saturation'; mg.fillStyle = '#808080'; mg.fillRect(0, 0, MM, MM); mg.restore(); mg.fillStyle = 'rgba(40,40,44,.25)'; mg.fillRect(0, 0, MM, MM); }
+  }
 }
 
 const PHASES = [
@@ -257,8 +310,14 @@ let hudAcc = 0, fpsAcc = 0, fpsCount = 0;
 function updateHud(dt, kmh){
   hudAcc += dt; fpsAcc += dt; fpsCount++;
 
-  el.speedo.classList.toggle('on', mode === 'car' || mode === 'plane' || mode === 'boat' || mode === 'ride');
-  if (mode === 'plane' && curPlane){
+  el.speedo.classList.toggle('on', mode === 'car' || mode === 'plane' || mode === 'boat' || mode === 'ride' || mode === 'heli');
+  if (mode === 'heli' && curHeli){
+    const h = curHeli, lbl = 'Helikopter · ' + h.L.name;
+    if (el.carlblTxt.textContent !== lbl){ el.carlblTxt.textContent = lbl; el.carlbl.classList.remove('stolen'); }
+    drawSpeedo(kmh, HELI_T.gauge, h.rpm);
+    el.gval.textContent = (h.onGround ? 'NA ZIEMI' : 'WYS ' + Math.max(0, Math.round(h.agl)) + ' m') + (h.vel.y > 0.5 ? ' ▲' : h.vel.y < -0.5 ? ' ▼' : '');
+    el.ghand.textContent = 'WIRNIK'; el.ghand.className = '';
+  } else if (mode === 'plane' && curPlane){
     const p = curPlane, lbl = 'Samolot · ' + p.T.name;
     if (el.carlblTxt.textContent !== lbl){ el.carlblTxt.textContent = lbl; el.carlbl.classList.remove('stolen'); }
     drawSpeedo(kmh, p.T.gauge, p.thr);
@@ -295,6 +354,7 @@ function updateHud(dt, kmh){
   Weapons.updateHud();
   el.hurtFlash.style.opacity = (player.hurtFlash * 0.7).toFixed(2);
   el.deadScreen.classList.toggle('on', player.dead);
+  el.deadScreen.classList.toggle('busted', !!player.busted);
   if (player.dead) player.mesh.visible = false;                                    // martwy gracz znika (ekran gaśnie do czerni)
   if (player.dead){
     const t = player.deathMsg || 'NIE ŻYJESZ', why = DEATH_CAUSES[player.deathCause] || 'Tym razem się nie udało.';
@@ -302,13 +362,13 @@ function updateHud(dt, kmh){
     if (dsT.textContent !== t) dsT.textContent = t;
     if (dsC.textContent !== why) dsC.textContent = why;
     const left = Math.max(0, ((player.respawnAt || 0) - performance.now()) / 1000);
-    document.getElementById('dsTimer').textContent = 'Odrodzenie w szpitalu za ' + Math.ceil(left) + ' s';
+    document.getElementById('dsTimer').textContent = (player.busted ? 'Zwolnienie z komisariatu za ' : 'Odrodzenie w szpitalu za ') + Math.ceil(left) + ' s';
     document.getElementById('dsBar').style.width = Math.round(100 - left / (RESPAWN_MS / 1000) * 100) + '%';
   }
 
   if (hudAcc > 0.12){
     hudAcc = 0;
-    el.modetxt.textContent = mode === 'car' ? 'W pojeździe' : mode === 'plane' ? 'W powietrzu' : mode === 'boat' ? 'Na wodzie' : mode === 'ride' ? 'Przejażdżka' : 'Pieszo';
+    el.modetxt.textContent = mode === 'car' ? 'W pojeździe' : mode === 'plane' || mode === 'heli' ? 'W powietrzu' : player.hiding ? 'W ukryciu' : mode === 'boat' ? 'Na wodzie' : mode === 'ride' ? 'Przejażdżka' : 'Pieszo';
     const hours = timeOfDay * 24;
     const hh = Math.floor(hours), mmn = Math.floor((hours - hh) * 60);
     el.clock.textContent = (hh < 10 ? '0' : '') + hh + ':' + (mmn < 10 ? '0' : '') + mmn;
@@ -324,14 +384,25 @@ function updateHud(dt, kmh){
     if (debugOpen) refreshDebugInfo();
   }
 
-  let nv = null;
-  if (mode === 'foot') nv = nearestVehicle();
-  const near = !!nv && nv.dist < 3.5;
-  promptEl.classList.toggle('on', near || mode === 'car' || mode === 'boat' || (mode === 'ride' && curRide && curRide.canExit) || (mode === 'plane' && curPlane && ((curPlane.onGround && curPlane.v < 3) || (!curPlane.onGround && curPlane.agl > 15))));
-  const want = mode === 'ride' ? 'outRide' : mode === 'car' ? 'out' : mode === 'boat' ? 'outBoat' : mode === 'plane' ? (curPlane && !curPlane.onGround ? 'bail' : 'outPlane') : (near ? (nv.kind === 'npc' ? 'jack' : nv.kind === 'plane' ? 'plane' : nv.kind === 'boat' ? 'boat' : nv.kind === 'ride' ? (nv.ride.ready() ? 'ride:' : 'rideWait:') + nv.ride.name : 'in') : lastPrompt);
+  let nv = null, bin = null, lift = null;
+  if (mode === 'foot' && !player.hiding){ nv = nearestVehicle(); bin = hideBinNear(1.9); lift = liftNear(); }
+  const near = !!nv && nv.dist < 3.5, pb = player.body.position;
+  const binOn = !!bin && Math.hypot(bin.x - pb.x, bin.z - pb.z) < (nv ? nv.dist : Infinity), liftOn = !!lift && (!nv || nv.dist > 1.5);
+  const heliOut = mode === 'heli' && curHeli && ((curHeli.onGround && Math.hypot(curHeli.vel.x, curHeli.vel.z) < 2) || (!curHeli.onGround && curHeli.agl > 12));
+  promptEl.classList.toggle('on', near || binOn || liftOn || !!player.hiding || !!player.canChute || heliOut || mode === 'car' || mode === 'boat' || (mode === 'ride' && curRide && curRide.canExit) || (mode === 'plane' && curPlane && ((curPlane.onGround && curPlane.v < 3) || (!curPlane.onGround && curPlane.agl > 15))));
+  const want = player.hiding ? 'unhide' : player.canChute ? 'chute' : mode === 'heli' ? (curHeli && !curHeli.onGround ? 'bailHeli' : 'outHeli') : liftOn ? (lift.up ? 'liftUp' : 'liftDown') : binOn ? 'hide'
+             : mode === 'ride' ? 'outRide' : mode === 'car' ? 'out' : mode === 'boat' ? 'outBoat' : mode === 'plane' ? (curPlane && !curPlane.onGround ? 'bail' : 'outPlane') : (near ? (nv.kind === 'npc' ? 'jack' : nv.kind === 'heli' ? 'heli' : nv.kind === 'plane' ? 'plane' : nv.kind === 'boat' ? 'boat' : nv.kind === 'ride' ? (nv.ride.ready() ? 'ride:' : 'rideWait:') + nv.ride.name : 'in') : lastPrompt);
   if (want !== lastPrompt){
     lastPrompt = want;
-    promptEl.innerHTML = want === 'out' || want === 'outRide' ? 'Naciśnij <kbd>F</kbd>, aby wysiąść'
+    promptEl.innerHTML = want === 'unhide' ? 'Naciśnij <kbd>F</kbd>, aby wyjść z kontenera'
+                        : want === 'hide' ? 'Naciśnij <kbd>F</kbd>, aby schować się w kontenerze'
+                        : want === 'chute' ? 'Naciśnij <kbd>Spacja</kbd>, aby otworzyć spadochron'
+                        : want === 'liftUp' ? 'Naciśnij <kbd>F</kbd> — winda na dach (lądowisko)'
+                        : want === 'liftDown' ? 'Naciśnij <kbd>F</kbd> — winda na dół'
+                        : want === 'outHeli' ? 'Naciśnij <kbd>F</kbd>, aby wysiąść z helikoptera'
+                        : want === 'bailHeli' ? 'Naciśnij <kbd>F</kbd>, aby wyskoczyć ze spadochronem'
+                        : want === 'heli' ? 'Naciśnij <kbd>F</kbd> lub <kbd>E</kbd>, aby wsiąść do helikoptera'
+                        : want === 'out' || want === 'outRide' ? 'Naciśnij <kbd>F</kbd>, aby wysiąść'
                         : want === 'outPlane' ? 'Naciśnij <kbd>F</kbd>, aby wysiąść z samolotu'
                         : want === 'bail' ? 'Naciśnij <kbd>F</kbd>, aby wyskoczyć ze spadochronem'
                         : want === 'outBoat' ? 'Naciśnij <kbd>F</kbd> przy brzegu, aby wysiąść'
